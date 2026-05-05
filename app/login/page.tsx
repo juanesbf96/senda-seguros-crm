@@ -10,6 +10,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -25,6 +26,13 @@ export default function LoginPage() {
       setLoading(false)
       return
     }
+
+    if (rememberMe) {
+      localStorage.removeItem('noRemember')
+    } else {
+      localStorage.setItem('noRemember', '1')
+    }
+    sessionStorage.setItem('session_started', '1')
 
     router.push('/')
     router.refresh()
@@ -86,6 +94,16 @@ export default function LoginPage() {
               </button>
             </div>
           </div>
+
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={e => setRememberMe(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-400 cursor-pointer"
+            />
+            <span className="text-sm text-slate-600">Mantener sesión iniciada</span>
+          </label>
 
           {error && (
             <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">

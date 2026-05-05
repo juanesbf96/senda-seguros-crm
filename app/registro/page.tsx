@@ -1,18 +1,17 @@
 'use client'
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { Shield, Eye, EyeOff } from 'lucide-react'
+import { Shield, Eye, EyeOff, MailCheck } from 'lucide-react'
 import Link from 'next/link'
 
 export default function RegistroPage() {
-  const router = useRouter()
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [verificationSent, setVerificationSent] = useState(false)
 
   async function handleRegistro(e: React.FormEvent) {
     e.preventDefault()
@@ -23,7 +22,7 @@ export default function RegistroPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: { data: { nombre } },
@@ -37,8 +36,41 @@ export default function RegistroPage() {
       return
     }
 
-    router.push('/')
-    router.refresh()
+    // Si no hay sesión inmediata, Supabase requiere confirmación por correo
+    if (!data.session) {
+      setVerificationSent(true)
+      return
+    }
+
+    sessionStorage.setItem('session_started', '1')
+    window.location.href = '/'
+  }
+
+  if (verificationSent) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-sm p-8 text-center">
+          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <MailCheck className="w-8 h-8 text-emerald-600" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mb-2">Revisa tu correo</h1>
+          <p className="text-sm text-slate-500 mb-2">
+            Te enviamos un enlace de verificación a
+          </p>
+          <p className="text-sm font-medium text-slate-800 mb-6">{email}</p>
+          <p className="text-xs text-slate-400 mb-6">
+            Haz clic en el enlace del correo para activar tu cuenta y acceder al CRM.
+            Revisa también tu carpeta de spam.
+          </p>
+          <Link
+            href="/login"
+            className="inline-block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            Ir al inicio de sesión
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
