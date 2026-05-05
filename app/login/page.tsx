@@ -33,9 +33,7 @@ export default function LoginPage() {
       localStorage.setItem('noRemember', '1')
     }
     sessionStorage.setItem('session_started', '1')
-
-    router.push('/')
-    router.refresh()
+    window.location.href = '/'
   }
 
   return (
