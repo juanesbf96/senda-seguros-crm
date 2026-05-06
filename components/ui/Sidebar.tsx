@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, FileText, Kanban,
   Bell, Shield, ChevronLeft, ChevronRight,
-  User, LogOut, ClipboardList,
+  User, LogOut, ClipboardList, CheckSquare, Send,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -17,7 +17,9 @@ const navItems = [
   { href: '/clientes', label: 'Clientes', icon: Users },
   { href: '/polizas', label: 'Pólizas', icon: FileText },
   { href: '/solicitudes', label: 'Solicitudes', icon: ClipboardList },
+  { href: '/remisiones', label: 'Remisiones', icon: Send },
   { href: '/renovaciones', label: 'Renovaciones', icon: Bell },
+  { href: '/tareas', label: 'Tareas', icon: CheckSquare },
 ]
 
 export default function Sidebar() {

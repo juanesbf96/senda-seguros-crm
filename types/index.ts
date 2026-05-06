@@ -64,6 +64,49 @@ export interface Contacto {
   cliente?: Pick<Cliente, 'id' | 'nombre'>
 }
 
+export type PrioridadTarea = 'normal' | 'alta' | 'urgente'
+
+export interface Tarea {
+  id: string
+  client_id: string | null
+  titulo: string
+  descripcion: string | null
+  fecha_vencimiento: string | null
+  completada: boolean
+  prioridad: PrioridadTarea
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+}
+
+export type EstadoGestion = 'pendiente' | 'contactado' | 'en_negociacion' | 'renovado' | 'no_renueva'
+
+export interface GestionRenovacion {
+  id: string
+  poliza_id: string
+  estado: EstadoGestion
+  notas: string | null
+  fecha: string
+}
+
+export type EstadoRemision = 'borrador' | 'enviada' | 'recibida' | 'aprobada' | 'rechazada'
+
+export interface Remision {
+  id: string
+  client_id: string | null
+  poliza_id: string | null
+  aseguradora: string
+  ramo: string
+  descripcion: string | null
+  estado: EstadoRemision
+  fecha: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+}
+
 export interface Solicitud {
   id: string
   client_id: string | null
