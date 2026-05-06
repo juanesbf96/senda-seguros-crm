@@ -14,7 +14,7 @@ const RAMOS = [
 ]
 const ESTADO_LABELS: Record<EstadoRemision, string> = {
   borrador: 'Borrador', enviada: 'Enviada', recibida: 'Recibida',
-  aprobada: 'Aprobada', rechazada: 'Rechazada',
+  aprobada: 'Aprobada', rechazada: 'Rechazada', anulada: 'Anulada',
 }
 
 interface Props {

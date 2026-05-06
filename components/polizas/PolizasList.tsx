@@ -1,11 +1,16 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Poliza, EstadoPoliza } from '@/types'
+import { Poliza, EstadoPoliza, PolizaAnexo, PolizaVinculado } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
-import { Search, AlertTriangle, Plus, Pencil, Trash2, FileText, ShieldCheck } from 'lucide-react'
+import {
+  Search, AlertTriangle, Plus, Pencil, Trash2,
+  FileText, ShieldCheck, Paperclip, Users, Archive, RefreshCw,
+} from 'lucide-react'
 import Link from 'next/link'
 import PolizaModal from './PolizaModal'
+import PolizaAnexoModal from './PolizaAnexoModal'
+import PolizaVinculadoModal from './PolizaVinculadoModal'
 
 const ESTADO_COLORS: Record<EstadoPoliza, string> = {
   activa:    'bg-emerald-100 text-emerald-700',
@@ -14,65 +19,145 @@ const ESTADO_COLORS: Record<EstadoPoliza, string> = {
   pendiente: 'bg-amber-100 text-amber-700',
 }
 const ESTADO_LABELS: Record<EstadoPoliza, string> = {
-  activa: 'Activa', vencida: 'Vencida', cancelada: 'Cancelada', pendiente: 'Pendiente'
+  activa: 'Activa', vencida: 'Vencida', cancelada: 'Cancelada', pendiente: 'Pendiente',
 }
 
-type PolizaConCliente = Poliza & { cliente: { id: string; nombre: string } | null }
-type Tab = 'seguros' | 'cumplimiento'
-
 const RAMOS_CUMPLIMIENTO = ['Fianzas', 'Cumplimiento']
+type Tab = 'polizas' | 'anexos' | 'vinculados' | 'eliminadas' | 'cumplimiento'
+type PolizaConCliente = Poliza & { cliente: { id: string; nombre: string } | null }
 
 export default function PolizasList() {
-  const [polizas, setPolizas] = useState<PolizaConCliente[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [polizas, setPolizas]       = useState<PolizaConCliente[]>([])
+  const [eliminadas, setEliminadas] = useState<PolizaConCliente[]>([])
+  const [anexos, setAnexos]         = useState<PolizaAnexo[]>([])
+  const [vinculados, setVinculados] = useState<PolizaVinculado[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]         = useState('')
   const [filterEstado, setFilterEstado] = useState<EstadoPoliza | 'all'>('all')
-  const [filterRamo, setFilterRamo] = useState('all')
-  const [activeTab, setActiveTab] = useState<Tab>('seguros')
-  const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState<PolizaConCliente | undefined>()
+  const [activeTab, setActiveTab]   = useState<Tab>('polizas')
 
-  async function load() {
+  // Modals
+  const [showPolizaModal, setShowPolizaModal]           = useState(false)
+  const [editingPoliza, setEditingPoliza]               = useState<PolizaConCliente | undefined>()
+  const [showAnexoModal, setShowAnexoModal]             = useState(false)
+  const [editingAnexo, setEditingAnexo]                 = useState<PolizaAnexo | undefined>()
+  const [showVinculadoModal, setShowVinculadoModal]     = useState(false)
+  const [editingVinculado, setEditingVinculado]         = useState<PolizaVinculado | undefined>()
+
+  async function loadPolizas() {
     const { data } = await supabase
       .from('polizas')
       .select('*, cliente:clientes(id, nombre)')
       .eq('eliminada', false)
       .order('fecha_fin', { ascending: true, nullsFirst: false })
     setPolizas((data as PolizaConCliente[]) || [])
+  }
+
+  async function loadEliminadas() {
+    const { data } = await supabase
+      .from('polizas')
+      .select('*, cliente:clientes(id, nombre)')
+      .eq('eliminada', true)
+      .order('created_at', { ascending: false })
+    setEliminadas((data as PolizaConCliente[]) || [])
+  }
+
+  async function loadAnexos() {
+    const { data } = await supabase
+      .from('poliza_anexos')
+      .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo), cliente:clientes(id, nombre)')
+      .order('created_at', { ascending: false })
+    setAnexos((data || []) as PolizaAnexo[])
+  }
+
+  async function loadVinculados() {
+    const { data } = await supabase
+      .from('poliza_vinculados')
+      .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .order('created_at', { ascending: false })
+    setVinculados((data || []) as PolizaVinculado[])
+  }
+
+  async function load() {
+    setLoading(true)
+    await Promise.all([loadPolizas(), loadEliminadas(), loadAnexos(), loadVinculados()])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
   async function softDelete(id: string) {
-    if (!confirm('¿Eliminar esta póliza? Podrá recuperarla desde la base de datos.')) return
-    await supabase.from('polizas').update({ eliminada: true, fecha_eliminacion: new Date().toISOString() }).eq('id', id)
+    if (!confirm('¿Mover esta póliza a Eliminadas?')) return
+    await supabase.from('polizas').update({ eliminada: true }).eq('id', id)
     setPolizas(prev => prev.filter(p => p.id !== id))
+    await loadEliminadas()
   }
 
-  // Split by tab
-  const byCumplimiento = (p: PolizaConCliente) => RAMOS_CUMPLIMIENTO.includes(p.ramo)
-  const tabPolizas = polizas.filter(p => activeTab === 'cumplimiento' ? byCumplimiento(p) : !byCumplimiento(p))
+  async function restorePoliza(id: string) {
+    await supabase.from('polizas').update({ eliminada: false }).eq('id', id)
+    setEliminadas(prev => prev.filter(p => p.id !== id))
+    await loadPolizas()
+  }
 
-  // Unique ramos for the active tab
-  const ramosDisponibles = [...new Set(tabPolizas.map(p => p.ramo))].sort()
+  async function deleteAnexo(id: string) {
+    if (!confirm('¿Eliminar este anexo?')) return
+    await supabase.from('poliza_anexos').delete().eq('id', id)
+    setAnexos(prev => prev.filter(a => a.id !== id))
+  }
 
-  const filtered = tabPolizas.filter(p => {
-    const nombre = p.cliente?.nombre?.toLowerCase() || ''
-    const matchSearch = !search ||
-      nombre.includes(search.toLowerCase()) ||
-      p.aseguradora.toLowerCase().includes(search.toLowerCase()) ||
-      p.ramo.toLowerCase().includes(search.toLowerCase()) ||
-      p.numero_poliza?.includes(search) ||
-      p.riesgo?.toLowerCase().includes(search.toLowerCase())
-    const matchEstado = filterEstado === 'all' || p.estado === filterEstado
-    const matchRamo = filterRamo === 'all' || p.ramo === filterRamo
-    return matchSearch && matchEstado && matchRamo
-  })
+  async function deleteVinculado(id: string) {
+    if (!confirm('¿Eliminar este vinculado?')) return
+    await supabase.from('poliza_vinculados').delete().eq('id', id)
+    setVinculados(prev => prev.filter(v => v.id !== id))
+  }
 
-  const primaTotal = filtered.filter(p => p.estado === 'activa').reduce((s, p) => s + (p.prima || 0), 0)
-  const cntSeguros = polizas.filter(p => !byCumplimiento(p)).length
-  const cntCumplimiento = polizas.filter(byCumplimiento).length
+  // Splits
+  const polizasNormales    = polizas.filter(p => !RAMOS_CUMPLIMIENTO.includes(p.ramo))
+  const polizasCumplimiento = polizas.filter(p => RAMOS_CUMPLIMIENTO.includes(p.ramo))
+
+  const q = search.toLowerCase()
+
+  function filterPolizas(list: PolizaConCliente[]) {
+    return list.filter(p => {
+      const matchSearch = !search ||
+        p.cliente?.nombre?.toLowerCase().includes(q) ||
+        p.aseguradora.toLowerCase().includes(q) ||
+        p.ramo.toLowerCase().includes(q) ||
+        p.numero_poliza?.includes(search) ||
+        p.riesgo?.toLowerCase().includes(q)
+      const matchEstado = filterEstado === 'all' || p.estado === filterEstado
+      return matchSearch && matchEstado
+    })
+  }
+
+  const filteredPolizas    = filterPolizas(polizasNormales)
+  const filteredCumplimiento = filterPolizas(polizasCumplimiento)
+  const filteredEliminadas = eliminadas.filter(p =>
+    !search ||
+    p.cliente?.nombre?.toLowerCase().includes(q) ||
+    p.aseguradora.toLowerCase().includes(q) ||
+    p.numero_poliza?.includes(search)
+  )
+  const filteredAnexos = anexos.filter(a =>
+    !search ||
+    a.cliente?.nombre?.toLowerCase().includes(q) ||
+    a.poliza?.numero_poliza?.includes(search) ||
+    a.numero_anexo?.toLowerCase().includes(q)
+  )
+  const filteredVinculados = vinculados.filter(v =>
+    !search ||
+    v.poliza?.numero_poliza?.includes(search) ||
+    v.numero_anexo_pago?.toLowerCase().includes(q) ||
+    v.beneficiario?.toLowerCase().includes(q)
+  )
+
+  const TABS: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
+    { key: 'polizas',     label: 'Pólizas',      icon: FileText,    count: polizasNormales.length      },
+    { key: 'anexos',      label: 'Anexos',        icon: Paperclip,   count: anexos.length               },
+    { key: 'vinculados',  label: 'Vinculados',    icon: Users,       count: vinculados.length           },
+    { key: 'eliminadas',  label: 'Eliminadas',    icon: Archive,     count: eliminadas.length           },
+    { key: 'cumplimiento',label: 'Cumplimiento',  icon: ShieldCheck, count: polizasCumplimiento.length  },
+  ]
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
@@ -87,34 +172,43 @@ export default function PolizasList() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Pólizas</h1>
           <p className="text-slate-500 text-sm mt-1">
-            {filtered.filter(p => p.estado === 'activa').length} activas · Prima: {formatCOP(primaTotal)}
+            {polizasNormales.filter(p => p.estado === 'activa').length} activas ·{' '}
+            Prima: {formatCOP(polizasNormales.filter(p => p.estado === 'activa').reduce((s, p) => s + (p.prima || 0), 0))}
           </p>
         </div>
-        <button
-          onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nueva póliza
-        </button>
+        <div className="flex gap-2">
+          {activeTab === 'polizas' || activeTab === 'cumplimiento' ? (
+            <button
+              onClick={() => { setEditingPoliza(undefined); setShowPolizaModal(true) }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Nueva póliza
+            </button>
+          ) : activeTab === 'anexos' ? (
+            <button
+              onClick={() => { setEditingAnexo(undefined); setShowAnexoModal(true) }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Nuevo anexo
+            </button>
+          ) : activeTab === 'vinculados' ? (
+            <button
+              onClick={() => { setEditingVinculado(undefined); setShowVinculadoModal(true) }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Nuevo vinculado
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {([
-          { key: 'seguros', label: 'Seguros', count: cntSeguros, icon: FileText },
-          { key: 'cumplimiento', label: 'Cumplimiento', count: cntCumplimiento, icon: ShieldCheck },
-        ] as { key: Tab; label: string; count: number; icon: React.ElementType }[]).map(({ key, label, count, icon: Icon }) => (
-          <button
-            key={key}
-            onClick={() => { setActiveTab(key); setFilterRamo('all') }}
+      <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+        {TABS.map(({ key, label, icon: Icon, count }) => (
+          <button key={key} onClick={() => { setActiveTab(key); setSearch('') }}
             className={[
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',
               activeTab === key
                 ? 'border-emerald-600 text-emerald-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700',
-            ].join(' ')}
-          >
+            ].join(' ')}>
             <Icon className="w-4 h-4" />
             {label}
             <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
@@ -128,136 +222,361 @@ export default function PolizasList() {
       <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={activeTab === 'cumplimiento' ? 'Buscar por cliente, aseguradora, riesgo...' : 'Buscar por cliente, aseguradora, ramo...'}
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
-          />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar..."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
         </div>
-        <select
-          value={filterRamo}
-          onChange={e => setFilterRamo(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
-        >
-          <option value="all">Todos los ramos</option>
-          {ramosDisponibles.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-        <select
-          value={filterEstado}
-          onChange={e => setFilterEstado(e.target.value as EstadoPoliza | 'all')}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
-        >
-          <option value="all">Todos los estados</option>
-          <option value="activa">Activa</option>
-          <option value="pendiente">Pendiente</option>
-          <option value="vencida">Vencida</option>
-          <option value="cancelada">Cancelada</option>
-        </select>
+        {(activeTab === 'polizas' || activeTab === 'cumplimiento') && (
+          <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as EstadoPoliza | 'all')}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            <option value="all">Todos los estados</option>
+            {(Object.entries(ESTADO_LABELS) as [EstadoPoliza, string][]).map(([k, v]) => (
+              <option key={k} value={k}>{v}</option>
+            ))}
+          </select>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-left text-xs text-slate-500">
-              <th className="px-4 py-3 font-medium">Cliente</th>
-              <th className="px-4 py-3 font-medium">
-                {activeTab === 'cumplimiento' ? 'Aseg. / Tipo' : 'Aseg. / Ramo'}
-              </th>
-              {activeTab === 'cumplimiento' && (
-                <th className="px-4 py-3 font-medium hidden md:table-cell">Riesgo / Objeto</th>
-              )}
-              <th className="px-4 py-3 font-medium hidden md:table-cell">N° Póliza</th>
-              <th className="px-4 py-3 font-medium hidden lg:table-cell">Prima</th>
-              <th className="px-4 py-3 font-medium">Vencimiento</th>
-              <th className="px-4 py-3 font-medium">Estado</th>
-              <th className="px-4 py-3 font-medium text-right">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => {
-              const days = p.fecha_fin ? daysUntil(p.fecha_fin) : null
-              const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
-              const warn = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
-              return (
-                <tr key={p.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${urgent ? 'bg-amber-50/40' : ''}`}>
+      {/* ── Tab: Pólizas ── */}
+      {activeTab === 'polizas' && (
+        <PolizasTable
+          polizas={filteredPolizas}
+          onEdit={p => { setEditingPoliza(p); setShowPolizaModal(true) }}
+          onDelete={softDelete}
+          showRiesgo={false}
+        />
+      )}
+
+      {/* ── Tab: Anexos ── */}
+      {activeTab === 'anexos' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">N° Póliza</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Cliente</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Documento</th>
+                <th className="px-4 py-3 font-medium">N° Anexo</th>
+                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAnexos.map(a => (
+                <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-slate-700 text-xs font-mono">{a.poliza?.numero_poliza || '—'}</td>
                   <td className="px-4 py-3">
-                    {p.client_id ? (
-                      <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">
-                        {p.cliente?.nombre || '—'}
-                      </Link>
-                    ) : <span className="text-slate-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-slate-700">{p.aseguradora}</p>
-                    <p className="text-xs text-slate-400">
-                      {activeTab === 'cumplimiento' ? (p.tipo_poliza || p.ramo) : p.ramo}
-                    </p>
-                  </td>
-                  {activeTab === 'cumplimiento' && (
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs max-w-[200px]">
-                      <span className="line-clamp-2">{p.riesgo || '—'}</span>
-                    </td>
-                  )}
-                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell">{p.numero_poliza || '—'}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-700 font-medium">
-                    {p.prima ? formatCOP(p.prima) : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className={urgent ? 'text-amber-700 font-medium' : warn ? 'text-amber-600' : 'text-slate-600'}>
-                        {formatDate(p.fecha_fin)}
-                      </span>
-                      {urgent && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
-                      {(urgent || warn) && days !== null && (
-                        <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {days}d
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[p.estado]}`}>
-                      {ESTADO_LABELS[p.estado]}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      a.estado === 'activo' ? 'bg-emerald-100 text-emerald-700' :
+                      a.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
+                      'bg-slate-100 text-slate-500'
+                    }`}>
+                      {a.estado.charAt(0).toUpperCase() + a.estado.slice(1)}
                     </span>
                   </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    {a.client_id
+                      ? <Link href={`/clientes/${a.client_id}`} className="text-slate-700 hover:text-emerald-600">{a.cliente?.nombre || '—'}</Link>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{a.documento || '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 text-xs">{a.numero_anexo || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => { setEditing(p); setShowModal(true) }}
-                        className="text-slate-400 hover:text-slate-700 transition-colors"
-                      >
+                      <button onClick={() => { setEditingAnexo(a); setShowAnexoModal(true) }}
+                        className="text-slate-400 hover:text-slate-700 transition-colors">
                         <Pencil className="w-4 h-4" />
                       </button>
-                      <button
-                        onClick={() => softDelete(p.id)}
-                        className="text-slate-400 hover:text-red-600 transition-colors"
-                      >
+                      <button onClick={() => deleteAnexo(a.id)}
+                        className="text-slate-400 hover:text-red-600 transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
-            <p className="text-sm">No se encontraron pólizas</p>
-          </div>
-        )}
-      </div>
+              ))}
+            </tbody>
+          </table>
+          {filteredAnexos.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay anexos registrados</p>
+            </div>
+          )}
+        </div>
+      )}
 
-      {showModal && (
+      {/* ── Tab: Vinculados ── */}
+      {activeTab === 'vinculados' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">Póliza</th>
+                <th className="px-4 py-3 font-medium">N° Anexo / Pago</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">N° Afiliado / Objeto</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Fecha inicio</th>
+                <th className="px-4 py-3 font-medium hidden lg:table-cell">Beneficiario</th>
+                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredVinculados.map(v => (
+                <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3">
+                    <p className="text-slate-700 text-xs font-mono">{v.poliza?.numero_poliza || '—'}</p>
+                    <p className="text-slate-400 text-xs">{v.poliza?.aseguradora}</p>
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 text-xs">{v.numero_anexo_pago || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{v.numero_afiliado_objeto || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{formatDate(v.fecha_inicio)}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-slate-600 text-xs">{v.beneficiario || '—'}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => { setEditingVinculado(v); setShowVinculadoModal(true) }}
+                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => deleteVinculado(v.id)}
+                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredVinculados.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay vinculados registrados</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: Eliminadas ── */}
+      {activeTab === 'eliminadas' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          {filteredEliminadas.length > 0 && (
+            <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
+              <span className="text-xs text-amber-700">{filteredEliminadas.length} póliza{filteredEliminadas.length !== 1 ? 's' : ''} eliminada{filteredEliminadas.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">Cliente</th>
+                <th className="px-4 py-3 font-medium">Aseg. / Ramo</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">N° Póliza</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Prima</th>
+                <th className="px-4 py-3 font-medium text-right">Restaurar</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredEliminadas.map(p => (
+                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors opacity-70">
+                  <td className="px-4 py-3">
+                    {p.client_id
+                      ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-700 hover:text-emerald-600">{p.cliente?.nombre || '—'}</Link>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="text-slate-700">{p.aseguradora}</p>
+                    <p className="text-xs text-slate-400">{p.ramo}</p>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{p.numero_poliza || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">{p.prima ? formatCOP(p.prima) : '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => restorePoliza(p.id)}
+                      title="Restaurar póliza"
+                      className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                      <RefreshCw className="w-3.5 h-3.5" /> Restaurar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredEliminadas.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <Archive className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay pólizas eliminadas</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Tab: Cumplimiento ── */}
+      {activeTab === 'cumplimiento' && (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">N° Póliza</th>
+                <th className="px-4 py-3 font-medium">Asegurado</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Tomador</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Prima neta</th>
+                <th className="px-4 py-3 font-medium hidden lg:table-cell">Total</th>
+                <th className="px-4 py-3 font-medium hidden lg:table-cell">Comisión</th>
+                <th className="px-4 py-3 font-medium hidden xl:table-cell">Rec. Oficina</th>
+                <th className="px-4 py-3 font-medium hidden xl:table-cell">Rec. Aseg.</th>
+                <th className="px-4 py-3 font-medium text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCumplimiento.map(p => (
+                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-xs font-mono text-slate-600">{p.numero_poliza || '—'}</td>
+                  <td className="px-4 py-3">
+                    {p.client_id
+                      ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-700 hover:text-emerald-600">{p.cliente?.nombre || '—'}</Link>
+                      : <span className="text-slate-400">—</span>}
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{p.nombre_tomador || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell font-medium text-slate-800">{p.prima ? formatCOP(p.prima) : '—'}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-slate-600">
+                    {p.prima ? formatCOP(p.prima + (p.comision || 0)) : '—'}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-slate-600">
+                    {p.comision ? formatCOP(p.comision) : '—'}
+                  </td>
+                  <td className="px-4 py-3 hidden xl:table-cell text-slate-600">
+                    {p.recaudado_oficina ? formatCOP(p.recaudado_oficina) : '—'}
+                  </td>
+                  <td className="px-4 py-3 hidden xl:table-cell text-slate-600">
+                    {p.recaudado_aseguradora ? formatCOP(p.recaudado_aseguradora) : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => { setEditingPoliza(p); setShowPolizaModal(true) }}
+                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => softDelete(p.id)}
+                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {filteredCumplimiento.length === 0 && (
+            <div className="text-center py-12 text-slate-400">
+              <ShieldCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
+              <p className="text-sm">No hay pólizas de cumplimiento</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modals */}
+      {showPolizaModal && (
         <PolizaModal
-          poliza={editing}
-          clientId={editing?.client_id || ''}
+          poliza={editingPoliza}
+          clientId={editingPoliza?.client_id || ''}
           isCumplimiento={activeTab === 'cumplimiento'}
-          onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); load() }}
+          onClose={() => setShowPolizaModal(false)}
+          onSaved={() => { setShowPolizaModal(false); load() }}
         />
+      )}
+      {showAnexoModal && (
+        <PolizaAnexoModal
+          anexo={editingAnexo}
+          onClose={() => setShowAnexoModal(false)}
+          onSaved={() => { setShowAnexoModal(false); loadAnexos() }}
+        />
+      )}
+      {showVinculadoModal && (
+        <PolizaVinculadoModal
+          vinculado={editingVinculado}
+          onClose={() => setShowVinculadoModal(false)}
+          onSaved={() => { setShowVinculadoModal(false); loadVinculados() }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ── Shared pólizas table ────────────────────────────────────────────────────
+function PolizasTable({
+  polizas, onEdit, onDelete, showRiesgo,
+}: {
+  polizas: PolizaConCliente[]
+  onEdit: (p: PolizaConCliente) => void
+  onDelete: (id: string) => void
+  showRiesgo: boolean
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-slate-50 border-b border-slate-200">
+          <tr className="text-left text-xs text-slate-500">
+            <th className="px-4 py-3 font-medium">Tipo póliza</th>
+            <th className="px-4 py-3 font-medium">N° Póliza</th>
+            <th className="px-4 py-3 font-medium">Aseguradora</th>
+            <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
+            <th className="px-4 py-3 font-medium hidden md:table-cell">Riesgo</th>
+            <th className="px-4 py-3 font-medium">Cliente</th>
+            <th className="px-4 py-3 font-medium hidden md:table-cell">Vencimiento</th>
+            <th className="px-4 py-3 font-medium text-right">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {polizas.map(p => {
+            const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
+            const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
+            const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
+            return (
+              <tr key={p.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${urgent ? 'bg-amber-50/30' : ''}`}>
+                <td className="px-4 py-3 text-slate-600 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>
+                <td className="px-4 py-3 text-slate-600 font-mono text-xs">{p.numero_poliza || '—'}</td>
+                <td className="px-4 py-3 text-slate-700">{p.aseguradora}</td>
+                <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{p.ramo}</td>
+                <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs max-w-[140px]">
+                  <span className="line-clamp-2">{p.riesgo || '—'}</span>
+                </td>
+                <td className="px-4 py-3">
+                  {p.client_id
+                    ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">{p.cliente?.nombre || '—'}</Link>
+                    : <span className="text-slate-400">—</span>}
+                </td>
+                <td className="px-4 py-3 hidden md:table-cell">
+                  <div className="flex items-center gap-1.5">
+                    <span className={urgent ? 'text-amber-700 font-medium' : warn ? 'text-amber-600' : 'text-slate-600'}>
+                      {formatDate(p.fecha_fin)}
+                    </span>
+                    {urgent && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
+                    {(urgent || warn) && days !== null && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {days}d
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => onEdit(p)} className="text-slate-400 hover:text-slate-700 transition-colors">
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => onDelete(p.id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      {polizas.length === 0 && (
+        <div className="text-center py-12 text-slate-400">
+          <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">No se encontraron pólizas</p>
+        </div>
       )}
     </div>
   )

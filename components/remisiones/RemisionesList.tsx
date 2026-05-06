@@ -2,17 +2,25 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Remision, EstadoRemision } from '@/types'
-import { Plus, Search, Pencil, Trash2, SendHorizonal, FileCheck2, FileClock, FileX2, FileEdit } from 'lucide-react'
+import {
+  Plus, Search, Pencil, Trash2,
+  SendHorizonal, FileCheck2, FileClock, FileX2, FileEdit, Ban,
+} from 'lucide-react'
 import Link from 'next/link'
 import RemisionModal from './RemisionModal'
 
+type Tab = 'activas' | 'anuladas'
+
 const ESTADO_CONFIG: Record<EstadoRemision, { label: string; cls: string; icon: React.ElementType }> = {
-  borrador:  { label: 'Borrador',  cls: 'bg-slate-100 text-slate-600',    icon: FileEdit },
-  enviada:   { label: 'Enviada',   cls: 'bg-blue-100 text-blue-700',      icon: SendHorizonal },
-  recibida:  { label: 'Recibida',  cls: 'bg-amber-100 text-amber-700',    icon: FileClock },
-  aprobada:  { label: 'Aprobada',  cls: 'bg-emerald-100 text-emerald-700', icon: FileCheck2 },
-  rechazada: { label: 'Rechazada', cls: 'bg-red-100 text-red-700',        icon: FileX2 },
+  borrador:  { label: 'Borrador',  cls: 'bg-slate-100 text-slate-600',     icon: FileEdit     },
+  enviada:   { label: 'Enviada',   cls: 'bg-blue-100 text-blue-700',       icon: SendHorizonal },
+  recibida:  { label: 'Recibida',  cls: 'bg-amber-100 text-amber-700',     icon: FileClock    },
+  aprobada:  { label: 'Aprobada',  cls: 'bg-emerald-100 text-emerald-700', icon: FileCheck2   },
+  rechazada: { label: 'Rechazada', cls: 'bg-red-100 text-red-700',         icon: FileX2       },
+  anulada:   { label: 'Anulada',   cls: 'bg-slate-100 text-slate-400',     icon: Ban          },
 }
+
+const ESTADOS_ACTIVOS: EstadoRemision[] = ['borrador', 'enviada', 'recibida', 'aprobada', 'rechazada']
 
 function formatFecha(s: string | null) {
   if (!s) return '—'
@@ -21,17 +29,18 @@ function formatFecha(s: string | null) {
 
 export default function RemisionesList() {
   const [remisiones, setRemisiones] = useState<Remision[]>([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
+  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]         = useState('')
   const [filterEstado, setFilterEstado] = useState<EstadoRemision | 'all'>('all')
-  const [showModal, setShowModal] = useState(false)
-  const [editing, setEditing] = useState<Remision | undefined>()
+  const [activeTab, setActiveTab]   = useState<Tab>('activas')
+  const [showModal, setShowModal]   = useState(false)
+  const [editing, setEditing]       = useState<Remision | undefined>()
 
   async function load() {
     const { data } = await supabase
       .from('remisiones')
       .select('*, cliente:clientes(id, nombre), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
-      .order('created_at', { ascending: false })
+      .order('numero_remision', { ascending: false })
     setRemisiones((data || []) as Remision[])
     setLoading(false)
   }
@@ -44,18 +53,24 @@ export default function RemisionesList() {
     setRemisiones(prev => prev.filter(r => r.id !== id))
   }
 
-  const counts = Object.keys(ESTADO_CONFIG).reduce((acc, k) => {
-    acc[k as EstadoRemision] = remisiones.filter(r => r.estado === k).length
+  const activas  = remisiones.filter(r => r.estado !== 'anulada')
+  const anuladas = remisiones.filter(r => r.estado === 'anulada')
+
+  const tabData = activeTab === 'activas' ? activas : anuladas
+
+  const counts = ESTADOS_ACTIVOS.reduce((acc, k) => {
+    acc[k] = activas.filter(r => r.estado === k).length
     return acc
   }, {} as Record<EstadoRemision, number>)
 
-  const filtered = remisiones.filter(r => {
-    const q = search.toLowerCase()
+  const q = search.toLowerCase()
+  const filtered = tabData.filter(r => {
     const matchSearch = !search ||
       r.cliente?.nombre?.toLowerCase().includes(q) ||
       r.aseguradora.toLowerCase().includes(q) ||
       r.ramo.toLowerCase().includes(q) ||
-      r.descripcion?.toLowerCase().includes(q)
+      r.descripcion?.toLowerCase().includes(q) ||
+      String(r.numero_remision || '').includes(q)
     const matchEstado = filterEstado === 'all' || r.estado === filterEstado
     return matchSearch && matchEstado
   })
@@ -68,10 +83,13 @@ export default function RemisionesList() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
+      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Remisiones</h1>
-          <p className="text-slate-500 text-sm mt-1">{remisiones.length} registro{remisiones.length !== 1 ? 's' : ''}</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {activas.length} activas · {anuladas.length} anuladas
+          </p>
         </div>
         <button onClick={() => { setEditing(undefined); setShowModal(true) }}
           className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -79,27 +97,52 @@ export default function RemisionesList() {
         </button>
       </div>
 
-      {/* Estado summary */}
-      <div className="grid grid-cols-5 gap-3 mb-6">
-        {(Object.entries(ESTADO_CONFIG) as [EstadoRemision, typeof ESTADO_CONFIG[EstadoRemision]][]).map(([key, { label, cls, icon: Icon }]) => (
-          <button key={key}
-            onClick={() => setFilterEstado(filterEstado === key ? 'all' : key)}
+      {/* Tabs */}
+      <div className="flex gap-1 mb-5 border-b border-slate-200">
+        {([
+          { key: 'activas',  label: 'Activas',  count: activas.length },
+          { key: 'anuladas', label: 'Anuladas', count: anuladas.length },
+        ] as { key: Tab; label: string; count: number }[]).map(({ key, label, count }) => (
+          <button key={key} onClick={() => { setActiveTab(key); setFilterEstado('all') }}
             className={[
-              'rounded-xl p-3 text-center border transition-all',
-              filterEstado === key ? `${cls} border-current` : 'bg-white border-slate-200 hover:border-slate-300',
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+              activeTab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
             ].join(' ')}>
-            <Icon className={`w-5 h-5 mx-auto mb-1 ${filterEstado === key ? '' : 'text-slate-400'}`} />
-            <p className={`text-xl font-bold ${filterEstado === key ? '' : 'text-slate-700'}`}>{counts[key]}</p>
-            <p className={`text-xs ${filterEstado === key ? '' : 'text-slate-500'}`}>{label}</p>
+            {label}
+            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+              {count}
+            </span>
           </button>
         ))}
       </div>
+
+      {/* Estado summary (only on Activas tab) */}
+      {activeTab === 'activas' && (
+        <div className="grid grid-cols-5 gap-3 mb-5">
+          {ESTADOS_ACTIVOS.map(key => {
+            const { label, cls, icon: Icon } = ESTADO_CONFIG[key]
+            const cnt = counts[key] || 0
+            return (
+              <button key={key}
+                onClick={() => setFilterEstado(filterEstado === key ? 'all' : key)}
+                className={[
+                  'rounded-xl p-3 text-center border transition-all',
+                  filterEstado === key ? `${cls} border-current` : 'bg-white border-slate-200 hover:border-slate-300',
+                ].join(' ')}>
+                <Icon className={`w-4 h-4 mx-auto mb-1 ${filterEstado === key ? '' : 'text-slate-400'}`} />
+                <p className={`text-lg font-bold ${filterEstado === key ? '' : 'text-slate-700'}`}>{cnt}</p>
+                <p className={`text-xs truncate ${filterEstado === key ? '' : 'text-slate-500'}`}>{label}</p>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative mb-5">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
         <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar por cliente, aseguradora, ramo..."
+          placeholder="Buscar por N°, cliente, aseguradora, ramo..."
           className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
       </div>
 
@@ -108,6 +151,7 @@ export default function RemisionesList() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr className="text-left text-xs text-slate-500">
+              <th className="px-4 py-3 font-medium w-16">N°</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium">Aseg. / Ramo</th>
               <th className="px-4 py-3 font-medium hidden md:table-cell">Descripción</th>
@@ -121,6 +165,9 @@ export default function RemisionesList() {
               const { label, cls, icon: Icon } = ESTADO_CONFIG[r.estado]
               return (
                 <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-slate-400 text-xs font-mono">
+                    {r.numero_remision ? `#${r.numero_remision}` : '—'}
+                  </td>
                   <td className="px-4 py-3">
                     {r.client_id
                       ? <Link href={`/clientes/${r.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">{r.cliente?.nombre || '—'}</Link>
@@ -159,7 +206,7 @@ export default function RemisionesList() {
         {filtered.length === 0 && (
           <div className="text-center py-12 text-slate-400">
             <SendHorizonal className="w-8 h-8 mx-auto mb-2 opacity-30" />
-            <p className="text-sm">No hay remisiones registradas</p>
+            <p className="text-sm">No hay remisiones en esta sección</p>
           </div>
         )}
       </div>

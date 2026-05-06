@@ -35,17 +35,21 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const defaultRamo = isCumplimiento ? 'Fianzas' : ''
   const [form, setForm] = useState({
-    client_id:      poliza?.client_id || clientId || '',
-    aseguradora:    poliza?.aseguradora || '',
-    ramo:           poliza?.ramo || defaultRamo,
-    tipo_poliza:    poliza?.tipo_poliza || '',
-    riesgo:         poliza?.riesgo || '',
-    numero_poliza:  poliza?.numero_poliza || '',
-    prima:          poliza?.prima?.toString() || '',
-    fecha_inicio:   poliza?.fecha_inicio || '',
-    fecha_fin:      poliza?.fecha_fin || '',
-    estado:         (poliza?.estado || 'activa') as EstadoPoliza,
-    notas:          poliza?.notas || '',
+    client_id:              poliza?.client_id || clientId || '',
+    aseguradora:            poliza?.aseguradora || '',
+    ramo:                   poliza?.ramo || defaultRamo,
+    tipo_poliza:            poliza?.tipo_poliza || '',
+    riesgo:                 poliza?.riesgo || '',
+    numero_poliza:          poliza?.numero_poliza || '',
+    prima:                  poliza?.prima?.toString() || '',
+    fecha_inicio:           poliza?.fecha_inicio || '',
+    fecha_fin:              poliza?.fecha_fin || '',
+    estado:                 (poliza?.estado || 'activa') as EstadoPoliza,
+    notas:                  poliza?.notas || '',
+    nombre_tomador:         poliza?.nombre_tomador || '',
+    comision:               poliza?.comision?.toString() || '',
+    recaudado_oficina:      poliza?.recaudado_oficina?.toString() || '',
+    recaudado_aseguradora:  poliza?.recaudado_aseguradora?.toString() || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -79,17 +83,21 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     setSaving(true)
     setError('')
     const payload = {
-      client_id:     form.client_id,
-      aseguradora:   form.aseguradora,
-      ramo:          form.ramo,
-      tipo_poliza:   form.tipo_poliza || null,
-      riesgo:        form.riesgo.trim() || null,
-      numero_poliza: form.numero_poliza || null,
-      prima:         form.prima ? parseFloat(form.prima.replace(/[^0-9.]/g, '')) : null,
-      fecha_inicio:  form.fecha_inicio || null,
-      fecha_fin:     form.fecha_fin || null,
-      estado:        form.estado,
-      notas:         form.notas || null,
+      client_id:             form.client_id,
+      aseguradora:           form.aseguradora,
+      ramo:                  form.ramo,
+      tipo_poliza:           form.tipo_poliza || null,
+      riesgo:                form.riesgo.trim() || null,
+      numero_poliza:         form.numero_poliza || null,
+      prima:                 form.prima ? parseFloat(form.prima.replace(/[^0-9.]/g, '')) : null,
+      fecha_inicio:          form.fecha_inicio || null,
+      fecha_fin:             form.fecha_fin || null,
+      estado:                form.estado,
+      notas:                 form.notas || null,
+      nombre_tomador:        form.nombre_tomador.trim() || null,
+      comision:              form.comision ? parseFloat(form.comision) : null,
+      recaudado_oficina:     form.recaudado_oficina ? parseFloat(form.recaudado_oficina) : null,
+      recaudado_aseguradora: form.recaudado_aseguradora ? parseFloat(form.recaudado_aseguradora) : null,
     }
     const { error: err } = poliza
       ? await supabase.from('polizas').update(payload).eq('id', poliza.id)
@@ -161,6 +169,24 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                   className={cls}
                 />
               </Field>
+              <Field label="Tomador">
+                <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
+                  placeholder="Nombre del tomador de la póliza..." className={cls} />
+              </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Comisión (COP)">
+                  <input type="number" min="0" value={form.comision} onChange={e => set('comision', e.target.value)}
+                    placeholder="0" className={cls} />
+                </Field>
+                <Field label="Recaudo oficina">
+                  <input type="number" min="0" value={form.recaudado_oficina} onChange={e => set('recaudado_oficina', e.target.value)}
+                    placeholder="0" className={cls} />
+                </Field>
+                <Field label="Recaudo aseg.">
+                  <input type="number" min="0" value={form.recaudado_aseguradora} onChange={e => set('recaudado_aseguradora', e.target.value)}
+                    placeholder="0" className={cls} />
+                </Field>
+              </div>
             </>
           )}
 

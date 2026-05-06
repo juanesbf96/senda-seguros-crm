@@ -1,13 +1,22 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Recibo, FormaPago, Cliente, Cobro } from '@/types'
+import { Recibo, FormaPago, TipoRecibo, Cliente, Cobro } from '@/types'
 import { X } from 'lucide-react'
 import { formatCOP } from '@/lib/utils'
+
+const TIPO_LABELS: Record<TipoRecibo, string> = {
+  anticipo:    'Anticipo',
+  activo:      'Recibo activo',
+  pago_directo:'Pago directo',
+  anulado:     'Anulado',
+  certificado: 'Certificado',
+}
 
 interface Props {
   recibo?: Recibo
   clienteId?: string
+  activeTab?: TipoRecibo
   onClose: () => void
   onSaved: () => void
 }
@@ -18,20 +27,22 @@ const FORMA_LABELS: Record<FormaPago, string> = {
 }
 const FORMA_REQUIERE_BANCO: FormaPago[] = ['transferencia', 'cheque', 'consignacion']
 
-export default function ReciboModal({ recibo, clienteId, onClose, onSaved }: Props) {
+export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onSaved }: Props) {
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [cobros, setCobros] = useState<Pick<Cobro, 'id' | 'concepto' | 'valor'>[]>([])
   const [form, setForm] = useState({
-    client_id:     recibo?.client_id || clienteId || '',
-    cobro_id:      recibo?.cobro_id || '',
-    numero_recibo: recibo?.numero_recibo || '',
-    concepto:      recibo?.concepto || '',
-    valor:         recibo?.valor?.toString() || '',
-    fecha_pago:    recibo?.fecha_pago || new Date().toISOString().split('T')[0],
-    forma_pago:    (recibo?.forma_pago || 'efectivo') as FormaPago,
-    banco:         recibo?.banco || '',
-    referencia:    recibo?.referencia || '',
-    notas:         recibo?.notas || '',
+    client_id:          recibo?.client_id || clienteId || '',
+    cobro_id:           recibo?.cobro_id || '',
+    numero_recibo:      recibo?.numero_recibo || '',
+    numero_certificado: recibo?.numero_certificado || '',
+    concepto:           recibo?.concepto || '',
+    valor:              recibo?.valor?.toString() || '',
+    fecha_pago:         recibo?.fecha_pago || new Date().toISOString().split('T')[0],
+    forma_pago:         (recibo?.forma_pago || 'efectivo') as FormaPago,
+    tipo:               (recibo?.tipo || activeTab || 'activo') as TipoRecibo,
+    banco:              recibo?.banco || '',
+    referencia:         recibo?.referencia || '',
+    notas:              recibo?.notas || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -67,16 +78,18 @@ export default function ReciboModal({ recibo, clienteId, onClose, onSaved }: Pro
     setSaving(true); setError('')
 
     const payload = {
-      client_id:     form.client_id || null,
-      cobro_id:      form.cobro_id || null,
-      numero_recibo: form.numero_recibo.trim() || null,
-      concepto:      form.concepto.trim(),
-      valor:         parseFloat(form.valor),
-      fecha_pago:    form.fecha_pago,
-      forma_pago:    form.forma_pago,
-      banco:         form.banco.trim() || null,
-      referencia:    form.referencia.trim() || null,
-      notas:         form.notas.trim() || null,
+      client_id:          form.client_id || null,
+      cobro_id:           form.cobro_id || null,
+      numero_recibo:      form.numero_recibo.trim() || null,
+      numero_certificado: form.numero_certificado.trim() || null,
+      concepto:           form.concepto.trim(),
+      valor:              parseFloat(form.valor),
+      fecha_pago:         form.fecha_pago,
+      forma_pago:         form.forma_pago,
+      tipo:               form.tipo,
+      banco:              form.banco.trim() || null,
+      referencia:         form.referencia.trim() || null,
+      notas:              form.notas.trim() || null,
     }
 
     const { error: err } = recibo
@@ -122,6 +135,15 @@ export default function ReciboModal({ recibo, clienteId, onClose, onSaved }: Pro
             </Field>
           )}
 
+          {/* Tipo de recibo */}
+          <Field label="Tipo de recibo">
+            <select value={form.tipo} onChange={e => set('tipo', e.target.value as TipoRecibo)} className={inputCls}>
+              {(Object.entries(TIPO_LABELS) as [TipoRecibo, string][]).map(([k, v]) => (
+                <option key={k} value={k}>{v}</option>
+              ))}
+            </select>
+          </Field>
+
           <div className="grid grid-cols-2 gap-4">
             <Field label="N° Recibo">
               <input value={form.numero_recibo} onChange={e => set('numero_recibo', e.target.value)}
@@ -131,6 +153,13 @@ export default function ReciboModal({ recibo, clienteId, onClose, onSaved }: Pro
               <input type="date" value={form.fecha_pago} onChange={e => set('fecha_pago', e.target.value)} className={inputCls} />
             </Field>
           </div>
+
+          {form.tipo === 'certificado' && (
+            <Field label="N° Certificado">
+              <input value={form.numero_certificado} onChange={e => set('numero_certificado', e.target.value)}
+                placeholder="Ej: CERT-2024-001" className={inputCls} />
+            </Field>
+          )}
 
           <Field label="Concepto *">
             <input value={form.concepto} onChange={e => set('concepto', e.target.value)}

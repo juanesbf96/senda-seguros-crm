@@ -13,7 +13,7 @@ const PRIORIDAD_CLS: Record<PrioridadTarea, string> = {
   normal: 'text-slate-400', alta: 'text-amber-500', urgente: 'text-red-500',
 }
 
-type TabKey = 'pendientes' | 'hoy' | 'vencidas' | 'completadas'
+type TabKey = 'pendientes' | 'hoy' | 'sin_fecha' | 'vencidas' | 'completadas'
 
 function today() { return new Date().toISOString().split('T')[0] }
 function tomorrow() {
@@ -58,15 +58,17 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
   function matchTab(t: Tarea) {
     if (activeTab === 'completadas') return t.completada
     if (t.completada) return false
-    if (activeTab === 'vencidas') return !!t.fecha_vencimiento && t.fecha_vencimiento < td
-    if (activeTab === 'hoy') return t.fecha_vencimiento === td || t.fecha_vencimiento === tm
-    // pendientes: no vencida, no hoy/mañana, or sin fecha
-    return !t.fecha_vencimiento || t.fecha_vencimiento > tm
+    if (activeTab === 'vencidas')  return !!t.fecha_vencimiento && t.fecha_vencimiento < td
+    if (activeTab === 'hoy')       return t.fecha_vencimiento === td || t.fecha_vencimiento === tm
+    if (activeTab === 'sin_fecha') return !t.fecha_vencimiento
+    // pendientes: tiene fecha futura (no vencida, no hoy/mañana)
+    return !!t.fecha_vencimiento && t.fecha_vencimiento > tm
   }
 
   const counts: Record<TabKey, number> = {
-    pendientes: tareas.filter(t => !t.completada && (!t.fecha_vencimiento || t.fecha_vencimiento > tm)).length,
+    pendientes: tareas.filter(t => !t.completada && !!t.fecha_vencimiento && t.fecha_vencimiento > tm).length,
     hoy:        tareas.filter(t => !t.completada && (t.fecha_vencimiento === td || t.fecha_vencimiento === tm)).length,
+    sin_fecha:  tareas.filter(t => !t.completada && !t.fecha_vencimiento).length,
     vencidas:   tareas.filter(t => !t.completada && !!t.fecha_vencimiento && t.fecha_vencimiento < td).length,
     completadas: tareas.filter(t => t.completada).length,
   }
@@ -79,9 +81,10 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
   })
 
   const TABS: { key: TabKey; label: string }[] = [
-    { key: 'pendientes', label: 'Pendientes' },
-    { key: 'hoy',        label: 'Hoy / Mañana' },
-    { key: 'vencidas',   label: 'Vencidas' },
+    { key: 'pendientes',  label: 'Pendientes' },
+    { key: 'hoy',         label: 'Hoy / Mañana' },
+    { key: 'sin_fecha',   label: 'Sin fecha' },
+    { key: 'vencidas',    label: 'Vencidas' },
     { key: 'completadas', label: 'Completadas' },
   ]
 
@@ -188,6 +191,11 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
                     <Link href={`/clientes/${t.client_id}`} className="text-xs text-emerald-600 hover:underline">
                       {t.cliente.nombre}
                     </Link>
+                  )}
+                  {t.asignado_a && (
+                    <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
+                      → {t.asignado_a}
+                    </span>
                   )}
                 </div>
               </div>

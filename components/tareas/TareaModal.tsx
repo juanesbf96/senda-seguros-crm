@@ -26,6 +26,7 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
     fecha_vencimiento: tarea?.fecha_vencimiento || '',
     prioridad:         (tarea?.prioridad || 'normal') as PrioridadTarea,
     completada:        tarea?.completada ?? false,
+    asignado_a:        tarea?.asignado_a || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
@@ -52,6 +53,7 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
       fecha_vencimiento: form.fecha_vencimiento || null,
       prioridad:         form.prioridad,
       completada:        form.completada,
+      asignado_a:        form.asignado_a.trim() || null,
     }
     const { error: err } = tarea
       ? await supabase.from('tareas').update(payload).eq('id', tarea.id)
@@ -101,6 +103,11 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
               </div>
             </Field>
           </div>
+
+          <Field label="Asignado a">
+            <input value={form.asignado_a} onChange={e => set('asignado_a', e.target.value)}
+              placeholder="Asesor responsable..." className={inputCls} />
+          </Field>
 
           <Field label="Descripción">
             <textarea value={form.descripcion} onChange={e => set('descripcion', e.target.value)}
