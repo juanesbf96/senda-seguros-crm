@@ -1,6 +1,7 @@
 export type Etapa = 'nuevo' | 'contactado' | 'cotizacion' | 'cerrado'
 export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'nota'
 export type EstadoPoliza = 'activa' | 'vencida' | 'cancelada' | 'pendiente'
+export type TipoCliente = 'persona_natural' | 'empresa' | 'consorcio'
 
 export interface Cliente {
   id: string
@@ -12,6 +13,12 @@ export interface Cliente {
   departamento: string | null
   etapa: Etapa
   notas: string | null
+  tipo_cliente: TipoCliente
+  razon_social: string | null
+  sobrenombre: string | null
+  nit: string | null
+  fecha_constitucion: string | null
+  fecha_nacimiento: string | null
   created_at: string
   updated_at: string
 }
@@ -27,6 +34,9 @@ export interface Poliza {
   fecha_fin: string | null
   estado: EstadoPoliza
   notas: string | null
+  tipo_poliza: string | null
+  riesgo: string | null
+  eliminada: boolean
   created_at: string
   cliente?: Cliente
 }
@@ -38,6 +48,17 @@ export interface Actividad {
   descripcion: string
   fecha: string
   created_at: string
+}
+
+export interface Contacto {
+  id: string
+  client_id: string
+  nombre: string
+  tipo_documento: string | null
+  numero_documento: string | null
+  cargo: string | null
+  created_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
 }
 
 export interface DashboardMetrics {
