@@ -204,6 +204,65 @@ export interface Recibo {
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
 }
 
+// ── S5: Vendedores / Liquidaciones / Prospectos ──────────────────────────────
+
+export interface Vendedor {
+  id: string
+  nombre: string
+  email: string | null
+  telefono: string | null
+  cedula: string | null
+  porcentaje_comision: number
+  activo: boolean
+  notas: string | null
+  created_at: string
+}
+
+export type EstadoLiquidacion = 'pendiente' | 'pagado' | 'anulado'
+
+export interface Liquidacion {
+  id: string
+  vendedor_id: string
+  periodo: string
+  total_primas: number
+  total_comision: number
+  estado: EstadoLiquidacion
+  fecha_pago: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  vendedor?: Pick<Vendedor, 'id' | 'nombre' | 'porcentaje_comision'>
+}
+
+export type FuenteProspecto = 'referido' | 'web' | 'llamada' | 'red_social' | 'evento' | 'otro'
+export type EtapaProspecto = 'nuevo' | 'contactado' | 'calificado' | 'propuesta' | 'cerrado_ganado' | 'cerrado_perdido'
+export type TipoActividadProspecto = 'llamada' | 'email' | 'reunion' | 'nota' | 'cotizacion'
+
+export interface Prospecto {
+  id: string
+  nombre: string
+  empresa: string | null
+  email: string | null
+  telefono: string | null
+  ciudad: string | null
+  fuente: FuenteProspecto | null
+  etapa: EtapaProspecto
+  ramo_interes: string | null
+  valor_estimado: number | null
+  asignado_a: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProspectoActividad {
+  id: string
+  prospecto_id: string
+  tipo: TipoActividadProspecto
+  descripcion: string
+  fecha: string
+}
+
 export interface DashboardMetrics {
   totalClientes: number
   clientesPorEtapa: Record<Etapa, number>
