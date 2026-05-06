@@ -2,6 +2,9 @@ export type Etapa = 'nuevo' | 'contactado' | 'cotizacion' | 'cerrado'
 export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'nota'
 export type EstadoPoliza = 'activa' | 'vencida' | 'cancelada' | 'pendiente'
 export type TipoCliente = 'persona_natural' | 'empresa' | 'consorcio'
+export type TipoSolicitud = 'expedicion' | 'renovacion' | 'endoso' | 'cancelacion' | 'certificado' | 'siniestro' | 'inclusion' | 'exclusion' | 'otro'
+export type EstadoSolicitud = 'nueva' | 'en_proceso' | 'resuelta' | 'cancelada'
+export type PrioridadSolicitud = 'normal' | 'urgente'
 
 export interface Cliente {
   id: string
@@ -59,6 +62,22 @@ export interface Contacto {
   cargo: string | null
   created_at: string
   cliente?: Pick<Cliente, 'id' | 'nombre'>
+}
+
+export interface Solicitud {
+  id: string
+  client_id: string | null
+  poliza_id: string | null
+  tipo: TipoSolicitud
+  estado: EstadoSolicitud
+  prioridad: PrioridadSolicitud
+  descripcion: string | null
+  fecha_limite: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
 }
 
 export interface DashboardMetrics {

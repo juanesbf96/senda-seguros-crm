@@ -1,39 +1,67 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Poliza, EstadoPoliza } from '@/types'
+import { Poliza, EstadoPoliza, Cliente } from '@/types'
 import { X } from 'lucide-react'
 
-const RAMOS = [
+const RAMOS_SEGUROS = [
   'Vida Individual','Vida Grupo','SOAT','Todo Riesgo Vehículo','Responsabilidad Civil',
-  'Hogar','Incendio','Empresarial','Salud','ARL','Transportes','Agrícola','Fianzas','Otros'
+  'Hogar','Incendio','Empresarial','Salud','ARL','Transportes','Agrícola','Otros',
+]
+const RAMOS_CUMPLIMIENTO = ['Fianzas','Cumplimiento']
+
+const TIPOS_CUMPLIMIENTO = [
+  'Licitación','Buena calidad de bienes','Anticipo','Cumplimiento del contrato',
+  'Estabilidad de obra','Correcto funcionamiento de equipos','Manejo','Garantía',
+  'Seriedad de oferta','Otro',
 ]
 
 const ASEGURADORAS = [
   'Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria',
-  'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado','Otro'
+  'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado','Otro',
 ]
 
 interface Props {
   poliza?: Poliza
-  clientId: string
+  /** Pre-selected client (when opening from a client's profile) */
+  clientId?: string
+  /** Opening from the Cumplimiento tab → default ramo to Fianzas */
+  isCumplimiento?: boolean
   onClose: () => void
   onSaved: () => void
 }
 
-export default function PolizaModal({ poliza, clientId, onClose, onSaved }: Props) {
+export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose, onSaved }: Props) {
+  const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
+  const defaultRamo = isCumplimiento ? 'Fianzas' : ''
   const [form, setForm] = useState({
-    aseguradora: poliza?.aseguradora || '',
-    ramo: poliza?.ramo || '',
-    numero_poliza: poliza?.numero_poliza || '',
-    prima: poliza?.prima?.toString() || '',
-    fecha_inicio: poliza?.fecha_inicio || '',
-    fecha_fin: poliza?.fecha_fin || '',
-    estado: poliza?.estado || 'activa' as EstadoPoliza,
-    notas: poliza?.notas || '',
+    client_id:      poliza?.client_id || clientId || '',
+    aseguradora:    poliza?.aseguradora || '',
+    ramo:           poliza?.ramo || defaultRamo,
+    tipo_poliza:    poliza?.tipo_poliza || '',
+    riesgo:         poliza?.riesgo || '',
+    numero_poliza:  poliza?.numero_poliza || '',
+    prima:          poliza?.prima?.toString() || '',
+    fecha_inicio:   poliza?.fecha_inicio || '',
+    fecha_fin:      poliza?.fecha_fin || '',
+    estado:         (poliza?.estado || 'activa') as EstadoPoliza,
+    notas:          poliza?.notas || '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const esCumplimiento = RAMOS_CUMPLIMIENTO.includes(form.ramo)
+
+  useEffect(() => {
+    // Only load client list when no clientId is pre-set
+    if (!clientId) {
+      supabase
+        .from('clientes')
+        .select('id, nombre')
+        .order('nombre')
+        .then(({ data }) => setClientes(data || []))
+    }
+  }, [clientId])
 
   function set(field: string, val: string) {
     setForm(f => ({ ...f, [field]: val }))
@@ -44,18 +72,24 @@ export default function PolizaModal({ poliza, clientId, onClose, onSaved }: Prop
       setError('Aseguradora y ramo son obligatorios')
       return
     }
+    if (!form.client_id) {
+      setError('Debes seleccionar un cliente')
+      return
+    }
     setSaving(true)
     setError('')
     const payload = {
-      client_id: clientId,
-      aseguradora: form.aseguradora,
-      ramo: form.ramo,
+      client_id:     form.client_id,
+      aseguradora:   form.aseguradora,
+      ramo:          form.ramo,
+      tipo_poliza:   form.tipo_poliza || null,
+      riesgo:        form.riesgo.trim() || null,
       numero_poliza: form.numero_poliza || null,
-      prima: form.prima ? parseFloat(form.prima.replace(/\./g, '').replace(',', '.')) : null,
-      fecha_inicio: form.fecha_inicio || null,
-      fecha_fin: form.fecha_fin || null,
-      estado: form.estado,
-      notas: form.notas || null,
+      prima:         form.prima ? parseFloat(form.prima.replace(/[^0-9.]/g, '')) : null,
+      fecha_inicio:  form.fecha_inicio || null,
+      fecha_fin:     form.fecha_fin || null,
+      estado:        form.estado,
+      notas:         form.notas || null,
     }
     const { error: err } = poliza
       ? await supabase.from('polizas').update(payload).eq('id', poliza.id)
@@ -75,6 +109,20 @@ export default function PolizaModal({ poliza, clientId, onClose, onSaved }: Prop
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Cliente — solo si no viene pre-seleccionado */}
+          {!clientId && (
+            <Field label="Cliente *">
+              <select
+                value={form.client_id}
+                onChange={e => set('client_id', e.target.value)}
+                className={cls}
+              >
+                <option value="">Seleccionar cliente...</option>
+                {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+              </select>
+            </Field>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <Field label="Aseguradora *">
               <select value={form.aseguradora} onChange={e => set('aseguradora', e.target.value)} className={cls}>
@@ -85,10 +133,36 @@ export default function PolizaModal({ poliza, clientId, onClose, onSaved }: Prop
             <Field label="Ramo *">
               <select value={form.ramo} onChange={e => set('ramo', e.target.value)} className={cls}>
                 <option value="">Seleccionar...</option>
-                {RAMOS.map(r => <option key={r} value={r}>{r}</option>)}
+                <optgroup label="Seguros">
+                  {RAMOS_SEGUROS.map(r => <option key={r} value={r}>{r}</option>)}
+                </optgroup>
+                <optgroup label="Cumplimiento">
+                  {RAMOS_CUMPLIMIENTO.map(r => <option key={r} value={r}>{r}</option>)}
+                </optgroup>
               </select>
             </Field>
           </div>
+
+          {/* Campos de Cumplimiento */}
+          {esCumplimiento && (
+            <>
+              <Field label="Tipo de amparo">
+                <select value={form.tipo_poliza} onChange={e => set('tipo_poliza', e.target.value)} className={cls}>
+                  <option value="">Seleccionar tipo...</option>
+                  {TIPOS_CUMPLIMIENTO.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </Field>
+              <Field label="Objeto / Riesgo amparado">
+                <textarea
+                  value={form.riesgo}
+                  onChange={e => set('riesgo', e.target.value)}
+                  placeholder="Describe el contrato u objeto amparado por la póliza..."
+                  rows={2}
+                  className={cls}
+                />
+              </Field>
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <Field label="Número de póliza">
@@ -97,7 +171,7 @@ export default function PolizaModal({ poliza, clientId, onClose, onSaved }: Prop
             </Field>
             <Field label="Prima anual (COP)">
               <input value={form.prima} onChange={e => set('prima', e.target.value)}
-                placeholder="Ej: 1200000" type="number" className={cls} />
+                placeholder="Ej: 1200000" type="number" min="0" className={cls} />
             </Field>
           </div>
 
@@ -124,7 +198,7 @@ export default function PolizaModal({ poliza, clientId, onClose, onSaved }: Prop
               placeholder="Coberturas adicionales, observaciones..." rows={2} className={cls} />
           </Field>
 
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
         </div>
 
         <div className="flex gap-3 p-5 border-t border-slate-200">
