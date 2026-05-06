@@ -123,6 +123,41 @@ export interface Solicitud {
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
 }
 
+export type EstadoCobro = 'pendiente' | 'pagado' | 'vencido' | 'anulado'
+export type FormaPago = 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'consignacion'
+
+export interface Cobro {
+  id: string
+  client_id: string | null
+  poliza_id: string | null
+  concepto: string
+  valor: number
+  fecha_vencimiento: string | null
+  estado: EstadoCobro
+  notas: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+}
+
+export interface Recibo {
+  id: string
+  client_id: string | null
+  cobro_id: string | null
+  numero_recibo: string | null
+  concepto: string
+  valor: number
+  fecha_pago: string
+  forma_pago: FormaPago
+  banco: string | null
+  referencia: string | null
+  notas: string | null
+  created_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  cobro?: Pick<Cobro, 'id' | 'concepto' | 'valor'>
+}
+
 export interface DashboardMetrics {
   totalClientes: number
   clientesPorEtapa: Record<Etapa, number>

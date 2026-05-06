@@ -6,6 +6,7 @@ import {
   LayoutDashboard, Users, FileText, Kanban,
   Bell, Shield, ChevronLeft, ChevronRight,
   User, LogOut, ClipboardList, CheckSquare, Send,
+  DollarSign, Receipt,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -19,6 +20,8 @@ const navItems = [
   { href: '/solicitudes', label: 'Solicitudes', icon: ClipboardList },
   { href: '/remisiones', label: 'Remisiones', icon: Send },
   { href: '/renovaciones', label: 'Renovaciones', icon: Bell },
+  { href: '/cobros', label: 'Cobros', icon: DollarSign },
+  { href: '/caja', label: 'Caja', icon: Receipt },
   { href: '/tareas', label: 'Tareas', icon: CheckSquare },
 ]
 
