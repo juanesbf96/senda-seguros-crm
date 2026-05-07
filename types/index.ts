@@ -22,6 +22,18 @@ export interface Cliente {
   nit: string | null
   fecha_constitucion: string | null
   fecha_nacimiento: string | null
+  // Sprint A
+  genero: string | null
+  fecha_vencimiento_cedula: string | null
+  estado_civil: string | null
+  tiene_vehiculo: boolean
+  tiene_hijos: boolean
+  num_hijos: number | null
+  ocupacion: string | null
+  empresa_trabajo: string | null
+  ingresos_aprox: number | null
+  categoria: string | null
+  autoriza_datos: boolean
   created_at: string
   updated_at: string
 }
@@ -44,6 +56,32 @@ export interface Poliza {
   comision: number | null
   recaudado_oficina: number | null
   recaudado_aseguradora: number | null
+  // Sprint A
+  tipo_modalidad: 'individual' | 'colectiva' | 'agrupadora' | null
+  fecha_expedicion: string | null
+  fecha_recepcion: string | null
+  asegurado_nombre: string | null
+  asegurado_documento: string | null
+  beneficiario_nombre: string | null
+  beneficiario_documento: string | null
+  beneficiario_oneroso: boolean
+  beneficiario_en_remision: boolean
+  prima_neta: number | null
+  porcentaje_iva: number | null
+  iva: number | null
+  gastos: number | null
+  porcentaje_comision_agencia: number | null
+  comision_agencia: number | null
+  total_prima: number | null
+  vendedor_id: string | null
+  porcentaje_comision_vendedor: number | null
+  retencion_vendedor: number | null
+  comision_vendedor: number | null
+  periodicidad_pago: string | null
+  forma_pago: string | null
+  medio_pago: string | null
+  banco_pago: string | null
+  valor_asegurado: number | null
   created_at: string
   cliente?: Cliente
 }
@@ -358,6 +396,11 @@ export interface AgendaEvento {
 
 // ── S5: Vendedores / Liquidaciones / Prospectos ──────────────────────────────
 
+export interface ComisionAnio {
+  anio: number
+  porcentaje: number
+}
+
 export interface Vendedor {
   id: string
   nombre: string
@@ -367,6 +410,11 @@ export interface Vendedor {
   porcentaje_comision: number
   activo: boolean
   notas: string | null
+  // Sprint A
+  banco: string | null
+  numero_cuenta: string | null
+  tipo_cuenta: string | null
+  comisiones_por_anio: ComisionAnio[]
   created_at: string
 }
 
