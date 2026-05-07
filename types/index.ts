@@ -204,6 +204,25 @@ export interface Recibo {
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
 }
 
+// ── Archivos ─────────────────────────────────────────────────────────────────
+
+export interface Archivo {
+  id: string
+  nombre: string
+  nombre_original: string
+  url: string
+  tipo_mime: string | null
+  tamano: number | null
+  client_id: string | null
+  poliza_id: string | null
+  prospecto_id: string | null
+  descripcion: string | null
+  created_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora'>
+  prospecto?: Pick<Prospecto, 'id' | 'nombre'>
+}
+
 // ── Agenda ───────────────────────────────────────────────────────────────────
 
 export type TipoEvento = 'evento' | 'reunion' | 'llamada' | 'recordatorio' | 'otro'

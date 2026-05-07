@@ -7,6 +7,7 @@ import {
   Bell, Shield, ChevronLeft, ChevronRight, ChevronDown,
   User, LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
+  BarChart2, FolderOpen,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -59,6 +60,14 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'CRM',
     items: [
       { href: '/prospectos', label: 'Prospectos', icon: TrendingUp },
+    ],
+  },
+  {
+    id: 'reportes',
+    label: 'Reportes',
+    items: [
+      { href: '/informes', label: 'Informes',  icon: BarChart2 },
+      { href: '/archivos', label: 'Archivos',  icon: FolderOpen },
     ],
   },
 ]
