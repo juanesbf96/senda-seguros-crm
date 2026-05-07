@@ -285,6 +285,34 @@ export interface Diligencia {
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora'>
 }
 
+// ── S8: Metas / Configuración ────────────────────────────────────────────────
+
+export type TipoMeta = 'prima_total' | 'clientes_nuevos' | 'renovaciones' | 'polizas_activas' | 'comisiones' | 'cobros' | 'personalizada'
+export type PeriodoMeta = 'mensual' | 'trimestral' | 'anual' | 'personalizado'
+
+export interface Meta {
+  id: string
+  nombre: string
+  tipo: TipoMeta
+  periodo: PeriodoMeta
+  valor_meta: number
+  valor_actual: number
+  fecha_inicio: string
+  fecha_fin: string
+  color: string
+  descripcion: string | null
+  auto_calcular: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ConfigItem {
+  id: string
+  clave: string
+  valor: string | null
+  updated_at: string
+}
+
 // ── Archivos ─────────────────────────────────────────────────────────────────
 
 export interface Archivo {

@@ -8,6 +8,7 @@ import {
   User, LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
   BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
+  Target, Bot, Settings,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -22,9 +23,10 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'principal',
     label: 'Principal',
     items: [
-      { href: '/',        label: 'Dashboard', icon: LayoutDashboard },
-      { href: '/leads',   label: 'Pipeline',  icon: Kanban },
-      { href: '/clientes',label: 'Clientes',  icon: Users },
+      { href: '/',           label: 'Dashboard',  icon: LayoutDashboard },
+      { href: '/asistente',  label: 'Asistente',  icon: Bot },
+      { href: '/leads',      label: 'Pipeline',   icon: Kanban },
+      { href: '/clientes',   label: 'Clientes',   icon: Users },
     ],
   },
   {
@@ -52,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/agenda',     label: 'Agenda',     icon: CalendarDays },
       { href: '/tareas',     label: 'Tareas',     icon: CheckSquare },
+      { href: '/metas',      label: 'Metas',      icon: Target },
       { href: '/vendedores', label: 'Vendedores', icon: UserCog },
     ],
   },
@@ -250,6 +253,33 @@ export default function Sidebar() {
 
       {/* ── User / Footer ────────────────────────────────────── */}
       <div className="border-t border-slate-700 px-2 py-2 space-y-0.5">
+        {/* Configuración */}
+        <div className="relative group">
+          <Link
+            href="/configuracion"
+            aria-label={collapsed ? 'Configuración' : undefined}
+            aria-current={pathname === '/configuracion' ? 'page' : undefined}
+            className={[
+              'flex items-center rounded-lg text-sm font-medium min-h-[38px]',
+              'transition-colors duration-150',
+              'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 focus:ring-offset-slate-900',
+              collapsed ? 'justify-center px-2' : 'gap-3 px-3',
+              pathname === '/configuracion'
+                ? 'bg-emerald-600 text-white'
+                : 'text-slate-300 hover:bg-slate-800 hover:text-white',
+            ].join(' ')}
+          >
+            <Settings className="w-4 h-4 flex-shrink-0" />
+            {!collapsed && <span className="whitespace-nowrap overflow-hidden text-sm">Configuración</span>}
+          </Link>
+          {collapsed && (
+            <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-slate-800 border border-slate-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out">
+              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-600" />
+              Configuración
+            </div>
+          )}
+        </div>
+
         <div className="relative group">
           <Link
             href="/perfil"
