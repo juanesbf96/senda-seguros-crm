@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import {
   LayoutDashboard, Users, FileText, Kanban,
   Bell, Shield, ChevronLeft, ChevronRight, ChevronDown,
-  User, LogOut, ClipboardList, CheckSquare, Send,
+  LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
   BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
   Target, Bot, Settings,
@@ -89,7 +89,6 @@ export default function Sidebar() {
   const router   = useRouter()
   const [collapsed, setCollapsed]   = useState(false)
   const [mounted, setMounted]       = useState(false)
-  const [userName, setUserName]     = useState('')
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     principal: true, polizas: true, finanzas: true, gestion: true, crm: true,
   })
@@ -104,9 +103,6 @@ export default function Sidebar() {
     }
 
     setMounted(true)
-    supabase.auth.getUser().then(({ data }) => {
-      setUserName(data.user?.user_metadata?.nombre ?? data.user?.email ?? '')
-    })
   }, [])
 
   function toggle() {
@@ -276,36 +272,6 @@ export default function Sidebar() {
             <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-slate-800 border border-slate-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out">
               <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-600" />
               Configuración
-            </div>
-          )}
-        </div>
-
-        <div className="relative group">
-          <Link
-            href="/perfil"
-            aria-label={collapsed ? 'Mi perfil' : undefined}
-            aria-current={pathname === '/perfil' ? 'page' : undefined}
-            className={[
-              'flex items-center rounded-lg text-sm font-medium min-h-[38px]',
-              'transition-colors duration-150',
-              'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 focus:ring-offset-slate-900',
-              collapsed ? 'justify-center px-2' : 'gap-3 px-3',
-              pathname === '/perfil'
-                ? 'bg-emerald-600 text-white'
-                : 'text-slate-300 hover:bg-slate-800 hover:text-white',
-            ].join(' ')}
-          >
-            <User className="w-4 h-4 flex-shrink-0" />
-            {!collapsed && (
-              <span className="whitespace-nowrap overflow-hidden truncate text-sm">
-                {userName || 'Mi perfil'}
-              </span>
-            )}
-          </Link>
-          {collapsed && (
-            <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-slate-800 border border-slate-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out">
-              <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-slate-600" />
-              {userName || 'Mi perfil'}
             </div>
           )}
         </div>
