@@ -1,9 +1,9 @@
-import Sidebar from '@/components/ui/Sidebar'
+import MktSidebar from '@/components/mkt/MktSidebar'
 
-export default function CRMLayout({ children }: { children: React.ReactNode }) {
+export default function MktLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar />
+      <MktSidebar />
       <main className="flex-1 overflow-y-auto">
         {children}
       </main>

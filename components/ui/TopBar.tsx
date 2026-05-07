@@ -1,20 +1,19 @@
 'use client'
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { MessageSquare, Bell, LogOut, Settings, ExternalLink, ChevronRight, X } from 'lucide-react'
+import { MessageSquare, Bell, LogOut, Settings, ExternalLink, ChevronRight, X, ArrowLeftRight } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
-// ── Emojis disponibles para el perfil ────────────────────────────────────────
+// ── Emojis disponibles ────────────────────────────────────────────────────────
 const EMOJIS = [
   '😊','🙂','😎','🤓','🧑‍💼','👨‍💼','👩‍💼','👨‍💻','👩‍💻',
   '🦸','🤵','👑','🚀','⭐','🌟','🔥','💼','🎯','🏆','💡',
 ]
-
 const EMOJI_KEY = 'senda-user-emoji'
 const DEFAULT_EMOJI = '🙂'
 
-// ── Tipos alertas ─────────────────────────────────────────────────────────────
+// ── Tipos ─────────────────────────────────────────────────────────────────────
 interface Notif {
   id: string
   tipo: 'renovacion' | 'cobro' | 'tarea' | 'diligencia'
@@ -37,7 +36,7 @@ const TIPO_LABEL: Record<Notif['tipo'], string> = {
   diligencia: 'Diligencia',
 }
 
-// ── Hook: cerrar al click fuera ────────────────────────────────────────────────
+// ── Hook: cerrar al click fuera ───────────────────────────────────────────────
 function useOutside(ref: React.RefObject<HTMLDivElement | null>, cb: () => void) {
   useEffect(() => {
     function handler(e: MouseEvent) {
@@ -49,25 +48,25 @@ function useOutside(ref: React.RefObject<HTMLDivElement | null>, cb: () => void)
 }
 
 // ── Panel wrapper ─────────────────────────────────────────────────────────────
-function Panel({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
+function Panel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute top-14 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+    <div className="absolute top-14 right-0 w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 z-[70] overflow-hidden">
       {children}
     </div>
   )
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-export default function TopBar() {
+export default function TopBar({ hq }: { hq: 'seg' | 'mkt' }) {
   const router = useRouter()
 
   const [openPanel, setOpenPanel] = useState<'mensajes' | 'notifs' | 'perfil' | null>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
 
   // Perfil
-  const [emoji,    setEmoji]    = useState(DEFAULT_EMOJI)
-  const [userName, setUserName] = useState('')
-  const [userEmail,setUserEmail]= useState('')
+  const [emoji,       setEmoji]       = useState(DEFAULT_EMOJI)
+  const [userName,    setUserName]    = useState('')
+  const [userEmail,   setUserEmail]   = useState('')
   const [pickingEmoji, setPickingEmoji] = useState(false)
 
   // Notificaciones
@@ -76,7 +75,6 @@ export default function TopBar() {
 
   useOutside(wrapRef, () => { setOpenPanel(null); setPickingEmoji(false) })
 
-  // Cargar emoji guardado y datos del usuario
   useEffect(() => {
     const saved = localStorage.getItem(EMOJI_KEY)
     if (saved && EMOJIS.includes(saved)) setEmoji(saved)
@@ -87,7 +85,6 @@ export default function TopBar() {
     })
   }, [])
 
-  // Cargar notificaciones reales del CRM
   const loadNotifs = useCallback(async () => {
     setLoadingN(true)
     const hoy  = new Date()
@@ -164,24 +161,44 @@ export default function TopBar() {
     router.push('/login')
   }
 
+  function switchHQ() {
+    setOpenPanel(null)
+    router.push(hq === 'seg' ? '/mkt' : '/')
+  }
+
   const urgentes = notifs.filter(n => n.urgente).length
+  const isSeg = hq === 'seg'
 
   return (
     <div ref={wrapRef} className="fixed top-4 right-5 z-[60] flex items-center gap-2.5">
+
+      {/* ── HQ SWITCHER ── */}
+      <button
+        onClick={switchHQ}
+        title={isSeg ? 'Cambiar a MKT HQ' : 'Cambiar a SEG HQ'}
+        className={`h-10 px-3.5 rounded-full flex items-center gap-2 shadow-lg border-2 font-semibold text-xs tracking-wide transition-all duration-200 ${
+          isSeg
+            ? 'bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-700'
+            : 'bg-violet-600 border-violet-500 text-white hover:bg-violet-700'
+        }`}
+      >
+        <span>{isSeg ? '⚡ SEG HQ' : '🚀 MKT HQ'}</span>
+        <ArrowLeftRight className="w-3.5 h-3.5 opacity-70" />
+      </button>
 
       {/* ── MENSAJES ── */}
       <div className="relative">
         <button onClick={() => toggle('mensajes')} title="Mensajes"
           className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all duration-150 ${
             openPanel === 'mensajes'
-              ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-200'
+              ? 'bg-emerald-600 border-emerald-500 text-white'
               : 'bg-white border-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
           }`}>
           <MessageSquare className="w-4 h-4" />
         </button>
 
         {openPanel === 'mensajes' && (
-          <Panel onClose={() => setOpenPanel(null)}>
+          <Panel>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-900 text-sm">Mensajes</h3>
               <button onClick={() => setOpenPanel(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
@@ -190,11 +207,14 @@ export default function TopBar() {
               <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-3">
                 <MessageSquare className="w-6 h-6 text-emerald-600" />
               </div>
-              <p className="text-sm font-medium text-slate-700 mb-1">Mensajería CRM</p>
-              <p className="text-xs text-slate-400 mb-4">Usa el Asistente virtual para consultas rápidas sobre tus datos del CRM.</p>
+              <p className="text-sm font-medium text-slate-700 mb-1">Centro de mensajes</p>
+              <p className="text-xs text-slate-400 mb-1">
+                Próximamente conectado con WhatsApp y redes sociales.
+              </p>
+              <p className="text-xs text-slate-300 mb-4">Cada mensaje mostrará su canal de origen.</p>
               <Link href="/asistente" onClick={() => setOpenPanel(null)}
                 className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors">
-                Abrir Asistente <ExternalLink className="w-3.5 h-3.5" />
+                Asistente virtual <ExternalLink className="w-3.5 h-3.5" />
               </Link>
             </div>
           </Panel>
@@ -204,13 +224,13 @@ export default function TopBar() {
       {/* ── NOTIFICACIONES ── */}
       <div className="relative">
         <button onClick={() => toggle('notifs')} title="Notificaciones"
-          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all duration-150 ${
+          className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all duration-150 relative ${
             openPanel === 'notifs'
-              ? 'bg-emerald-600 border-emerald-500 text-white shadow-emerald-200'
+              ? 'bg-emerald-600 border-emerald-500 text-white'
               : 'bg-white border-white text-slate-600 hover:border-emerald-300 hover:text-emerald-600'
           }`}>
           <Bell className="w-4 h-4" />
-          {urgentes > 0 && (
+          {urgentes > 0 && openPanel !== 'notifs' && (
             <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center leading-none">
               {urgentes > 9 ? '9+' : urgentes}
             </span>
@@ -218,7 +238,7 @@ export default function TopBar() {
         </button>
 
         {openPanel === 'notifs' && (
-          <Panel onClose={() => setOpenPanel(null)}>
+          <Panel>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <h3 className="font-semibold text-slate-900 text-sm">Notificaciones</h3>
@@ -273,14 +293,14 @@ export default function TopBar() {
         <button onClick={() => toggle('perfil')} title="Mi perfil"
           className={`w-10 h-10 rounded-full flex items-center justify-center shadow-lg border-2 transition-all duration-150 text-lg leading-none ${
             openPanel === 'perfil'
-              ? 'border-emerald-500 shadow-emerald-200 bg-emerald-50'
+              ? 'border-emerald-500 bg-emerald-50'
               : 'bg-white border-white hover:border-emerald-300'
           }`}>
           {emoji}
         </button>
 
         {openPanel === 'perfil' && (
-          <Panel onClose={() => setOpenPanel(null)}>
+          <Panel>
             <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-semibold text-slate-900 text-sm">Mi perfil</h3>
               <button onClick={() => setOpenPanel(null)} className="text-slate-400 hover:text-slate-600"><X className="w-4 h-4" /></button>
@@ -288,7 +308,6 @@ export default function TopBar() {
 
             {!pickingEmoji ? (
               <>
-                {/* Avatar + datos */}
                 <div className="px-4 py-4 flex items-center gap-3">
                   <button onClick={() => setPickingEmoji(true)} title="Cambiar emoji"
                     className="w-14 h-14 rounded-2xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-3xl transition-colors flex-shrink-0 relative group">

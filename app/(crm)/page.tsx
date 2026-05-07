@@ -1,5 +1,11 @@
 import Dashboard from '@/components/Dashboard'
+import TopBar from '@/components/ui/TopBar'
 
 export default function Home() {
-  return <Dashboard />
+  return (
+    <>
+      <TopBar hq="seg" />
+      <Dashboard />
+    </>
+  )
 }
