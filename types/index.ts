@@ -204,6 +204,87 @@ export interface Recibo {
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
 }
 
+// ── S7: Siniestros / Facturas / Diligencias ──────────────────────────────────
+
+export type EstadoSiniestro = 'reportado' | 'en_estudio' | 'en_pago' | 'cerrado' | 'rechazado'
+
+export interface Siniestro {
+  id: string
+  numero_siniestro: number | null
+  client_id: string | null
+  poliza_id: string | null
+  aseguradora: string | null
+  ramo: string | null
+  fecha_ocurrencia: string | null
+  fecha_reporte: string
+  descripcion: string
+  amparo: string | null
+  valor_reclamado: number | null
+  valor_aprobado: number | null
+  estado: EstadoSiniestro
+  notas: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+  amparos?: SiniestroAmparo[]
+}
+
+export interface SiniestroAmparo {
+  id: string
+  siniestro_id: string
+  nombre: string
+  valor: number | null
+  estado: 'pendiente' | 'aprobado' | 'rechazado'
+  notas: string | null
+  created_at: string
+}
+
+export type EstadoFactura = 'pendiente' | 'pagada' | 'vencida' | 'anulada'
+export type TipoFactura   = 'emitida' | 'recibida'
+
+export interface Factura {
+  id: string
+  numero_factura: number | null
+  tipo: TipoFactura
+  client_id: string | null
+  poliza_id: string | null
+  aseguradora: string | null
+  concepto: string
+  valor_base: number
+  iva: number
+  total: number
+  retencion: number
+  fecha_emision: string
+  fecha_vencimiento: string | null
+  estado: EstadoFactura
+  notas: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora'>
+}
+
+export type EstadoDiligencia = 'pendiente' | 'en_proceso' | 'completada' | 'cancelada'
+export type TipoDiligencia = 'tramite' | 'certificado' | 'paz_y_salvo' | 'inclusion' | 'exclusion' | 'endoso' | 'otro'
+
+export interface Diligencia {
+  id: string
+  numero_diligencia: number | null
+  client_id: string | null
+  poliza_id: string | null
+  tipo: TipoDiligencia
+  descripcion: string
+  asignado_a: string | null
+  fecha_limite: string | null
+  estado: EstadoDiligencia
+  notas: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora'>
+}
+
 // ── Archivos ─────────────────────────────────────────────────────────────────
 
 export interface Archivo {

@@ -7,7 +7,7 @@ import {
   Bell, Shield, ChevronLeft, ChevronRight, ChevronDown,
   User, LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
-  BarChart2, FolderOpen,
+  BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -63,11 +63,20 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
+    id: 'operaciones',
+    label: 'Operaciones',
+    items: [
+      { href: '/siniestros',  label: 'Siniestros',  icon: ShieldAlert },
+      { href: '/facturas',    label: 'Facturas',    icon: FileSpreadsheet },
+      { href: '/diligencias', label: 'Diligencias', icon: ClipboardCheck },
+    ],
+  },
+  {
     id: 'reportes',
     label: 'Reportes',
     items: [
-      { href: '/informes', label: 'Informes',  icon: BarChart2 },
-      { href: '/archivos', label: 'Archivos',  icon: FolderOpen },
+      { href: '/informes', label: 'Informes', icon: BarChart2 },
+      { href: '/archivos', label: 'Archivos', icon: FolderOpen },
     ],
   },
 ]
