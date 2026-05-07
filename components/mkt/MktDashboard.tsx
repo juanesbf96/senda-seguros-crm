@@ -45,7 +45,7 @@ const MODULES = [
 ]
 
 const TAG_COLORS: Record<string, string> = {
-  'Captación': 'bg-violet-100 text-violet-700',
+  'Captación': 'bg-sky-100 text-sky-700',
   'Campañas':  'bg-fuchsia-100 text-fuchsia-700',
   'Analytics': 'bg-emerald-100 text-emerald-700',
 }
@@ -56,11 +56,11 @@ export default function MktDashboard() {
 
       {/* Hero */}
       <div className="mb-8 mt-2">
-        <div className="inline-flex items-center gap-2 bg-violet-100 text-violet-700 text-xs font-semibold px-3 py-1 rounded-full mb-3">
+        <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-700 text-xs font-semibold px-3 py-1 rounded-full mb-3">
           <span>🚀</span> MKT HQ — Marketing Command Center
         </div>
         <h1 className="text-3xl font-bold text-slate-900 mb-2">
-          El CRM de marketing está <span className="text-violet-600">en construcción</span>
+          El CRM de marketing está <span className="text-sky-600">en construcción</span>
         </h1>
         <p className="text-slate-500 max-w-2xl">
           Aquí vivirán todas las herramientas para atraer, convertir y fidelizar clientes.
@@ -71,7 +71,7 @@ export default function MktDashboard() {
       {/* Stats placeholder */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
         {[
-          { label: 'Leads activos',     value: '—', icon: UserPlus,   color: 'bg-violet-50 text-violet-600' },
+          { label: 'Leads activos',     value: '—', icon: UserPlus,   color: 'bg-violet-50 text-sky-600' },
           { label: 'Campañas activas',  value: '—', icon: Megaphone,  color: 'bg-fuchsia-50 text-fuchsia-600' },
           { label: 'Mensajes hoy',      value: '—', icon: MessageSquare, color: 'bg-blue-50 text-blue-600' },
           { label: 'Conversión',        value: '—', icon: BarChart3,  color: 'bg-emerald-50 text-emerald-600' },
@@ -108,7 +108,7 @@ export default function MktDashboard() {
               <h3 className="font-semibold text-slate-900 mb-1">{label}</h3>
               <p className="text-sm text-slate-500 leading-relaxed">{desc}</p>
             </div>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-violet-600 transition-colors mt-auto pt-1">
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-sky-600 transition-colors mt-auto pt-1">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
               Próximamente
               <ArrowRight className="w-3 h-3 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -118,11 +118,11 @@ export default function MktDashboard() {
       </div>
 
       {/* Bottom note */}
-      <div className="mt-8 p-4 bg-violet-50 border border-violet-100 rounded-xl flex items-start gap-3">
+      <div className="mt-8 p-4 bg-sky-50 border border-sky-100 rounded-xl flex items-start gap-3">
         <span className="text-2xl flex-shrink-0">💡</span>
         <div>
-          <p className="text-sm font-semibold text-violet-900 mb-1">Ingeniería inversa en curso</p>
-          <p className="text-sm text-violet-700">
+          <p className="text-sm font-semibold text-sky-900 mb-1">Ingeniería inversa en curso</p>
+          <p className="text-sm text-sky-700">
             Los módulos se construirán basados en las mejores herramientas de marketing para aseguradoras.
             Follow-up funnels, mensajería multicanal y automatizaciones serán el núcleo.
           </p>

@@ -94,18 +94,18 @@ export default function MktSidebar() {
   }
 
   if (!mounted) {
-    return <aside className="w-60 flex-shrink-0 bg-violet-950" />
+    return <aside className="w-60 flex-shrink-0 bg-slate-900" />
   }
 
   return (
     <aside className={[
-      'flex-shrink-0 bg-violet-950 text-white flex flex-col h-full',
+      'flex-shrink-0 bg-slate-900 text-white flex flex-col h-full',
       'transition-[width] motion-reduce:transition-none duration-[220ms] ease-out',
       collapsed ? 'w-[60px]' : 'w-60',
     ].join(' ')}>
 
       {/* ── Header ── */}
-      <div className="h-[60px] flex-shrink-0 border-b border-violet-800 flex items-center px-2.5 gap-2 overflow-hidden">
+      <div className="h-[60px] flex-shrink-0 border-b border-slate-700 flex items-center px-2.5 gap-2 overflow-hidden">
         {!collapsed && (
           <>
             <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
@@ -113,7 +113,7 @@ export default function MktSidebar() {
             </div>
             <div className="flex-1 min-w-0 overflow-hidden">
               <p className="font-bold text-sm leading-tight whitespace-nowrap">MKT HQ</p>
-              <p className="text-xs text-violet-400">Marketing Command</p>
+              <p className="text-xs text-sky-400">Marketing Command</p>
             </div>
           </>
         )}
@@ -121,7 +121,7 @@ export default function MktSidebar() {
           aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           className={[
             'flex items-center justify-center rounded-lg flex-shrink-0 w-9 h-9',
-            'text-violet-400 hover:text-white hover:bg-violet-800 active:bg-violet-700',
+            'text-sky-400 hover:text-white hover:bg-slate-800 active:bg-slate-700',
             'transition-colors duration-150',
             collapsed ? 'mx-auto' : '',
           ].join(' ')}>
@@ -138,7 +138,7 @@ export default function MktSidebar() {
             <div key={group.id} className="mb-1">
               {!collapsed && (
                 <button onClick={() => toggleGroup(group.id)}
-                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-violet-500 hover:text-violet-300 transition-colors">
+                  className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400 hover:text-slate-300 transition-colors">
                   <span>{group.label}</span>
                   <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${isOpen ? '' : '-rotate-90'}`} />
                 </button>
@@ -159,22 +159,22 @@ export default function MktSidebar() {
                             collapsed ? 'justify-center px-2' : 'gap-3 px-3',
                             soon ? 'opacity-50 cursor-default' : '',
                             active && !soon
-                              ? 'bg-violet-600 text-white'
-                              : 'text-violet-300 hover:bg-violet-800 hover:text-white',
+                              ? 'bg-sky-600 text-white'
+                              : 'text-slate-300 hover:bg-slate-800 hover:text-white',
                           ].join(' ')}>
                           <Icon className="w-4 h-4 flex-shrink-0" />
                           {!collapsed && (
                             <span className="flex-1 whitespace-nowrap overflow-hidden text-sm">{label}</span>
                           )}
                           {!collapsed && soon && (
-                            <span className="text-[9px] font-bold bg-violet-700 text-violet-300 px-1.5 py-0.5 rounded uppercase tracking-wide">
+                            <span className="text-[9px] font-bold bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded uppercase tracking-wide">
                               Soon
                             </span>
                           )}
                         </Link>
                         {/* Tooltip */}
                         {collapsed && (
-                          <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-violet-900 border border-violet-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out">
+                          <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-slate-800 border border-slate-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150 ease-out">
                             <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-violet-700" />
                             {label}{soon ? ' (próximo)' : ''}
                           </div>
@@ -185,26 +185,26 @@ export default function MktSidebar() {
                 </div>
               )}
 
-              {collapsed && <div className="mx-3 my-1 border-t border-violet-800/50" />}
+              {collapsed && <div className="mx-3 my-1 border-t border-slate-700/40" />}
             </div>
           )
         })}
       </nav>
 
       {/* ── Footer ── */}
-      <div className="border-t border-violet-800 px-2 py-2 space-y-0.5">
+      <div className="border-t border-slate-700 px-2 py-2 space-y-0.5">
         <div className="relative group">
           <Link href="/configuracion"
             className={[
               'flex items-center rounded-lg text-sm font-medium min-h-[38px] transition-colors duration-150',
               collapsed ? 'justify-center px-2' : 'gap-3 px-3',
-              'text-violet-400 hover:bg-violet-800 hover:text-white',
+              'text-sky-400 hover:bg-slate-800 hover:text-white',
             ].join(' ')}>
             <Settings className="w-4 h-4 flex-shrink-0" />
             {!collapsed && <span className="text-sm">Configuración</span>}
           </Link>
           {collapsed && (
-            <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-violet-900 border border-violet-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150">
+            <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-slate-800 border border-slate-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150">
               <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-violet-700" />
               Configuración
             </div>
@@ -216,13 +216,13 @@ export default function MktSidebar() {
             className={[
               'w-full flex items-center rounded-lg text-sm font-medium min-h-[38px] transition-colors duration-150',
               collapsed ? 'justify-center px-2' : 'gap-3 px-3',
-              'text-violet-500 hover:bg-violet-800 hover:text-red-400',
+              'text-slate-400 hover:bg-slate-800 hover:text-red-400',
             ].join(' ')}>
             <LogOut className="w-4 h-4 flex-shrink-0" />
             {!collapsed && <span className="text-sm">Cerrar sesión</span>}
           </button>
           {collapsed && (
-            <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-violet-900 border border-violet-700 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150">
+            <div role="tooltip" className="pointer-events-none absolute left-full top-1/2 -translate-y-1/2 ml-3 z-50 bg-slate-800 border border-slate-600 text-white text-xs font-medium px-2.5 py-1.5 rounded-lg shadow-xl whitespace-nowrap opacity-0 translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-[opacity,transform] duration-150">
               <span className="absolute right-full top-1/2 -translate-y-1/2 border-4 border-transparent border-r-violet-700" />
               Cerrar sesión
             </div>

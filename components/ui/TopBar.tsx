@@ -179,7 +179,7 @@ export default function TopBar({ hq }: { hq: 'seg' | 'mkt' }) {
         className={`h-10 px-3.5 rounded-full flex items-center gap-2 shadow-lg border-2 font-semibold text-xs tracking-wide transition-all duration-200 ${
           isSeg
             ? 'bg-emerald-600 border-emerald-500 text-white hover:bg-emerald-700'
-            : 'bg-violet-600 border-violet-500 text-white hover:bg-violet-700'
+            : 'bg-sky-600 border-sky-500 text-white hover:bg-sky-700'
         }`}
       >
         <span>{isSeg ? '⚡ SEG HQ' : '🚀 MKT HQ'}</span>
