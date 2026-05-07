@@ -204,6 +204,30 @@ export interface Recibo {
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
 }
 
+// ── Agenda ───────────────────────────────────────────────────────────────────
+
+export type TipoEvento = 'evento' | 'reunion' | 'llamada' | 'recordatorio' | 'otro'
+
+export interface AgendaEvento {
+  id: string
+  titulo: string
+  descripcion: string | null
+  fecha_inicio: string
+  fecha_fin: string
+  todo_el_dia: boolean
+  color: string
+  tipo: TipoEvento
+  notas: string | null
+  client_id: string | null
+  poliza_id: string | null
+  prospecto_id: string | null
+  created_at: string
+  updated_at: string
+  cliente?: Pick<Cliente, 'id' | 'nombre'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora'>
+  prospecto?: Pick<Prospecto, 'id' | 'nombre'>
+}
+
 // ── S5: Vendedores / Liquidaciones / Prospectos ──────────────────────────────
 
 export interface Vendedor {

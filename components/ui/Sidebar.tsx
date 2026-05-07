@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Users, FileText, Kanban,
   Bell, Shield, ChevronLeft, ChevronRight, ChevronDown,
   User, LogOut, ClipboardList, CheckSquare, Send,
-  DollarSign, Receipt, UserCog, Calculator, TrendingUp,
+  DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 
@@ -49,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'gestion',
     label: 'Gestión',
     items: [
+      { href: '/agenda',     label: 'Agenda',     icon: CalendarDays },
       { href: '/tareas',     label: 'Tareas',     icon: CheckSquare },
       { href: '/vendedores', label: 'Vendedores', icon: UserCog },
     ],
