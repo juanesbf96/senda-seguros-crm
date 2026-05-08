@@ -6,6 +6,7 @@ import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Search, AlertTriangle, Plus, Pencil, Trash2,
   FileText, ShieldCheck, Paperclip, Users, Archive, RefreshCw,
+  SlidersHorizontal, X,
 } from 'lucide-react'
 import Link from 'next/link'
 import PolizaModal from './PolizaModal'
@@ -23,8 +24,29 @@ const ESTADO_LABELS: Record<EstadoPoliza, string> = {
 }
 
 const RAMOS_CUMPLIMIENTO = ['Fianzas', 'Cumplimiento']
+const ASEGURADORAS = [
+  'Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria',
+  'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado','Otro',
+]
+const RAMOS_SEGUROS = [
+  'Vida Individual','Vida Grupo','SOAT','Todo Riesgo Vehículo','Responsabilidad Civil',
+  'Hogar','Incendio','Empresarial','Salud','ARL','Transportes','Agrícola','Otros',
+]
+
 type Tab = 'polizas' | 'anexos' | 'vinculados' | 'eliminadas' | 'cumplimiento'
 type PolizaConCliente = Poliza & { cliente: { id: string; nombre: string } | null }
+
+interface ExtraFilters {
+  aseguradora: string
+  ramo:        string
+  modalidad:   string
+  vencimiento: string   // 'all' | '30' | '60'
+}
+const defaultExtra: ExtraFilters = { aseguradora: '', ramo: '', modalidad: '', vencimiento: 'all' }
+
+function countExtra(f: ExtraFilters) {
+  return [!!f.aseguradora, !!f.ramo, !!f.modalidad, f.vencimiento !== 'all'].filter(Boolean).length
+}
 
 export default function PolizasList() {
   const [polizas, setPolizas]       = useState<PolizaConCliente[]>([])
@@ -34,6 +56,8 @@ export default function PolizasList() {
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
   const [filterEstado, setFilterEstado] = useState<EstadoPoliza | 'all'>('all')
+  const [extra, setExtra]           = useState<ExtraFilters>(defaultExtra)
+  const [showFilters, setShowFilters] = useState(false)
   const [activeTab, setActiveTab]   = useState<Tab>('polizas')
 
   // Modals
@@ -118,15 +142,26 @@ export default function PolizasList() {
   const q = search.toLowerCase()
 
   function filterPolizas(list: PolizaConCliente[]) {
+    const today = new Date()
     return list.filter(p => {
       const matchSearch = !search ||
         p.cliente?.nombre?.toLowerCase().includes(q) ||
         p.aseguradora.toLowerCase().includes(q) ||
         p.ramo.toLowerCase().includes(q) ||
         p.numero_poliza?.includes(search) ||
-        p.riesgo?.toLowerCase().includes(q)
-      const matchEstado = filterEstado === 'all' || p.estado === filterEstado
-      return matchSearch && matchEstado
+        p.riesgo?.toLowerCase().includes(q) ||
+        p.nombre_tomador?.toLowerCase().includes(q)
+      const matchEstado    = filterEstado === 'all' || p.estado === filterEstado
+      const matchAseg      = !extra.aseguradora || p.aseguradora === extra.aseguradora
+      const matchRamo      = !extra.ramo        || p.ramo === extra.ramo
+      const matchModalidad = !extra.modalidad   || p.tipo_modalidad === extra.modalidad
+      let matchVenc = true
+      if (extra.vencimiento !== 'all' && p.fecha_fin) {
+        const days = Math.ceil((new Date(p.fecha_fin).getTime() - today.getTime()) / 86400000)
+        const limit = parseInt(extra.vencimiento)
+        matchVenc = days >= 0 && days <= limit
+      }
+      return matchSearch && matchEstado && matchAseg && matchRamo && matchModalidad && matchVenc
     })
   }
 
@@ -218,24 +253,81 @@ export default function PolizasList() {
         ))}
       </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 mb-5 flex-wrap">
+      {/* ── Filters ── */}
+      <div className="flex gap-3 mb-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar..."
+            placeholder="Buscar por cliente, aseguradora, N° póliza..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
         </div>
+
         {(activeTab === 'polizas' || activeTab === 'cumplimiento') && (
           <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as EstadoPoliza | 'all')}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            className={selCls(filterEstado !== 'all')}>
             <option value="all">Todos los estados</option>
             {(Object.entries(ESTADO_LABELS) as [EstadoPoliza, string][]).map(([k, v]) => (
               <option key={k} value={k}>{v}</option>
             ))}
           </select>
         )}
+
+        {(activeTab === 'polizas' || activeTab === 'cumplimiento') && (
+          <button onClick={() => setShowFilters(v => !v)}
+            className={[
+              'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors',
+              showFilters || countExtra(extra) > 0
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+            ].join(' ')}>
+            <SlidersHorizontal className="w-4 h-4" />
+            Filtros
+            {countExtra(extra) > 0 && (
+              <span className="bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                {countExtra(extra)}
+              </span>
+            )}
+          </button>
+        )}
+
+        {(countExtra(extra) > 0 || filterEstado !== 'all' || search) && (
+          <button onClick={() => { setExtra(defaultExtra); setFilterEstado('all'); setSearch('') }}
+            className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors px-2">
+            <X className="w-3.5 h-3.5" /> Limpiar
+          </button>
+        )}
       </div>
+
+      {/* ── Panel filtros avanzados ── */}
+      {showFilters && (activeTab === 'polizas' || activeTab === 'cumplimiento') && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <FiltroSelect label="Aseguradora" value={extra.aseguradora} onChange={v => setExtra(e => ({ ...e, aseguradora: v }))}>
+            <option value="">Todas</option>
+            {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
+          </FiltroSelect>
+          <FiltroSelect label="Ramo" value={extra.ramo} onChange={v => setExtra(e => ({ ...e, ramo: v }))}>
+            <option value="">Todos</option>
+            <optgroup label="Seguros">
+              {RAMOS_SEGUROS.map(r => <option key={r} value={r}>{r}</option>)}
+            </optgroup>
+            <optgroup label="Cumplimiento">
+              {RAMOS_CUMPLIMIENTO.map(r => <option key={r} value={r}>{r}</option>)}
+            </optgroup>
+          </FiltroSelect>
+          <FiltroSelect label="Modalidad" value={extra.modalidad} onChange={v => setExtra(e => ({ ...e, modalidad: v }))}>
+            <option value="">Todas</option>
+            <option value="individual">Individual</option>
+            <option value="colectiva">Colectiva</option>
+            <option value="agrupadora">Agrupadora</option>
+          </FiltroSelect>
+          <FiltroSelect label="Vencimiento" value={extra.vencimiento} onChange={v => setExtra(e => ({ ...e, vencimiento: v }))}>
+            <option value="all">Cualquier fecha</option>
+            <option value="30">Próximos 30 días</option>
+            <option value="60">Próximos 60 días</option>
+            <option value="90">Próximos 90 días</option>
+          </FiltroSelect>
+        </div>
+      )}
 
       {/* ── Tab: Pólizas ── */}
       {activeTab === 'polizas' && (
@@ -497,6 +589,28 @@ export default function PolizasList() {
           onSaved={() => { setShowVinculadoModal(false); loadVinculados() }}
         />
       )}
+    </div>
+  )
+}
+
+/* ── helpers ── */
+function selCls(active: boolean) {
+  return [
+    'px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-colors',
+    active ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600',
+  ].join(' ')
+}
+
+function FiltroSelect({ label, value, onChange, children }: {
+  label: string; value: string; onChange: (v: string) => void; children: React.ReactNode
+}) {
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+        {children}
+      </select>
     </div>
   )
 }
