@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check } from 'lucide-react'
+import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight } from 'lucide-react'
 import { ConfigItem } from '@/types'
 
 const AGENCY_KEYS = ['nombre_agencia', 'nit', 'telefono', 'email', 'ciudad', 'departamento', 'direccion']
@@ -268,8 +268,93 @@ function CategoriasEditor({ value, onChange }: { value: string; onChange: (v: st
   )
 }
 
+/* ── Módulos configurables ──────────────────────────── */
+interface ModuloConfig {
+  key: string
+  label: string
+  descripcion: string
+  group: string
+  requiere?: string   // key of a module that must be enabled first
+}
+
+const MODULOS: ModuloConfig[] = [
+  // CRM core
+  { key: 'modulo_prospectos',     label: 'Prospectos / Pipeline',         descripcion: 'Kanban de oportunidades y seguimiento de prospectos antes de convertirlos en clientes.',         group: 'CRM' },
+  { key: 'modulo_segmentos',      label: 'Segmentos de clientes',         descripcion: 'Filtra y agrupa clientes por categoría, ramo, ciudad u otras variables de segmentación.',         group: 'CRM' },
+  { key: 'modulo_agenda',         label: 'Agenda y calendario',           descripcion: 'Eventos, recordatorios y reuniones vinculados a clientes y pólizas.',                             group: 'CRM' },
+  { key: 'modulo_tareas',         label: 'Gestión de tareas',             descripcion: 'Tablero de tareas por estado con prioridades y asignación de responsables.',                      group: 'CRM' },
+  // Pólizas / producción
+  { key: 'modulo_renovaciones',   label: 'Campañas de renovación',        descripcion: 'Gestor de campañas de renovación con seguimiento por estado (pendiente, renovado, no renueva).',  group: 'Producción' },
+  { key: 'modulo_cumplimiento',   label: 'Pólizas de cumplimiento',       descripcion: 'Subsección de pólizas para ramo Cumplimiento / Judicial con campos especiales.',                 group: 'Producción' },
+  { key: 'modulo_anexos',         label: 'Anexos de pólizas',             descripcion: 'Control de anexos y vinculados asociados a cada póliza.',                                        group: 'Producción' },
+  { key: 'modulo_cierre_prod',    label: 'Cierre de producción',          descripcion: 'Bloqueo contable al cierre de mes o período para evitar modificaciones retroactivas.',             group: 'Producción' },
+  { key: 'modulo_cocorretaje',    label: 'Cocorretaje',                   descripcion: 'Gestión de pólizas compartidas entre varias corredoras con reparto de comisiones.',               group: 'Producción' },
+  // Finanzas
+  { key: 'modulo_siniestros',     label: 'Siniestros',                    descripcion: 'Registro y seguimiento de siniestros con amparos, valores reclamados y estado de pago.',         group: 'Finanzas' },
+  { key: 'modulo_diligencias',    label: 'Diligencias',                   descripcion: 'Control de trámites, certificados y paz y salvos pendientes.',                                   group: 'Finanzas' },
+  { key: 'modulo_conciliacion',   label: 'Conciliación de comisiones',    descripcion: 'Cuadre entre comisiones emitidas en facturas y pagos recibidos de aseguradoras.',                group: 'Finanzas' },
+  { key: 'modulo_reteiva_vend',   label: 'Reteiva a vendedores',          descripcion: 'Aplica retención de IVA en las liquidaciones de vendedores según régimen tributario.',            group: 'Finanzas' },
+  { key: 'modulo_pagos_auto',     label: 'Crear pagos automáticos',       descripcion: 'Genera cobros y recibos automáticamente al registrar una póliza o renovación.',                  group: 'Finanzas' },
+  // Comunicación
+  { key: 'modulo_notif_email',    label: 'Notificaciones por correo',     descripcion: 'Envío de alertas de renovación, vencimiento y novedades a clientes por email.',                 group: 'Comunicación' },
+  { key: 'modulo_remision_pdf',   label: 'Remisión PDF automática',       descripcion: 'Generación de PDF de remisiones para enviar a aseguradoras.',                                    group: 'Comunicación' },
+  { key: 'modulo_archivos',       label: 'Módulo de archivos',            descripcion: 'Gestor de documentos adjuntos por cliente, póliza y prospecto con subida a la nube.',           group: 'Comunicación' },
+]
+
+const MODULO_GROUPS = ['CRM', 'Producción', 'Finanzas', 'Comunicación']
+
+function ModulosEditor({ config, onToggle }: {
+  config: Record<string, string>
+  onToggle: (key: string, val: boolean) => void
+}) {
+  return (
+    <div className="space-y-6">
+      {MODULO_GROUPS.map(group => {
+        const items = MODULOS.filter(m => m.group === group)
+        return (
+          <div key={group} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-200">
+              <h3 className="text-sm font-semibold text-slate-700">{group}</h3>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {items.map(mod => {
+                const enabled = config[mod.key] === '1'
+                return (
+                  <div key={mod.key} className="flex items-center gap-4 px-5 py-4">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-slate-800">{mod.label}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{mod.descripcion}</p>
+                    </div>
+                    <button
+                      onClick={() => onToggle(mod.key, !enabled)}
+                      className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                        enabled
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
+                          : 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {enabled
+                        ? <><ToggleRight className="w-4 h-4 text-emerald-500" /> Activo</>
+                        : <><ToggleLeft className="w-4 h-4 text-slate-400" /> Inactivo</>
+                      }
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
+
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        <strong>Nota:</strong> Activar o desactivar un módulo no elimina los datos existentes. Solo oculta o muestra la funcionalidad en la interfaz. Los cambios aplican después de guardar.
+      </div>
+    </div>
+  )
+}
+
 /* ── Main Component ─────────────────────────────────── */
-type TabKey = 'agencia' | 'listas' | 'categorias'
+type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos'
 
 export default function ConfiguracionView() {
   const [config, setConfig]   = useState<Record<string, string>>({})
@@ -309,10 +394,15 @@ export default function ConfiguracionView() {
     </div>
   )
 
+  function toggleModulo(key: string, val: boolean) {
+    set(key, val ? '1' : '0')
+  }
+
   const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
-    { key: 'agencia',    label: 'Datos de la agencia',   icon: Building2 },
-    { key: 'listas',     label: 'Listados del sistema',  icon: List },
+    { key: 'agencia',    label: 'Datos de la agencia',    icon: Building2 },
+    { key: 'listas',     label: 'Listados del sistema',   icon: List },
     { key: 'categorias', label: 'Categorías de clientes', icon: Tag },
+    { key: 'modulos',    label: 'Módulos',                icon: ToggleRight },
   ]
 
   return (
@@ -427,6 +517,24 @@ export default function ConfiguracionView() {
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
             <strong>Nota:</strong> Los cambios en los listados no afectan los registros ya guardados. Solo modifican las opciones disponibles en los nuevos formularios. Recuerda guardar los cambios con el botón superior.
           </div>
+        </div>
+      )}
+
+      {/* ── Módulos tab ── */}
+      {tab === 'modulos' && (
+        <div>
+          <div className="flex items-start gap-3 mb-5">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+              <ToggleRight className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-800">Módulos configurables</h3>
+              <p className="text-sm text-slate-500 mt-0.5">
+                Activa o desactiva funcionalidades del CRM según las necesidades de tu agencia.
+              </p>
+            </div>
+          </div>
+          <ModulosEditor config={config} onToggle={toggleModulo} />
         </div>
       )}
 

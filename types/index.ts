@@ -278,8 +278,8 @@ export interface SiniestroAmparo {
   created_at: string
 }
 
-export type EstadoFactura = 'pendiente' | 'pagada' | 'vencida' | 'anulada'
-export type TipoFactura   = 'emitida' | 'recibida'
+export type EstadoFactura = 'pendiente' | 'pagada' | 'vencida' | 'anulada' | 'borrador'
+export type TipoFactura   = 'emitida' | 'recibida' | 'nota_credito' | 'nota_debito'
 
 export interface Factura {
   id: string
@@ -289,10 +289,26 @@ export interface Factura {
   poliza_id: string | null
   aseguradora: string | null
   concepto: string
+  // Legacy fields (kept for backward compat)
   valor_base: number
   iva: number
-  total: number
   retencion: number
+  total: number
+  // v2 — spec tributaria colombiana
+  fecha_corte: string | null
+  comision_gravada: number
+  comision_no_gravada: number
+  pct_iva: number
+  pct_ret_iva: number
+  ret_iva: number
+  pct_ret_ica: number
+  ret_ica: number
+  pct_ret_fuente: number
+  ret_fuente: number
+  otros: number
+  gran_total: number
+  es_borrador: boolean
+  sede: string | null
   fecha_emision: string
   fecha_vencimiento: string | null
   estado: EstadoFactura
