@@ -34,7 +34,7 @@ interface UploadForm {
   prospecto_id: string
 }
 
-export default function ArchivosView() {
+export default function ArchivosView({ clienteId }: { clienteId?: string }) {
   const [archivos,    setArchivos]    = useState<Archivo[]>([])
   const [clientes,    setClientes]    = useState<Pick<Cliente,  'id'|'nombre'>[]>([])
   const [polizas,     setPolizas]     = useState<Pick<Poliza,   'id'|'numero_poliza'|'aseguradora'>[]>([])
@@ -44,16 +44,19 @@ export default function ArchivosView() {
   const [search,      setSearch]      = useState('')
   const [filterTipo,  setFilterTipo]  = useState('')
   const [uploadForm,  setUploadForm]  = useState<UploadForm>({
-    open: false, file: null, descripcion: '', client_id: '', poliza_id: '', prospecto_id: '',
+    open: false, file: null, descripcion: '', client_id: clienteId || '', poliza_id: '', prospecto_id: '',
   })
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
+    let archQ = supabase.from('archivos')
+      .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora), prospecto:prospectos(id,nombre)')
+      .order('created_at', { ascending: false })
+    if (clienteId) archQ = archQ.eq('client_id', clienteId)
+
     const [archRes, clRes, proRes] = await Promise.all([
-      supabase.from('archivos')
-        .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora), prospecto:prospectos(id,nombre)')
-        .order('created_at', { ascending: false }),
+      archQ,
       supabase.from('clientes').select('id,nombre').order('nombre'),
       supabase.from('prospectos').select('id,nombre').order('nombre'),
     ])
@@ -63,7 +66,7 @@ export default function ArchivosView() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [clienteId])
 
   useEffect(() => {
     if (!uploadForm.client_id) { setPolizas([]); return }

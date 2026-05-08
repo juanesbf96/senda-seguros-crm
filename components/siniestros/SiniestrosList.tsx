@@ -24,7 +24,7 @@ const ESTADO_COLORS: Record<EstadoSiniestro, string> = {
 
 type Tab = EstadoSiniestro | 'todos'
 
-export default function SiniestrosList() {
+export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
   const [siniestros, setSiniestros] = useState<Siniestro[]>([])
   const [loading,    setLoading]    = useState(true)
   const [search,     setSearch]     = useState('')
@@ -33,15 +33,17 @@ export default function SiniestrosList() {
   const [editing,    setEditing]    = useState<Siniestro | undefined>()
 
   async function load() {
-    const { data } = await supabase
+    let q = supabase
       .from('siniestros')
       .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora,ramo), amparos:siniestro_amparos(*)')
       .order('created_at', { ascending: false })
+    if (clienteId) q = q.eq('client_id', clienteId)
+    const { data } = await q
     setSiniestros((data || []) as Siniestro[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [clienteId])
 
   async function deleteSiniestro(id: string) {
     if (!confirm('¿Eliminar este siniestro?')) return
@@ -181,6 +183,7 @@ export default function SiniestrosList() {
 
       {showModal && (
         <SiniestroModal siniestro={editing}
+          clienteId={clienteId}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load() }} />
       )}

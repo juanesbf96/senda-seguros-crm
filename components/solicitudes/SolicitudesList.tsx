@@ -25,7 +25,7 @@ function formatDate(d: string | null) {
   return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-export default function SolicitudesList() {
+export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
@@ -34,15 +34,17 @@ export default function SolicitudesList() {
   const [editing, setEditing]         = useState<Solicitud | undefined>()
 
   async function load() {
-    const { data } = await supabase
+    let q = supabase
       .from('solicitudes')
       .select('*, cliente:clientes(id, nombre), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
       .order('numero_solicitud', { ascending: false })
+    if (clienteId) q = q.eq('client_id', clienteId)
+    const { data } = await q
     setSolicitudes((data || []) as Solicitud[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [clienteId])
 
   async function deleteSolicitud(id: string) {
     if (!confirm('¿Eliminar esta solicitud?')) return
@@ -203,6 +205,7 @@ export default function SolicitudesList() {
       {showModal && (
         <SolicitudModal
           solicitud={editing}
+          clienteId={clienteId}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load() }}
         />
