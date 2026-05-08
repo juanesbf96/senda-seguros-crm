@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical } from 'lucide-react'
+import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check } from 'lucide-react'
 import { ConfigItem } from '@/types'
 
 const AGENCY_KEYS = ['nombre_agencia', 'nit', 'telefono', 'email', 'ciudad', 'departamento', 'direccion']
@@ -10,6 +10,13 @@ const AGENCY_LABELS: Record<string, string> = {
   email: 'Correo electrónico', ciudad: 'Ciudad', departamento: 'Departamento', direccion: 'Dirección',
 }
 
+const PRESET_COLORS = [
+  '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
+  '#ec4899', '#14b8a6', '#f97316', '#64748b', '#1d4ed8',
+  '#16a34a', '#dc2626', '#7c3aed', '#0284c7', '#b45309',
+]
+
+/* ── TagListEditor ──────────────────────────────────── */
 function TagListEditor({ label, value, onChange }: {
   label: string; value: string; onChange: (v: string) => void
 }) {
@@ -65,12 +72,211 @@ function TagListEditor({ label, value, onChange }: {
   )
 }
 
+/* ── Categorías Editor ──────────────────────────────── */
+interface Categoria {
+  id: string
+  nombre: string
+  color: string
+  descripcion: string
+}
+
+const CAT_DEFAULTS: Omit<Categoria, 'id'> = { nombre: '', color: '#10b981', descripcion: '' }
+
+function CategoriasEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [cats,    setCats]    = useState<Categoria[]>([])
+  const [editId,  setEditId]  = useState<string | null>(null)
+  const [editData, setEditData] = useState<Omit<Categoria, 'id'>>(CAT_DEFAULTS)
+  const [newForm, setNewForm] = useState<Omit<Categoria, 'id'>>(CAT_DEFAULTS)
+  const [adding,  setAdding]  = useState(false)
+
+  useEffect(() => {
+    try { setCats(JSON.parse(value || '[]')) } catch { setCats([]) }
+  }, [value])
+
+  function sync(next: Categoria[]) {
+    setCats(next)
+    onChange(JSON.stringify(next))
+  }
+
+  function addCat() {
+    if (!newForm.nombre.trim()) return
+    const cat: Categoria = { id: crypto.randomUUID(), ...newForm, nombre: newForm.nombre.trim() }
+    sync([...cats, cat])
+    setNewForm(CAT_DEFAULTS)
+    setAdding(false)
+  }
+
+  function startEdit(cat: Categoria) {
+    setEditId(cat.id)
+    setEditData({ nombre: cat.nombre, color: cat.color, descripcion: cat.descripcion })
+  }
+
+  function saveEdit() {
+    if (!editData.nombre.trim() || !editId) return
+    sync(cats.map(c => c.id === editId ? { ...c, ...editData, nombre: editData.nombre.trim() } : c))
+    setEditId(null)
+  }
+
+  function removeCat(id: string) {
+    if (!confirm('¿Eliminar esta categoría? Los clientes con esta categoría quedarán sin categoría asignada.')) return
+    sync(cats.filter(c => c.id !== id))
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Existing categories */}
+      {cats.map(cat => (
+        <div key={cat.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          {editId === cat.id ? (
+            /* Edit row */
+            <div className="p-4 space-y-3">
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Nombre</label>
+                  <input value={editData.nombre} onChange={e => setEditData(d => ({ ...d, nombre: e.target.value }))}
+                    className={iCls} placeholder="Nombre de la categoría" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-500 mb-1">Color</label>
+                  <div className="flex flex-wrap gap-1.5 w-48">
+                    {PRESET_COLORS.map(c => (
+                      <button key={c} onClick={() => setEditData(d => ({ ...d, color: c }))}
+                        style={{ backgroundColor: c }}
+                        className={`w-6 h-6 rounded-full border-2 transition-all ${editData.color === c ? 'border-slate-800 scale-110' : 'border-transparent'}`} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-500 mb-1">Descripción (opcional)</label>
+                <input value={editData.descripcion} onChange={e => setEditData(d => ({ ...d, descripcion: e.target.value }))}
+                  className={iCls} placeholder="Ej: Clientes con alto volumen de pólizas" />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button onClick={() => setEditId(null)}
+                  className="px-3 py-1.5 text-sm border border-slate-200 text-slate-600 rounded-lg hover:bg-slate-50">
+                  Cancelar
+                </button>
+                <button onClick={saveEdit} disabled={!editData.nombre.trim()}
+                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+                  <Check className="w-3.5 h-3.5" /> Guardar
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Display row */
+            <div className="flex items-center gap-3 px-4 py-3 group">
+              <div className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center"
+                style={{ backgroundColor: cat.color + '20', border: `2px solid ${cat.color}` }}>
+                <span className="w-3 h-3 rounded-full" style={{ backgroundColor: cat.color }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-slate-800 text-sm">{cat.nombre}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full text-white font-medium"
+                    style={{ backgroundColor: cat.color }}>
+                    {cat.nombre}
+                  </span>
+                </div>
+                {cat.descripcion && (
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">{cat.descripcion}</p>
+                )}
+              </div>
+              <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button onClick={() => startEdit(cat)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button onClick={() => removeCat(cat.id)}
+                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {cats.length === 0 && !adding && (
+        <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+          <Tag className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+          <p className="text-sm text-slate-400">No hay categorías creadas</p>
+          <p className="text-xs text-slate-400 mt-1">Crea categorías para clasificar y segmentar tus clientes</p>
+        </div>
+      )}
+
+      {/* Add new form */}
+      {adding ? (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-emerald-800">Nueva categoría</p>
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Nombre *</label>
+              <input value={newForm.nombre} onChange={e => setNewForm(f => ({ ...f, nombre: e.target.value }))}
+                onKeyDown={e => { if (e.key === 'Enter') addCat() }}
+                className={iCls} placeholder="Ej: VIP, Preferencial, Estándar..." autoFocus />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Color</label>
+              <div className="flex flex-wrap gap-1.5 w-48">
+                {PRESET_COLORS.map(c => (
+                  <button key={c} onClick={() => setNewForm(f => ({ ...f, color: c }))}
+                    style={{ backgroundColor: c }}
+                    className={`w-6 h-6 rounded-full border-2 transition-all ${newForm.color === c ? 'border-slate-800 scale-110' : 'border-transparent'}`} />
+                ))}
+              </div>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-slate-600 mb-1">Descripción (opcional)</label>
+            <input value={newForm.descripcion} onChange={e => setNewForm(f => ({ ...f, descripcion: e.target.value }))}
+              className={iCls} placeholder="Descripción breve de la categoría" />
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => { setAdding(false); setNewForm(CAT_DEFAULTS) }}
+              className="px-3 py-1.5 text-sm border border-slate-200 bg-white text-slate-600 rounded-lg hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button onClick={addCat} disabled={!newForm.nombre.trim()}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+              <Plus className="w-3.5 h-3.5" /> Crear categoría
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={() => setAdding(true)}
+          className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-200 text-slate-500 hover:border-emerald-400 hover:text-emerald-600 hover:bg-emerald-50/50 rounded-xl text-sm font-medium transition-colors">
+          <Plus className="w-4 h-4" /> Agregar categoría
+        </button>
+      )}
+
+      {cats.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+          <p className="text-xs font-medium text-slate-600 mb-2">Vista previa de etiquetas:</p>
+          <div className="flex flex-wrap gap-2">
+            {cats.map(cat => (
+              <span key={cat.id}
+                className="text-xs px-3 py-1 rounded-full font-medium text-white"
+                style={{ backgroundColor: cat.color }}>
+                {cat.nombre}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Main Component ─────────────────────────────────── */
+type TabKey = 'agencia' | 'listas' | 'categorias'
+
 export default function ConfiguracionView() {
   const [config, setConfig]   = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
   const [saved, setSaved]     = useState(false)
-  const [tab, setTab]         = useState<'agencia' | 'listas'>('agencia')
+  const [tab, setTab]         = useState<TabKey>('agencia')
 
   const load = useCallback(async () => {
     const { data } = await supabase.from('configuracion').select('*')
@@ -103,6 +309,12 @@ export default function ConfiguracionView() {
     </div>
   )
 
+  const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+    { key: 'agencia',    label: 'Datos de la agencia',   icon: Building2 },
+    { key: 'listas',     label: 'Listados del sistema',  icon: List },
+    { key: 'categorias', label: 'Categorías de clientes', icon: Tag },
+  ]
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
@@ -110,7 +322,7 @@ export default function ConfiguracionView() {
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Settings className="w-6 h-6 text-emerald-600" /> Configuración
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Personaliza la información de tu agencia y los listados del sistema</p>
+          <p className="text-slate-500 text-sm mt-1">Personaliza tu agencia, listados y categorías de clientes</p>
         </div>
         <button onClick={saveAll} disabled={saving}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -129,17 +341,17 @@ export default function ConfiguracionView() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-6 border-b border-slate-200">
-        {[['agencia', 'Datos de la agencia', Building2], ['listas', 'Listados del sistema', List]].map(([key, label, Icon]) => (
-          <button key={key as string} onClick={() => setTab(key as 'agencia' | 'listas')}
+        {TABS.map(({ key, label, icon: Icon }) => (
+          <button key={key} onClick={() => setTab(key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'
             }`}>
-            {/* @ts-ignore */}
-            <Icon className="w-4 h-4" /> {label as string}
+            <Icon className="w-4 h-4" /> {label}
           </button>
         ))}
       </div>
 
+      {/* ── Agencia tab ── */}
       {tab === 'agencia' && (
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-6">
@@ -166,7 +378,6 @@ export default function ConfiguracionView() {
             ))}
           </div>
 
-          {/* Preview card */}
           {config.nombre_agencia && (
             <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
               <p className="text-xs font-medium text-slate-500 mb-2 uppercase tracking-wide">Vista previa</p>
@@ -190,6 +401,7 @@ export default function ConfiguracionView() {
         </div>
       )}
 
+      {/* ── Listas tab ── */}
       {tab === 'listas' && (
         <div className="space-y-5">
           <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -217,6 +429,37 @@ export default function ConfiguracionView() {
           </div>
         </div>
       )}
+
+      {/* ── Categorías tab ── */}
+      {tab === 'categorias' && (
+        <div className="space-y-5">
+          <div className="bg-white rounded-xl border border-slate-200 p-6">
+            <div className="flex items-start gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center flex-shrink-0">
+                <Tag className="w-5 h-5 text-violet-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800">Categorías de clientes</h3>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Define etiquetas para clasificar y segmentar tus clientes (VIP, Preferencial, Estándar, etc.).
+                  Cada categoría tiene un nombre, color y descripción opcional.
+                </p>
+              </div>
+            </div>
+
+            <CategoriasEditor
+              value={config.categorias_clientes || '[]'}
+              onChange={v => set('categorias_clientes', v)}
+            />
+          </div>
+
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
+            <strong>Tip:</strong> Las categorías creadas aquí estarán disponibles en el formulario de clientes y en los filtros avanzados de la lista de clientes. Recuerda guardar los cambios con el botón superior.
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
+const iCls = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"

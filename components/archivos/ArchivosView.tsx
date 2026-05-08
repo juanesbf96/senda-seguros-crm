@@ -5,6 +5,7 @@ import { Archivo, Cliente, Poliza, Prospecto } from '@/types'
 import {
   Upload, Trash2, Download, Search, FileText,
   FileImage, File, Film, Music, X, Paperclip,
+  FolderOpen, Shield, Users, UserCheck, SlidersHorizontal,
 } from 'lucide-react'
 
 function formatBytes(b: number | null): string {
@@ -25,6 +26,24 @@ function FileIcon({ mime }: { mime: string | null }) {
   return <File className="w-5 h-5 text-slate-400" />
 }
 
+type TabFilter = 'todos' | 'poliza' | 'cliente' | 'prospecto'
+
+interface TabConfig { key: TabFilter; label: string; icon: React.ElementType; color: string }
+const TABS: TabConfig[] = [
+  { key: 'todos',     label: 'Todos',      icon: FolderOpen,  color: 'text-slate-600'   },
+  { key: 'poliza',    label: 'Pólizas',    icon: Shield,      color: 'text-emerald-600' },
+  { key: 'cliente',   label: 'Clientes',   icon: Users,       color: 'text-blue-600'    },
+  { key: 'prospecto', label: 'Prospectos', icon: UserCheck,   color: 'text-violet-600'  },
+]
+
+function tabMatch(a: Archivo, tab: TabFilter): boolean {
+  if (tab === 'todos')     return true
+  if (tab === 'poliza')    return !!a.poliza_id
+  if (tab === 'cliente')   return !!a.client_id && !a.poliza_id && !a.prospecto_id
+  if (tab === 'prospecto') return !!a.prospecto_id
+  return true
+}
+
 interface UploadForm {
   open: boolean
   file: File | null
@@ -42,7 +61,9 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
   const [loading,     setLoading]     = useState(true)
   const [uploading,   setUploading]   = useState(false)
   const [search,      setSearch]      = useState('')
+  const [activeTab,   setActiveTab]   = useState<TabFilter>('todos')
   const [filterTipo,  setFilterTipo]  = useState('')
+  const [showFilters, setShowFilters] = useState(false)
   const [uploadForm,  setUploadForm]  = useState<UploadForm>({
     open: false, file: null, descripcion: '', client_id: clienteId || '', poliza_id: '', prospecto_id: '',
   })
@@ -109,7 +130,7 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
 
     if (dbErr) { setError(dbErr.message); setUploading(false); return }
 
-    setUploadForm({ open: false, file: null, descripcion: '', client_id: '', poliza_id: '', prospecto_id: '' })
+    setUploadForm({ open: false, file: null, descripcion: '', client_id: clienteId || '', poliza_id: '', prospecto_id: '' })
     load()
   }
 
@@ -120,16 +141,28 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
     setArchivos(prev => prev.filter(a => a.id !== archivo.id))
   }
 
+  /* ── Filtering ─────────────────────────────────────── */
   const q = search.toLowerCase()
   const filtered = archivos.filter(a => {
     const matchSearch = !search ||
       a.nombre_original.toLowerCase().includes(q) ||
       a.descripcion?.toLowerCase().includes(q) ||
       a.cliente?.nombre?.toLowerCase().includes(q) ||
-      a.prospecto?.nombre?.toLowerCase().includes(q)
+      a.prospecto?.nombre?.toLowerCase().includes(q) ||
+      a.poliza?.aseguradora?.toLowerCase().includes(q) ||
+      a.poliza?.numero_poliza?.toLowerCase().includes(q)
     const matchTipo = !filterTipo || a.tipo_mime?.includes(filterTipo)
-    return matchSearch && matchTipo
+    const matchTab  = tabMatch(a, activeTab)
+    return matchSearch && matchTipo && matchTab
   })
+
+  /* ── Tab counts ────────────────────────────────────── */
+  const tabCounts: Record<TabFilter, number> = {
+    todos:     archivos.length,
+    poliza:    archivos.filter(a => !!a.poliza_id).length,
+    cliente:   archivos.filter(a => !!a.client_id && !a.poliza_id && !a.prospecto_id).length,
+    prospecto: archivos.filter(a => !!a.prospecto_id).length,
+  }
 
   const totalSize = archivos.reduce((s, a) => s + (a.tamano || 0), 0)
 
@@ -143,7 +176,7 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
     <div className="p-6 max-w-6xl mx-auto">
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Archivos</h1>
           <p className="text-slate-500 text-sm mt-1">
@@ -156,33 +189,88 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
         </button>
       </div>
 
-      {/* Filters */}
+      {/* Classification tabs */}
+      {!clienteId && (
+        <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+          {TABS.map(({ key, label, icon: Icon, color }) => (
+            <button key={key} onClick={() => setActiveTab(key)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors ${
+                activeTab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}>
+              <Icon className={`w-4 h-4 ${activeTab === key ? 'text-emerald-600' : color}`} />
+              {label}
+              <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
+                activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {tabCounts[key]}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Search + Filters row */}
       <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, cliente, descripción..."
+            placeholder="Buscar por nombre, cliente, aseguradora, póliza..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          {search && (
+            <button onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
-        <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400">
-          <option value="">Todos los tipos</option>
-          <option value="pdf">PDF</option>
-          <option value="image">Imágenes</option>
-          <option value="word">Word</option>
-          <option value="sheet">Excel</option>
-        </select>
+
+        <button onClick={() => setShowFilters(f => !f)}
+          className={`flex items-center gap-2 px-3 py-2 text-sm border rounded-lg transition-colors ${
+            filterTipo ? 'border-emerald-400 text-emerald-600 bg-emerald-50' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}>
+          <SlidersHorizontal className="w-4 h-4" />
+          Tipo {filterTipo && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />}
+        </button>
       </div>
+
+      {/* Tipo filter panel */}
+      {showFilters && (
+        <div className="mb-5 p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-wrap gap-2">
+          {[
+            { val: '',       label: 'Todos los tipos' },
+            { val: 'pdf',    label: 'PDF' },
+            { val: 'image',  label: 'Imágenes' },
+            { val: 'word',   label: 'Word' },
+            { val: 'sheet',  label: 'Excel' },
+            { val: 'video',  label: 'Video' },
+          ].map(({ val, label }) => (
+            <button key={val} onClick={() => setFilterTipo(val)}
+              className={`px-3 py-1.5 text-xs rounded-lg border font-medium transition-colors ${
+                filterTipo === val
+                  ? 'bg-emerald-600 text-white border-emerald-600'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Grid de archivos */}
       {filtered.length === 0 ? (
         <div className="text-center py-20 text-slate-400">
           <Paperclip className="w-10 h-10 mx-auto mb-3 opacity-30" />
-          <p className="text-sm">No hay archivos subidos</p>
-          <button onClick={() => setUploadForm(f => ({ ...f, open: true }))}
-            className="mt-4 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
-            Subir el primer archivo
-          </button>
+          {search || filterTipo ? (
+            <p className="text-sm">Sin resultados para los filtros aplicados</p>
+          ) : (
+            <>
+              <p className="text-sm">No hay archivos en esta sección</p>
+              <button onClick={() => setUploadForm(f => ({ ...f, open: true }))}
+                className="mt-4 text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                Subir el primer archivo
+              </button>
+            </>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -212,22 +300,27 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
                 <p className="text-xs text-slate-400 truncate mb-2">{archivo.descripcion}</p>
               )}
 
-              <div className="space-y-1 mt-2">
+              <div className="flex flex-wrap gap-1 mt-2">
                 {archivo.cliente && (
                   <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" />
+                    <Users className="w-3 h-3" />
                     {archivo.cliente.nombre}
                   </span>
                 )}
                 {archivo.poliza && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full ml-1">
+                  <span className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full">
+                    <Shield className="w-3 h-3" />
                     {archivo.poliza.aseguradora}
                   </span>
                 )}
                 {archivo.prospecto && (
-                  <span className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full ml-1">
+                  <span className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded-full">
+                    <UserCheck className="w-3 h-3" />
                     {archivo.prospecto.nombre}
                   </span>
+                )}
+                {!archivo.client_id && !archivo.poliza_id && !archivo.prospecto_id && (
+                  <span className="text-xs text-slate-300 italic">Sin vincular</span>
                 )}
               </div>
 
@@ -254,8 +347,10 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
                 className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors">
                 {uploadForm.file ? (
                   <div>
-                    <FileIcon mime={uploadForm.file.type} />
-                    <p className="text-sm font-medium text-slate-700 mt-2">{uploadForm.file.name}</p>
+                    <div className="flex justify-center mb-2">
+                      <FileIcon mime={uploadForm.file.type} />
+                    </div>
+                    <p className="text-sm font-medium text-slate-700">{uploadForm.file.name}</p>
                     <p className="text-xs text-slate-400">{formatBytes(uploadForm.file.size)}</p>
                   </div>
                 ) : (
@@ -275,14 +370,16 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
                   placeholder="Ej: Póliza original firmada" className={cls} />
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Cliente (opcional)</label>
-                <select value={uploadForm.client_id} onChange={e => { setUF('client_id', e.target.value); setUF('poliza_id', '') }}
-                  className={cls}>
-                  <option value="">Sin cliente</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
-              </div>
+              {!clienteId && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Cliente (opcional)</label>
+                  <select value={uploadForm.client_id} onChange={e => { setUF('client_id', e.target.value); setUF('poliza_id', '') }}
+                    className={cls}>
+                    <option value="">Sin cliente</option>
+                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                  </select>
+                </div>
+              )}
 
               {polizas.length > 0 && (
                 <div>
@@ -295,14 +392,16 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Prospecto (opcional)</label>
-                <select value={uploadForm.prospecto_id} onChange={e => setUF('prospecto_id', e.target.value)}
-                  className={cls}>
-                  <option value="">Sin prospecto</option>
-                  {prospectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-                </select>
-              </div>
+              {!clienteId && (
+                <div>
+                  <label className="block text-xs font-medium text-slate-600 mb-1">Prospecto (opcional)</label>
+                  <select value={uploadForm.prospecto_id} onChange={e => setUF('prospecto_id', e.target.value)}
+                    className={cls}>
+                    <option value="">Sin prospecto</option>
+                    {prospectos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                  </select>
+                </div>
+              )}
 
               {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
             </div>
