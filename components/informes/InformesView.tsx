@@ -47,7 +47,7 @@ export default function InformesView() {
 
   // Data states
   const [metricas, setMetricas] = useState({
-    totalPrimas: 0, polizasActivas: 0, cobrosPendientes: 0,
+    totalPrimas: 0, totalComision: 0, polizasActivas: 0, cobrosPendientes: 0,
     cobrosVencidos: 0, totalClientes: 0, prospectosPipeline: 0,
   })
   const [primasPorMes, setPrimasPorMes]       = useState<{ mes: string; primas: number }[]>([])
@@ -69,7 +69,9 @@ export default function InformesView() {
     const from = getDateFrom(periodo).toISOString()
 
     const [polizasRes, cobrosRes, clientesRes, prospectosRes, liquidacionesRes] = await Promise.all([
-      supabase.from('polizas').select('id, prima, ramo, estado, fecha_inicio, created_at').eq('eliminada', false),
+      supabase.from('polizas')
+        .select('id, prima, prima_neta, comision_agencia, comision_vendedor, ramo, estado, fecha_inicio, created_at, vendedor:vendedores(nombre)')
+        .eq('eliminada', false),
       supabase.from('cobros').select('id, valor, estado, created_at'),
       supabase.from('clientes').select('id, created_at'),
       supabase.from('prospectos').select('id, etapa'),
@@ -87,7 +89,8 @@ export default function InformesView() {
     // ── Métricas generales ─────────────────────────────────────
     const polizasActivas = polizas.filter(p => p.estado === 'activa')
     setMetricas({
-      totalPrimas:       polizasActivas.reduce((s, p) => s + (p.prima || 0), 0),
+      totalPrimas:       polizasActivas.reduce((s, p) => s + ((p as any).prima_neta || p.prima || 0), 0),
+      totalComision:     polizasActivas.reduce((s, p) => s + ((p as any).comision_agencia || 0), 0),
       polizasActivas:    polizasActivas.length,
       cobrosPendientes:  cobros.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0),
       cobrosVencidos:    cobros.filter(c => c.estado === 'vencido').reduce((s, c) => s + c.valor, 0),
@@ -104,9 +107,10 @@ export default function InformesView() {
       meses[key] = 0
     }
     polizas.forEach(p => {
-      if (!p.fecha_inicio || !p.prima) return
+      const valor = p.prima_neta || p.prima
+      if (!p.fecha_inicio || !valor) return
       const key = p.fecha_inicio.slice(0, 7)
-      if (key in meses) meses[key] += p.prima
+      if (key in meses) meses[key] += valor
     })
     setPrimasPorMes(Object.entries(meses).map(([mes, primas]) => ({
       mes: new Date(mes + '-01').toLocaleString('es-CO', { month: 'short', year: '2-digit' }),
@@ -142,12 +146,21 @@ export default function InformesView() {
       Object.entries(byEtapa).map(([etapa, total]) => ({ etapa: ETAPA_LABELS[etapa] || etapa, total }))
     )
 
-    // ── Comisiones por vendedor ───────────────────────────────────
+    // ── Comisiones por vendedor (desde pólizas activas + liquidaciones) ──
     const byVendedor: Record<string, number> = {}
-    liquidaciones.forEach((l: any) => {
-      const nombre = l.vendedor?.nombre || 'Sin nombre'
-      byVendedor[nombre] = (byVendedor[nombre] || 0) + (l.total_comision || 0)
-    })
+    // Primero desde polizas.comision_vendedor (Sprint A data)
+    polizas.filter((p: any) => p.estado === 'activa' && p.comision_vendedor && p.vendedor?.nombre)
+      .forEach((p: any) => {
+        const nombre = p.vendedor.nombre
+        byVendedor[nombre] = (byVendedor[nombre] || 0) + (p.comision_vendedor || 0)
+      })
+    // Si no hay datos en pólizas, usar liquidaciones históricas
+    if (Object.keys(byVendedor).length === 0) {
+      liquidaciones.forEach((l: any) => {
+        const nombre = l.vendedor?.nombre || 'Sin nombre'
+        byVendedor[nombre] = (byVendedor[nombre] || 0) + (l.total_comision || 0)
+      })
+    }
     setComisionesPorVendedor(
       Object.entries(byVendedor)
         .sort((a, b) => b[1] - a[1])
@@ -188,18 +201,18 @@ export default function InformesView() {
 
       {/* Métricas */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <MetricCard label="Prima total activa" value={formatCOP(metricas.totalPrimas)}
+        <MetricCard label="Prima neta activa" value={formatCOP(metricas.totalPrimas)}
           icon={DollarSign} color="bg-emerald-100 text-emerald-600" />
+        <MetricCard label="Comisión agencia" value={formatCOP(metricas.totalComision)}
+          icon={TrendingUp} color="bg-blue-100 text-blue-600" />
         <MetricCard label="Pólizas activas" value={String(metricas.polizasActivas)}
-          icon={FileText} color="bg-blue-100 text-blue-600" />
+          icon={FileText} color="bg-violet-100 text-violet-600" />
         <MetricCard label="Cobros pendientes" value={formatCOP(metricas.cobrosPendientes)}
           icon={Clock} color="bg-amber-100 text-amber-600" />
         <MetricCard label="Cobros vencidos" value={formatCOP(metricas.cobrosVencidos)}
           icon={AlertTriangle} color="bg-red-100 text-red-600" />
         <MetricCard label="Clientes" value={String(metricas.totalClientes)}
-          icon={Users} color="bg-violet-100 text-violet-600" />
-        <MetricCard label="Pipeline activo" value={String(metricas.prospectosPipeline)}
-          icon={TrendingUp} color="bg-teal-100 text-teal-600" />
+          icon={Users} color="bg-teal-100 text-teal-600" />
       </div>
 
       {/* Gráficas fila 1 */}
