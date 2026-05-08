@@ -150,7 +150,8 @@ export default function PolizasList() {
         p.ramo.toLowerCase().includes(q) ||
         p.numero_poliza?.includes(search) ||
         p.riesgo?.toLowerCase().includes(q) ||
-        p.nombre_tomador?.toLowerCase().includes(q)
+        p.nombre_tomador?.toLowerCase().includes(q) ||
+        p.asegurado_nombre?.toLowerCase().includes(q)
       const matchEstado    = filterEstado === 'all' || p.estado === filterEstado
       const matchAseg      = !extra.aseguradora || p.aseguradora === extra.aseguradora
       const matchRamo      = !extra.ramo        || p.ramo === extra.ramo
@@ -208,7 +209,7 @@ export default function PolizasList() {
           <h1 className="text-2xl font-bold text-slate-900">Pólizas</h1>
           <p className="text-slate-500 text-sm mt-1">
             {polizasNormales.filter(p => p.estado === 'activa').length} activas ·{' '}
-            Prima: {formatCOP(polizasNormales.filter(p => p.estado === 'activa').reduce((s, p) => s + (p.prima || 0), 0))}
+            Prima: {formatCOP(polizasNormales.filter(p => p.estado === 'activa').reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0))}
           </p>
         </div>
         <div className="flex gap-2">
@@ -502,66 +503,128 @@ export default function PolizasList() {
 
       {/* ── Tab: Cumplimiento ── */}
       {activeTab === 'cumplimiento' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
-                <th className="px-4 py-3 font-medium">N° Póliza</th>
-                <th className="px-4 py-3 font-medium">Asegurado</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">Tomador</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">Prima neta</th>
-                <th className="px-4 py-3 font-medium hidden lg:table-cell">Total</th>
-                <th className="px-4 py-3 font-medium hidden lg:table-cell">Comisión</th>
-                <th className="px-4 py-3 font-medium hidden xl:table-cell">Rec. Oficina</th>
-                <th className="px-4 py-3 font-medium hidden xl:table-cell">Rec. Aseg.</th>
-                <th className="px-4 py-3 font-medium text-right">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredCumplimiento.map(p => (
-                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-xs font-mono text-slate-600">{p.numero_poliza || '—'}</td>
-                  <td className="px-4 py-3">
-                    {p.client_id
-                      ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-700 hover:text-emerald-600">{p.cliente?.nombre || '—'}</Link>
-                      : <span className="text-slate-400">—</span>}
-                  </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{p.nombre_tomador || '—'}</td>
-                  <td className="px-4 py-3 hidden md:table-cell font-medium text-slate-800">{p.prima ? formatCOP(p.prima) : '—'}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-600">
-                    {p.prima ? formatCOP(p.prima + (p.comision || 0)) : '—'}
-                  </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-600">
-                    {p.comision ? formatCOP(p.comision) : '—'}
-                  </td>
-                  <td className="px-4 py-3 hidden xl:table-cell text-slate-600">
-                    {p.recaudado_oficina ? formatCOP(p.recaudado_oficina) : '—'}
-                  </td>
-                  <td className="px-4 py-3 hidden xl:table-cell text-slate-600">
-                    {p.recaudado_aseguradora ? formatCOP(p.recaudado_aseguradora) : '—'}
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => { setEditingPoliza(p); setShowPolizaModal(true) }}
-                        className="text-slate-400 hover:text-slate-700 transition-colors">
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button onClick={() => softDelete(p.id)}
-                        className="text-slate-400 hover:text-red-600 transition-colors">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+        <div className="space-y-4">
+          {/* Stats */}
+          {polizasCumplimiento.length > 0 && (() => {
+            const activas = polizasCumplimiento.filter(p => p.estado === 'activa')
+            const primaNeta   = activas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
+            const totalPrima  = activas.reduce((s, p) => s + (p.total_prima || 0), 0)
+            const comision    = activas.reduce((s, p) => s + (p.comision_agencia || 0), 0)
+            const recOficina  = activas.reduce((s, p) => s + (p.recaudado_oficina || 0), 0)
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: 'Activas',       val: `${activas.length} pólizas`, color: 'text-emerald-700' },
+                  { label: 'Prima neta',    val: formatCOP(primaNeta),        color: 'text-slate-800'   },
+                  { label: 'Total prima',   val: formatCOP(totalPrima),       color: 'text-slate-800'   },
+                  { label: 'Comisión',      val: formatCOP(comision),         color: 'text-indigo-700'  },
+                ].map(({ label, val, color }) => (
+                  <div key={label} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
+                    <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+                    <p className={`font-bold text-sm ${color}`}>{val}</p>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+
+          {/* Table */}
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr className="text-left text-xs text-slate-500">
+                  <th className="px-4 py-3 font-medium">N° Póliza</th>
+                  <th className="px-4 py-3 font-medium">Asegurado / Cliente</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">Tomador</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">Estado</th>
+                  <th className="px-4 py-3 font-medium hidden md:table-cell">Vencimiento</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Prima neta</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Total</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Comisión</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Rec. Ofic.</th>
+                  <th className="px-4 py-3 font-medium hidden xl:table-cell">Rec. Aseg.</th>
+                  <th className="px-4 py-3 font-medium text-right">Acciones</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          {filteredCumplimiento.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
-              <ShieldCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
-              <p className="text-sm">No hay pólizas de cumplimiento</p>
-            </div>
-          )}
+              </thead>
+              <tbody>
+                {filteredCumplimiento.map(p => {
+                  const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
+                  const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
+                  const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
+                  return (
+                    <tr key={p.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${urgent ? 'bg-amber-50/30' : ''}`}>
+                      <td className="px-4 py-3 text-xs font-mono text-slate-600">{p.numero_poliza || '—'}</td>
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-slate-700 text-sm">
+                          {p.asegurado_nombre || (p.client_id
+                            ? <Link href={`/clientes/${p.client_id}`} className="hover:text-emerald-600">{p.cliente?.nombre}</Link>
+                            : '—')}
+                        </p>
+                        {p.asegurado_nombre && p.client_id && (
+                          <Link href={`/clientes/${p.client_id}`} className="text-xs text-slate-400 hover:text-emerald-600">
+                            {p.cliente?.nombre}
+                          </Link>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{p.nombre_tomador || '—'}</td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[p.estado]}`}>
+                          {ESTADO_LABELS[p.estado]}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 hidden md:table-cell">
+                        <div className="flex items-center gap-1.5">
+                          <span className={urgent ? 'text-amber-700 font-medium text-xs' : warn ? 'text-amber-600 text-xs' : 'text-slate-600 text-xs'}>
+                            {formatDate(p.fecha_fin)}
+                          </span>
+                          {urgent && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />}
+                          {(urgent || warn) && days !== null && (
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {days}d
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell font-medium text-slate-800 text-sm">
+                        {p.prima_neta ? formatCOP(p.prima_neta) : p.prima ? formatCOP(p.prima) : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden lg:table-cell text-slate-600 text-sm">
+                        {p.total_prima ? formatCOP(p.total_prima) : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-slate-600 text-sm">
+                        {p.comision_agencia ? formatCOP(p.comision_agencia) : p.comision ? formatCOP(p.comision) : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-slate-600 text-sm">
+                        {p.recaudado_oficina ? formatCOP(p.recaudado_oficina) : '—'}
+                      </td>
+                      <td className="px-4 py-3 hidden xl:table-cell text-slate-600 text-sm">
+                        {p.recaudado_aseguradora ? formatCOP(p.recaudado_aseguradora) : '—'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={() => { setEditingPoliza(p); setShowPolizaModal(true) }}
+                            className="text-slate-400 hover:text-slate-700 transition-colors">
+                            <Pencil className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => softDelete(p.id)}
+                            className="text-slate-400 hover:text-red-600 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {filteredCumplimiento.length === 0 && (
+              <div className="text-center py-14 text-slate-400">
+                <ShieldCheck className="w-10 h-10 mx-auto mb-3 opacity-25" />
+                <p className="text-sm font-medium">No hay pólizas de cumplimiento</p>
+                <p className="text-xs mt-1 text-slate-400">Las pólizas de ramo Fianzas y Cumplimiento aparecen aquí automáticamente</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
