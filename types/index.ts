@@ -479,6 +479,20 @@ export interface ProspectoActividad {
   fecha: string
 }
 
+export interface CampanaRenovacion {
+  id: string
+  nombre: string
+  descripcion: string | null
+  fecha_inicio_periodo: string
+  fecha_fin_periodo: string
+  estado: 'activa' | 'cerrada'
+  aseguradora: string | null
+  ramo: string | null
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface DashboardMetrics {
   totalClientes: number
   clientesPorEtapa: Record<Etapa, number>
