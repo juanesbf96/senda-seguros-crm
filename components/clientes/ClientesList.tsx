@@ -1,8 +1,11 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
-import { Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2, SlidersHorizontal, X } from 'lucide-react'
+import {
+  Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2,
+  SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet,
+} from 'lucide-react'
 import Link from 'next/link'
 import ClienteModal from './ClienteModal'
 import ImportModal from './ImportModal'
@@ -62,6 +65,39 @@ function countActiveFilters(f: Filters) {
   ].filter(Boolean).length
 }
 
+/* ── CSV helpers ── */
+function clientesToCSV(rows: Cliente[]): string {
+  const headers = ['Nombre','Alias','Tipo','Cédula/NIT','Teléfono','Email','Ciudad','Departamento','Etapa','Categoría']
+  const escape = (v: string | null | undefined) => {
+    if (v == null) return ''
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const lines = rows.map(c => [
+    c.nombre,
+    c.sobrenombre,
+    TIPO_LABELS[c.tipo_cliente],
+    c.tipo_cliente === 'persona_natural' ? c.cedula : c.nit,
+    c.telefono,
+    c.email,
+    c.ciudad,
+    c.departamento,
+    ETAPA_LABELS[c.etapa],
+    c.categoria,
+  ].map(escape).join(','))
+  return '﻿' + [headers.join(','), ...lines].join('\r\n')
+}
+
+function downloadCSV(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function ClientesList() {
   const [clientes,      setClientes]      = useState<Cliente[]>([])
   const [loading,       setLoading]       = useState(true)
@@ -73,6 +109,14 @@ export default function ClientesList() {
   const [editing,       setEditing]       = useState<Cliente | undefined>()
   const [activeTab,     setActiveTab]     = useState<Tab>('clientes')
   const [contactCount,  setContactCount]  = useState(0)
+
+  // Multi-select
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false)
+
+  // Row dropdown
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   async function load() {
     const { data } = await supabase.from('clientes').select('*').order('created_at', { ascending: false })
@@ -86,6 +130,18 @@ export default function ClientesList() {
   }
 
   useEffect(() => { load(); loadContactCount() }, [])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!openMenuId) return
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [openMenuId])
 
   async function deleteCliente(id: string) {
     if (!confirm('¿Eliminar este cliente y todos sus datos?')) return
@@ -124,11 +180,63 @@ export default function ClientesList() {
 
   const activeFilterCount = countActiveFilters(filters)
 
+  /* ── Selection helpers ── */
+  function toggleSelect(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    if (selected.size === filtered.length && filtered.length > 0) {
+      setSelected(new Set())
+    } else {
+      setSelected(new Set(filtered.map(c => c.id)))
+    }
+  }
+
+  /* ── Bulk actions ── */
+  async function bulkChangeEtapa(etapa: Etapa) {
+    const ids = Array.from(selected)
+    await supabase.from('clientes').update({ etapa }).in('id', ids)
+    setClientes(prev => prev.map(c => ids.includes(c.id) ? { ...c, etapa } : c))
+    setSelected(new Set())
+  }
+
+  async function bulkDelete() {
+    const ids = Array.from(selected)
+    await supabase.from('clientes').delete().in('id', ids)
+    setClientes(prev => prev.filter(c => !ids.includes(c.id)))
+    setSelected(new Set())
+    setConfirmingBulkDelete(false)
+  }
+
+  /* ── CSV exports ── */
+  function exportCSV() {
+    const filename = `clientes_${new Date().toISOString().split('T')[0]}.csv`
+    downloadCSV(clientesToCSV(filtered), filename)
+  }
+
+  function exportSelected() {
+    const rows = clientes.filter(c => selected.has(c.id))
+    const filename = `clientes_seleccion_${new Date().toISOString().split('T')[0]}.csv`
+    downloadCSV(clientesToCSV(rows), filename)
+  }
+
+  function exportOne(c: Cliente) {
+    const filename = `cliente_${c.nombre.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`
+    downloadCSV(clientesToCSV([c]), filename)
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center h-full">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
     </div>
   )
+
+  const allFilteredSelected = filtered.length > 0 && selected.size === filtered.length
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -148,6 +256,10 @@ export default function ClientesList() {
               <button onClick={() => setShowImport(true)}
                 className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 <Upload className="w-4 h-4" /> Importar CSV
+              </button>
+              <button onClick={exportCSV}
+                className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <Download className="w-4 h-4" /> Exportar CSV
               </button>
               <button onClick={() => { setEditing(undefined); setShowModal(true) }}
                 className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -273,6 +385,14 @@ export default function ClientesList() {
             <table className="w-full text-sm">
               <thead className="bg-slate-50 border-b border-slate-200">
                 <tr className="text-left text-xs text-slate-500">
+                  <th className="px-4 py-3 font-medium w-8">
+                    <input
+                      type="checkbox"
+                      checked={allFilteredSelected}
+                      onChange={toggleAll}
+                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                    />
+                  </th>
                   <th className="px-4 py-3 font-medium">Nombre</th>
                   <th className="px-4 py-3 font-medium hidden sm:table-cell">Tipo</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Cédula / NIT</th>
@@ -285,7 +405,15 @@ export default function ClientesList() {
               </thead>
               <tbody>
                 {filtered.map(c => (
-                  <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <tr key={c.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selected.has(c.id) ? 'bg-emerald-50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(c.id)}
+                        onChange={() => toggleSelect(c.id)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                      />
+                    </td>
                     <td className="px-4 py-3">
                       <Link href={`/clientes/${c.id}`} className="font-medium text-slate-800 hover:text-emerald-600 transition-colors">
                         {c.nombre}
@@ -330,15 +458,72 @@ export default function ClientesList() {
                         : <span className="text-slate-300 text-xs">—</span>}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-1">
+                        {/* Ver */}
+                        <Link href={`/clientes/${c.id}`}
+                          className="text-slate-400 hover:text-emerald-600 transition-colors p-0.5">
+                          <Eye className="w-4 h-4" />
+                        </Link>
+                        {/* Editar */}
                         <button onClick={() => { setEditing(c); setShowModal(true) }}
-                          className="text-slate-400 hover:text-slate-700 transition-colors">
+                          className="text-slate-400 hover:text-slate-700 transition-colors p-0.5">
                           <Pencil className="w-4 h-4" />
                         </button>
+                        {/* Eliminar */}
                         <button onClick={() => deleteCliente(c.id)}
-                          className="text-slate-400 hover:text-red-600 transition-colors">
+                          className="text-slate-400 hover:text-red-600 transition-colors p-0.5">
                           <Trash2 className="w-4 h-4" />
                         </button>
+                        {/* Más opciones */}
+                        <div className="relative" ref={openMenuId === c.id ? menuRef : null}>
+                          <button
+                            onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
+                            className="text-slate-400 hover:text-slate-700 transition-colors p-0.5">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                          {openMenuId === c.id && (
+                            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30 min-w-[170px] py-1 text-sm">
+                              {c.telefono && (
+                                <a
+                                  href={`https://wa.me/57${c.telefono.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={() => setOpenMenuId(null)}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                                  <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                                  WhatsApp
+                                </a>
+                              )}
+                              {c.telefono && (
+                                <a
+                                  href={`tel:${c.telefono}`}
+                                  onClick={() => setOpenMenuId(null)}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                                  <Phone className="w-3.5 h-3.5 text-blue-500" />
+                                  Llamar
+                                </a>
+                              )}
+                              {c.email && (
+                                <a
+                                  href={`mailto:${c.email}`}
+                                  onClick={() => setOpenMenuId(null)}
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                                  <MapPin className="w-3.5 h-3.5 text-purple-500" />
+                                  Enviar email
+                                </a>
+                              )}
+                              {(c.telefono || c.email) && (
+                                <div className="border-t border-slate-100 my-1" />
+                              )}
+                              <button
+                                onClick={() => { exportOne(c); setOpenMenuId(null) }}
+                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700 w-full text-left">
+                                <Download className="w-3.5 h-3.5 text-slate-400" />
+                                Exportar este cliente
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -357,6 +542,61 @@ export default function ClientesList() {
               </div>
             )}
           </div>
+
+          {/* ── Floating bulk action bar ── */}
+          {selected.size > 0 && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
+              <span className="text-sm font-medium whitespace-nowrap">{selected.size} seleccionados</span>
+
+              <div className="w-px h-5 bg-slate-600" />
+
+              {/* Cambiar etapa */}
+              <select
+                onChange={e => { if (e.target.value) bulkChangeEtapa(e.target.value as Etapa) }}
+                defaultValue=""
+                className="bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                <option value="" disabled>Cambiar etapa...</option>
+                <option value="nuevo">Nuevo</option>
+                <option value="contactado">Contactado</option>
+                <option value="cotizacion">Cotización</option>
+                <option value="cerrado">Cerrado</option>
+              </select>
+
+              {/* Exportar selección */}
+              <button
+                onClick={exportSelected}
+                className="flex items-center gap-1.5 text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                <Download className="w-3.5 h-3.5" /> Exportar selección
+              </button>
+
+              {/* Eliminar con confirm inline */}
+              {confirmingBulkDelete ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-red-300">¿Eliminar {selected.size} clientes?</span>
+                  <button onClick={bulkDelete}
+                    className="text-xs bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors">
+                    Sí, eliminar
+                  </button>
+                  <button onClick={() => setConfirmingBulkDelete(false)}
+                    className="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-lg transition-colors">
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmingBulkDelete(true)}
+                  className="flex items-center gap-1.5 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
+                </button>
+              )}
+
+              {/* Deselect all */}
+              <button onClick={() => { setSelected(new Set()); setConfirmingBulkDelete(false) }}
+                className="text-slate-400 hover:text-white transition-colors ml-1">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </>
       )}
 

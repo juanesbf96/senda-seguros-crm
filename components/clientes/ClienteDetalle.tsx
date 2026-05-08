@@ -1,14 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Cliente, Poliza, Actividad, TipoActividad } from '@/types'
+import { Cliente, Poliza, Actividad, TipoActividad, Cobro, Remision } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   ArrowLeft, Phone, Mail, MapPin, Pencil, AlertTriangle,
   FileText, Clock, CheckSquare, Paperclip, Users, ClipboardList,
   ShieldAlert, Plus, Trash2, PhoneCall, AtSign, StickyNote,
   User, Building2, Car, Baby, Briefcase, DollarSign, Tag,
-  ShieldCheck, Calendar, IdCard,
+  ShieldCheck, Calendar, IdCard, MessageCircle, Wallet, FileCheck,
 } from 'lucide-react'
 import Link from 'next/link'
 import ClienteModal from './ClienteModal'
@@ -53,7 +53,180 @@ const CATEGORIA_COLORS: Record<string, string> = {
   Inactivo:    'bg-red-100 text-red-500 border-red-200',
 }
 
-type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros'
+const COBRO_ESTADO_COLORS: Record<string, string> = {
+  pendiente: 'bg-amber-100 text-amber-700',
+  pagado:    'bg-emerald-100 text-emerald-700',
+  vencido:   'bg-red-100 text-red-700',
+  anulado:   'bg-slate-100 text-slate-500',
+}
+
+const COBRO_TIPO_LABELS: Record<string, string> = {
+  por_cobrar:           'Por cobrar',
+  por_pagar:            'Por pagar',
+  comision_por_cobrar:  'Comisión p/c',
+  comision_recibida:    'Comisión rec.',
+}
+
+const REMISION_ESTADO_COLORS: Record<string, string> = {
+  borrador:  'bg-slate-100 text-slate-600',
+  enviada:   'bg-blue-100 text-blue-700',
+  recibida:  'bg-purple-100 text-purple-700',
+  aprobada:  'bg-emerald-100 text-emerald-700',
+  rechazada: 'bg-red-100 text-red-700',
+  anulada:   'bg-red-100 text-red-700',
+}
+
+type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros' | 'cobros' | 'remisiones'
+
+/* ────────────────────────────────── inline tab components ── */
+
+function ClienteCobros({ id }: { id: string }) {
+  const [cobros, setCobros] = useState<Cobro[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('cobros')
+      .select('*')
+      .eq('client_id', id)
+      .order('fecha_vencimiento', { ascending: true })
+      .then(({ data }) => { setCobros(data || []); setLoading(false) })
+  }, [id])
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
+    </div>
+  )
+
+  const totalPendiente = cobros.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0)
+  const totalPagado    = cobros.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.valor, 0)
+
+  return (
+    <div className="p-6">
+      <h2 className="font-semibold text-slate-800 text-sm mb-4">Cobros ({cobros.length})</h2>
+      {cobros.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+          <Wallet className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">Sin cobros registrados</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">Concepto</th>
+                <th className="px-4 py-3 font-medium hidden sm:table-cell">Tipo</th>
+                <th className="px-4 py-3 font-medium">Valor</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Vencimiento</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {cobros.map(c => (
+                <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-slate-700 font-medium">{c.concepto}</td>
+                  <td className="px-4 py-3 text-slate-500 hidden sm:table-cell text-xs">
+                    {COBRO_TIPO_LABELS[c.tipo] ?? c.tipo}
+                  </td>
+                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCOP(c.valor)}</td>
+                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell text-xs">
+                    {c.fecha_vencimiento ? formatDate(c.fecha_vencimiento) : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COBRO_ESTADO_COLORS[c.estado] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {c.estado}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-slate-50 border-t border-slate-200">
+              <tr className="text-xs text-slate-500">
+                <td colSpan={2} className="px-4 py-2.5 font-semibold">Subtotales</td>
+                <td colSpan={3} className="px-4 py-2.5">
+                  <div className="flex gap-4">
+                    <span>Pendiente: <strong className="text-amber-700">{totalPendiente > 0 ? formatCOP(totalPendiente) : '—'}</strong></span>
+                    <span>Pagado: <strong className="text-emerald-700">{totalPagado > 0 ? formatCOP(totalPagado) : '—'}</strong></span>
+                  </div>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ClienteRemisiones({ id }: { id: string }) {
+  const [remisiones, setRemisiones] = useState<Remision[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    supabase
+      .from('remisiones')
+      .select('*')
+      .eq('client_id', id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { setRemisiones(data || []); setLoading(false) })
+  }, [id])
+
+  if (loading) return (
+    <div className="flex items-center justify-center py-12">
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
+    </div>
+  )
+
+  return (
+    <div className="p-6">
+      <h2 className="font-semibold text-slate-800 text-sm mb-4">Remisiones ({remisiones.length})</h2>
+      {remisiones.length === 0 ? (
+        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+          <FileCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
+          <p className="text-sm">Sin remisiones registradas</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr className="text-left text-xs text-slate-500">
+                <th className="px-4 py-3 font-medium">N° Remisión</th>
+                <th className="px-4 py-3 font-medium hidden sm:table-cell">Aseguradora</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+                <th className="px-4 py-3 font-medium hidden lg:table-cell">Fecha</th>
+                <th className="px-4 py-3 font-medium hidden xl:table-cell">Notas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {remisiones.map(r => (
+                <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-slate-700">
+                    {r.numero_remision ? `#${r.numero_remision}` : '—'}
+                  </td>
+                  <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{r.aseguradora}</td>
+                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell text-xs">{r.ramo}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${REMISION_ESTADO_COLORS[r.estado] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {r.estado}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-500 hidden lg:table-cell text-xs">
+                    {r.fecha ? formatDate(r.fecha) : formatDate(r.created_at)}
+                  </td>
+                  <td className="px-4 py-3 text-slate-400 hidden xl:table-cell text-xs truncate max-w-[180px]">
+                    {r.notas || '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
 
 /* ────────────────────────────────── component ── */
 
@@ -61,6 +234,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
   const [cliente,      setCliente]    = useState<Cliente | null>(null)
   const [polizas,      setPolizas]    = useState<Poliza[]>([])
   const [actividades,  setActividades]= useState<Actividad[]>([])
+  const [cobrosPendientes, setCobrosPendientes] = useState<{ id: string; valor: number; estado: string }[]>([])
   const [loading,      setLoading]    = useState(true)
   const [activeTab,    setActiveTab]  = useState<TabKey>('datos')
 
@@ -75,14 +249,16 @@ export default function ClienteDetalle({ id }: { id: string }) {
   const [savingAct, setSavingAct] = useState(false)
 
   async function load() {
-    const [{ data: c }, { data: p }, { data: a }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: a }, { data: cb }] = await Promise.all([
       supabase.from('clientes').select('*').eq('id', id).single(),
       supabase.from('polizas').select('*').eq('client_id', id).eq('eliminada', false).order('created_at', { ascending: false }),
       supabase.from('actividades').select('*').eq('client_id', id).order('fecha', { ascending: false }),
+      supabase.from('cobros').select('id, valor, estado').eq('client_id', id).eq('estado', 'pendiente'),
     ])
     setCliente(c)
     setPolizas(p || [])
     setActividades(a || [])
+    setCobrosPendientes(cb || [])
     setLoading(false)
   }
 
@@ -122,10 +298,12 @@ export default function ClienteDetalle({ id }: { id: string }) {
 
   /* derived */
   const polizasActivas = polizas.filter(p => p.estado === 'activa')
-  const primaTotal     = polizasActivas.reduce((s, p) => s + (p.prima || p.prima_neta || 0), 0)
+  const primaTotal     = polizasActivas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
   const proximoVence   = polizas
     .filter(p => p.estado === 'activa' && p.fecha_fin)
     .sort((a, b) => (a.fecha_fin! > b.fecha_fin! ? 1 : -1))[0]
+
+  const totalCobrosPendientes = cobrosPendientes.reduce((s, c) => s + c.valor, 0)
 
   const TABS: { key: TabKey; label: string; icon: React.ElementType; count?: number }[] = [
     { key: 'datos',       label: 'Datos',        icon: User },
@@ -136,6 +314,8 @@ export default function ClienteDetalle({ id }: { id: string }) {
     { key: 'contactos',   label: 'Contactos',    icon: Users },
     { key: 'solicitudes', label: 'Solicitudes',  icon: ClipboardList },
     { key: 'siniestros',  label: 'Siniestros',   icon: ShieldAlert },
+    { key: 'cobros',      label: 'Cobros',       icon: Wallet },
+    { key: 'remisiones',  label: 'Remisiones',   icon: FileCheck },
   ]
 
   return (
@@ -168,24 +348,35 @@ export default function ClienteDetalle({ id }: { id: string }) {
                   </span>
                 )}
               </div>
-              <div className="flex flex-wrap gap-3 mt-1.5">
+              {/* Quick action buttons */}
+              <div className="flex flex-wrap gap-2 mt-2">
                 {cliente.telefono && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500">
-                    <Phone className="w-3 h-3" />{cliente.telefono}
-                  </span>
+                  <a href={`tel:${cliente.telefono}`}
+                    className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 text-slate-600 transition-colors">
+                    <Phone className="w-3.5 h-3.5" />{cliente.telefono}
+                  </a>
+                )}
+                {cliente.telefono && (
+                  <a href={`https://wa.me/57${cliente.telefono.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 text-emerald-600 transition-colors">
+                    <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
+                  </a>
                 )}
                 {cliente.email && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500">
-                    <Mail className="w-3 h-3" />{cliente.email}
-                  </span>
+                  <a href={`mailto:${cliente.email}`}
+                    className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 text-slate-600 transition-colors">
+                    <Mail className="w-3.5 h-3.5" />{cliente.email}
+                  </a>
                 )}
                 {cliente.ciudad && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <span className="flex items-center gap-1 text-xs text-slate-500 px-1">
                     <MapPin className="w-3 h-3" />{cliente.ciudad}{cliente.departamento ? `, ${cliente.departamento}` : ''}
                   </span>
                 )}
                 {cliente.cedula && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <span className="flex items-center gap-1 text-xs text-slate-500 px-1">
                     <IdCard className="w-3 h-3" />CC {cliente.cedula}
                   </span>
                 )}
@@ -200,7 +391,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
         </div>
 
         {/* KPIs */}
-        <div className="flex gap-4 mb-4">
+        <div className="flex gap-4 mb-4 flex-wrap">
           <KPI label="Pólizas activas" value={String(polizasActivas.length)} />
           <KPI label="Prima total" value={primaTotal > 0 ? formatCOP(primaTotal) : '—'} accent />
           {proximoVence?.fecha_fin && (
@@ -210,6 +401,11 @@ export default function ClienteDetalle({ id }: { id: string }) {
               warn={daysUntil(proximoVence.fecha_fin) <= 30}
             />
           )}
+          <KPI
+            label="Cobros pend."
+            value={totalCobrosPendientes > 0 ? formatCOP(totalCobrosPendientes) : '—'}
+            warn={cobrosPendientes.length > 0}
+          />
         </div>
 
         {/* Tab bar */}
@@ -519,6 +715,16 @@ export default function ClienteDetalle({ id }: { id: string }) {
         {/* ── TAB: SINIESTROS ── */}
         {activeTab === 'siniestros' && (
           <SiniestrosList clienteId={id} />
+        )}
+
+        {/* ── TAB: COBROS ── */}
+        {activeTab === 'cobros' && (
+          <ClienteCobros id={id} />
+        )}
+
+        {/* ── TAB: REMISIONES ── */}
+        {activeTab === 'remisiones' && (
+          <ClienteRemisiones id={id} />
         )}
       </div>
 
