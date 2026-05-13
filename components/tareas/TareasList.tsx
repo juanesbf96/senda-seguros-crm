@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Tarea, PrioridadTarea } from '@/types'
-import { Plus, Search, Pencil, Trash2, CheckSquare, Square, AlertCircle, ArrowUp, Minus, CheckCircle2, Clock, X, SlidersHorizontal, Check } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, CheckSquare, Square, AlertCircle, ArrowUp, Minus, CheckCircle2, Clock, X, Filter, Check } from 'lucide-react'
 import Link from 'next/link'
 import TareaModal from './TareaModal'
 
@@ -132,7 +132,7 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
                     ? 'bg-emerald-50 border border-emerald-300 text-emerald-700'
                     : 'bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200'
                 }`}>
-                <SlidersHorizontal className="w-4 h-4" />
+                <Filter className="w-4 h-4" />
                 Prioridad
                 {filterPrioridades.size > 0 && (
                   <span className="bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
@@ -296,7 +296,18 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
       {showModal && (
         <TareaModal tarea={editing} clienteId={clienteId}
           onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); load() }} />
+          onSaved={(fechaVencimiento?: string | null) => {
+            setShowModal(false)
+            load()
+            // Auto-switch to the tab where the saved task will appear
+            if (!editing) { // only on create, not edit
+              const td2 = today(), tm2 = tomorrow()
+              if (!fechaVencimiento) setActiveTab('sin_fecha')
+              else if (fechaVencimiento < td2) setActiveTab('vencidas')
+              else if (fechaVencimiento === td2 || fechaVencimiento === tm2) setActiveTab('hoy')
+              else setActiveTab('pendientes')
+            }
+          }} />
       )}
     </div>
   )

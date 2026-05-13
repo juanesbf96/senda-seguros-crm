@@ -8,7 +8,7 @@ interface Props {
   tarea?: Tarea
   clienteId?: string
   onClose: () => void
-  onSaved: () => void
+  onSaved: (fechaVencimiento?: string | null) => void
 }
 
 const PRIORIDAD_CONFIG: Record<PrioridadTarea, { label: string; cls: string; icon: React.ElementType }> = {
@@ -59,7 +59,7 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
       ? await supabase.from('tareas').update(payload).eq('id', tarea.id)
       : await supabase.from('tareas').insert(payload)
     if (err) { setError(err.message); setSaving(false); return }
-    onSaved()
+    onSaved(form.fecha_vencimiento || null)
   }
 
   return (
