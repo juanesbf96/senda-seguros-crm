@@ -4,12 +4,13 @@ import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
 import {
   Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2,
-  SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet,
+  SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet, TrendingUp,
 } from 'lucide-react'
 import Link from 'next/link'
 import ClienteModal from './ClienteModal'
 import ImportModal from './ImportModal'
 import ContactosTab from './ContactosTab'
+import CRMComercialView from './CRMComercialView'
 
 const ETAPA_LABELS: Record<Etapa, string> = {
   nuevo: 'Nuevo', contactado: 'Contactado', cotizacion: 'Cotización', cerrado: 'Cerrado',
@@ -37,7 +38,7 @@ const DEPARTAMENTOS = [
   'Valle del Cauca','Vaupés','Vichada',
 ]
 
-type Tab = 'clientes' | 'contactos'
+type Tab = 'clientes' | 'contactos' | 'crm'
 
 interface Filters {
   etapa:       Etapa | 'all'
@@ -247,7 +248,9 @@ export default function ClientesList() {
           <p className="text-slate-500 text-sm mt-1">
             {activeTab === 'clientes'
               ? `${filtered.length} de ${clientes.length} registros`
-              : `${contactCount} contactos vinculados`}
+              : activeTab === 'contactos'
+              ? `${contactCount} contactos vinculados`
+              : 'Pipeline comercial y oportunidades'}
           </p>
         </div>
         <div className="flex gap-2">
@@ -272,26 +275,42 @@ export default function ClientesList() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {[
-          { key: 'clientes' as Tab, label: 'Clientes', icon: Users, count: clientes.length },
-          { key: 'contactos' as Tab, label: 'Contactos', icon: UserSquare2, count: contactCount },
-        ].map(({ key, label, icon: Icon, count }) => (
-          <button key={key} onClick={() => setActiveTab(key)}
-            className={[
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-              activeTab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
-            ].join(' ')}>
-            <Icon className="w-4 h-4" />
-            {label}
-            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-              {count}
-            </span>
-          </button>
-        ))}
+        <button onClick={() => setActiveTab('clientes')}
+          className={[
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'clientes' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+          ].join(' ')}>
+          <Users className="w-4 h-4" />
+          Clientes
+          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'clientes' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            {clientes.length}
+          </span>
+        </button>
+        <button onClick={() => setActiveTab('contactos')}
+          className={[
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'contactos' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+          ].join(' ')}>
+          <UserSquare2 className="w-4 h-4" />
+          Contactos
+          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'contactos' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            {contactCount}
+          </span>
+        </button>
+        <button onClick={() => setActiveTab('crm')}
+          className={[
+            'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
+            activeTab === 'crm' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+          ].join(' ')}>
+          <TrendingUp className="w-4 h-4" />
+          CRM Comercial
+        </button>
       </div>
 
       {activeTab === 'contactos' ? (
         <ContactosTab onCountChange={setContactCount} />
+      ) : activeTab === 'crm' ? (
+        <CRMComercialView />
       ) : (
         <>
           {/* ── Toolbar ── */}
