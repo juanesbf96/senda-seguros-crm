@@ -127,12 +127,11 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
             <div className="relative" ref={filterRef}>
               <button
                 onClick={() => setShowFilterMenu(v => !v)}
-                className={[
-                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors',
+                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filterPrioridades.size > 0
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
-                ].join(' ')}>
+                    ? 'bg-emerald-50 border border-emerald-300 text-emerald-700'
+                    : 'bg-slate-100 border border-slate-300 text-slate-600 hover:bg-slate-200'
+                }`}>
                 <SlidersHorizontal className="w-4 h-4" />
                 Prioridad
                 {filterPrioridades.size > 0 && (
