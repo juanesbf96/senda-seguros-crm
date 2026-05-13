@@ -31,6 +31,7 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
   const [activeTab, setActiveTab] = useState<TabKey>('pendientes')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Tarea | undefined>()
+  const [filterPrioridad, setFilterPrioridad] = useState<PrioridadTarea | 'all'>('all')
 
   async function load() {
     let q = supabase.from('tareas').select('*, cliente:clientes(id, nombre)').order('fecha_vencimiento', { ascending: true, nullsFirst: false })
@@ -77,7 +78,8 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
     const matchSearch = !search || t.titulo.toLowerCase().includes(search.toLowerCase()) ||
       t.descripcion?.toLowerCase().includes(search.toLowerCase()) ||
       t.cliente?.nombre?.toLowerCase().includes(search.toLowerCase())
-    return matchTab(t) && matchSearch
+    const matchPrioridad = filterPrioridad === 'all' || t.prioridad === filterPrioridad
+    return matchTab(t) && matchSearch && matchPrioridad
   })
 
   const TABS: { key: TabKey; label: string }[] = [
@@ -140,12 +142,35 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
         )}
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar tarea..."
-          className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+      {/* Search + Priority filter */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar tarea..."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+        </div>
+        <div className="flex gap-1.5 items-center">
+          {([
+            { key: 'all',     label: 'Todas',   cls: 'bg-slate-100 text-slate-600 border-slate-200',   activeCls: 'bg-slate-700 text-white border-slate-700' },
+            { key: 'normal',  label: 'Normal',  cls: 'bg-white text-slate-500 border-slate-200',        activeCls: 'bg-slate-500 text-white border-slate-500' },
+            { key: 'alta',    label: 'Alta',    cls: 'bg-white text-amber-600 border-amber-200',        activeCls: 'bg-amber-500 text-white border-amber-500' },
+            { key: 'urgente', label: 'Urgente', cls: 'bg-white text-red-600 border-red-200',            activeCls: 'bg-red-500 text-white border-red-500' },
+          ] as { key: PrioridadTarea | 'all'; label: string; cls: string; activeCls: string }[]).map(({ key, label, cls, activeCls }) => {
+            const Icon = key === 'all' ? null : PRIORIDAD_ICON[key as PrioridadTarea]
+            const isActive = filterPrioridad === key
+            return (
+              <button key={key} onClick={() => setFilterPrioridad(key)}
+                className={[
+                  'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors',
+                  isActive ? activeCls : cls + ' hover:border-slate-300',
+                ].join(' ')}>
+                {Icon && <Icon className="w-3 h-3" />}
+                {label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* List */}
