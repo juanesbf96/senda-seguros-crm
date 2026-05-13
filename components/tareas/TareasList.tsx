@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Tarea, PrioridadTarea } from '@/types'
-import { Plus, Search, Pencil, Trash2, CheckSquare, Square, AlertCircle, ArrowUp, Minus, CheckCircle2, Clock, X } from 'lucide-react'
+import { Plus, Search, Pencil, Trash2, CheckSquare, Square, AlertCircle, ArrowUp, Minus, CheckCircle2, Clock, X, SlidersHorizontal, Check } from 'lucide-react'
 import Link from 'next/link'
 import TareaModal from './TareaModal'
 
@@ -32,6 +32,19 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<Tarea | undefined>()
   const [filterPrioridades, setFilterPrioridades] = useState<Set<PrioridadTarea>>(new Set())
+  const [showFilterMenu, setShowFilterMenu] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!showFilterMenu) return
+    function handleClick(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setShowFilterMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showFilterMenu])
 
   async function load() {
     let q = supabase.from('tareas').select('*, cliente:clientes(id, nombre)').order('fecha_vencimiento', { ascending: true, nullsFirst: false })
@@ -109,10 +122,69 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
               {counts.pendientes} pendiente{counts.pendientes !== 1 ? 's' : ''}
             </p>
           </div>
-          <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4" /> Nueva tarea
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Filter dropdown */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setShowFilterMenu(v => !v)}
+                className={[
+                  'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors',
+                  filterPrioridades.size > 0
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+                ].join(' ')}>
+                <SlidersHorizontal className="w-4 h-4" />
+                Prioridad
+                {filterPrioridades.size > 0 && (
+                  <span className="bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                    {filterPrioridades.size}
+                  </span>
+                )}
+              </button>
+
+              {showFilterMenu && (
+                <div className="absolute right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-lg z-30 w-44 py-1.5 text-sm">
+                  <p className="px-3 py-1 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Prioridad</p>
+                  {([
+                    { key: 'normal' as PrioridadTarea,  label: 'Normal',  icon: Minus,        cls: 'text-slate-500' },
+                    { key: 'alta' as PrioridadTarea,    label: 'Alta',    icon: ArrowUp,      cls: 'text-amber-500' },
+                    { key: 'urgente' as PrioridadTarea, label: 'Urgente', icon: AlertCircle,  cls: 'text-red-500'   },
+                  ]).map(({ key, label, icon: Icon, cls }) => {
+                    const isActive = filterPrioridades.has(key)
+                    return (
+                      <button key={key}
+                        onClick={() => setFilterPrioridades(prev => {
+                          const next = new Set(prev)
+                          next.has(key) ? next.delete(key) : next.add(key)
+                          return next
+                        })}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 transition-colors">
+                        <Icon className={`w-4 h-4 ${cls}`} />
+                        <span className="flex-1 text-left text-slate-700">{label}</span>
+                        {isActive && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                      </button>
+                    )
+                  })}
+                  {filterPrioridades.size > 0 && (
+                    <>
+                      <div className="border-t border-slate-100 my-1" />
+                      <button
+                        onClick={() => { setFilterPrioridades(new Set()); setShowFilterMenu(false) }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 text-slate-400 hover:text-red-500 transition-colors text-xs">
+                        <X className="w-3.5 h-3.5" />
+                        Limpiar filtro
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Nueva tarea
+            </button>
+          </div>
         </div>
       )}
 
@@ -142,47 +214,12 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
         )}
       </div>
 
-      {/* Search + Priority filter */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar tarea..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
-        </div>
-        <div className="flex gap-1.5 items-center">
-          {([
-            { key: 'normal',  label: 'Normal',  inactiveCls: 'bg-white text-slate-500 border-slate-200 hover:border-slate-400', activeCls: 'bg-slate-600 text-white border-slate-600' },
-            { key: 'alta',    label: 'Alta',    inactiveCls: 'bg-white text-amber-600 border-amber-200 hover:border-amber-400', activeCls: 'bg-amber-500 text-white border-amber-500' },
-            { key: 'urgente', label: 'Urgente', inactiveCls: 'bg-white text-red-600 border-red-200 hover:border-red-400',       activeCls: 'bg-red-500 text-white border-red-500'   },
-          ] as { key: PrioridadTarea; label: string; inactiveCls: string; activeCls: string }[]).map(({ key, label, inactiveCls, activeCls }) => {
-            const Icon = PRIORIDAD_ICON[key]
-            const isActive = filterPrioridades.has(key)
-            return (
-              <button key={key}
-                onClick={() => {
-                  setFilterPrioridades(prev => {
-                    const next = new Set(prev)
-                    next.has(key) ? next.delete(key) : next.add(key)
-                    return next
-                  })
-                }}
-                className={[
-                  'flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-medium border transition-colors',
-                  isActive ? activeCls : inactiveCls,
-                ].join(' ')}>
-                <Icon className="w-3 h-3" />
-                {label}
-              </button>
-            )
-          })}
-          {filterPrioridades.size > 0 && (
-            <button onClick={() => setFilterPrioridades(new Set())}
-              className="text-slate-400 hover:text-slate-600 transition-colors p-1.5 rounded-lg hover:bg-slate-100">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
+      {/* Search */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar tarea..."
+          className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
       </div>
 
       {/* List */}
