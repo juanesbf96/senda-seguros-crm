@@ -1,8 +1,9 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users } from 'lucide-react'
 import { ConfigItem } from '@/types'
+import WorkspaceMembersView from '@/components/workspace/WorkspaceMembersView'
 
 const AGENCY_KEYS = ['nombre_agencia', 'nit', 'telefono', 'email', 'ciudad', 'departamento', 'direccion']
 const AGENCY_LABELS: Record<string, string> = {
@@ -354,7 +355,7 @@ function ModulosEditor({ config, onToggle }: {
 }
 
 /* ── Main Component ─────────────────────────────────── */
-type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos'
+type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'workspace'
 
 export default function ConfiguracionView() {
   const [config, setConfig]   = useState<Record<string, string>>({})
@@ -403,6 +404,7 @@ export default function ConfiguracionView() {
     { key: 'listas',     label: 'Listados del sistema',   icon: List },
     { key: 'categorias', label: 'Categorías de clientes', icon: Tag },
     { key: 'modulos',    label: 'Módulos',                icon: ToggleRight },
+    { key: 'workspace',  label: 'Workspace & Miembros',   icon: Users },
   ]
 
   return (
@@ -565,6 +567,11 @@ export default function ConfiguracionView() {
             <strong>Tip:</strong> Las categorías creadas aquí estarán disponibles en el formulario de clientes y en los filtros avanzados de la lista de clientes. Recuerda guardar los cambios con el botón superior.
           </div>
         </div>
+      )}
+
+      {/* ── Workspace tab ── */}
+      {tab === 'workspace' && (
+        <WorkspaceMembersView />
       )}
     </div>
   )

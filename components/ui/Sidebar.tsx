@@ -8,9 +8,10 @@ import {
   LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
   BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
-  Target, Bot, Settings,
+  Target, Bot, Settings, Building2, Check, ChevronsUpDown,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const STORAGE_KEY       = 'senda-sidebar-collapsed'
 const GROUPS_STORAGE_KEY = 'senda-sidebar-groups'
@@ -87,8 +88,10 @@ const NAV_GROUPS: NavGroup[] = [
 export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
+  const { workspaces, currentWorkspace, currentRole, setCurrentWorkspace } = useWorkspace()
   const [collapsed, setCollapsed]   = useState(false)
   const [mounted, setMounted]       = useState(false)
+  const [wsMenuOpen, setWsMenuOpen] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     principal: true, polizas: true, finanzas: true, gestion: true, crm: true,
   })
@@ -139,29 +142,81 @@ export default function Sidebar() {
       ].join(' ')}
     >
       {/* ── Header ─────────────────────────────────────────── */}
-      <div className="h-[60px] flex-shrink-0 border-b border-slate-700 flex items-center px-2.5 gap-2 overflow-hidden">
-        {!collapsed && (
-          <>
-            <Shield className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-            <div className="flex-1 min-w-0 overflow-hidden">
-              <p className="font-bold text-sm leading-tight whitespace-nowrap">Senda Seguros</p>
-              <p className="text-xs text-slate-400">CRM</p>
-            </div>
-          </>
+      <div className="flex-shrink-0 border-b border-slate-700">
+        <div className="h-[60px] flex items-center px-2.5 gap-2 overflow-hidden">
+          {!collapsed && (
+            <>
+              <Shield className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <p className="font-bold text-sm leading-tight whitespace-nowrap">Senda Seguros</p>
+                <p className="text-xs text-slate-400">CRM</p>
+              </div>
+            </>
+          )}
+          <button
+            onClick={toggle}
+            aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
+            className={[
+              'flex items-center justify-center rounded-lg flex-shrink-0 w-9 h-9',
+              'text-slate-400 hover:text-white hover:bg-slate-700 active:bg-slate-600',
+              'transition-colors duration-150',
+              'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 focus:ring-offset-slate-900',
+              collapsed ? 'mx-auto' : '',
+            ].join(' ')}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {/* Workspace switcher */}
+        {!collapsed && currentWorkspace && (
+          <div className="relative px-2 pb-2">
+            <button
+              onClick={() => setWsMenuOpen(v => !v)}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors text-left"
+            >
+              <div className="w-6 h-6 rounded-md bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                <Building2 className="w-3.5 h-3.5 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-white truncate leading-tight">{currentWorkspace.name}</p>
+                <p className="text-[10px] text-slate-400 capitalize">{currentRole}</p>
+              </div>
+              <ChevronsUpDown className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
+            </button>
+
+            {wsMenuOpen && workspaces.length > 1 && (
+              <div className="absolute left-2 right-2 top-full mt-1 bg-slate-800 border border-slate-600 rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+                <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                  Mis workspaces
+                </p>
+                {workspaces.map(ws => (
+                  <button
+                    key={ws.id}
+                    onClick={() => { setCurrentWorkspace(ws); setWsMenuOpen(false) }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-700 transition-colors text-left"
+                  >
+                    <div className="w-5 h-5 rounded bg-emerald-600/80 flex items-center justify-center flex-shrink-0">
+                      <Building2 className="w-3 h-3 text-white" />
+                    </div>
+                    <span className="flex-1 text-xs text-slate-200 truncate">{ws.name}</span>
+                    {ws.id === currentWorkspace.id && (
+                      <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         )}
-        <button
-          onClick={toggle}
-          aria-label={collapsed ? 'Expandir menú' : 'Colapsar menú'}
-          className={[
-            'flex items-center justify-center rounded-lg flex-shrink-0 w-9 h-9',
-            'text-slate-400 hover:text-white hover:bg-slate-700 active:bg-slate-600',
-            'transition-colors duration-150',
-            'focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-1 focus:ring-offset-slate-900',
-            collapsed ? 'mx-auto' : '',
-          ].join(' ')}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
+
+        {collapsed && currentWorkspace && (
+          <div className="px-2 pb-2 flex justify-center">
+            <div title={currentWorkspace.name} className="w-8 h-8 rounded-md bg-emerald-600 flex items-center justify-center">
+              <Building2 className="w-4 h-4 text-white" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Navigation ──────────────────────────────────────── */}
