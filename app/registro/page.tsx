@@ -1,10 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { Shield, Eye, EyeOff, MailCheck } from 'lucide-react'
+import { Shield, Eye, EyeOff, MailCheck, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function RegistroPage() {
+function RegistroContent() {
+  const params = useSearchParams()
+  const inviteToken = params.get('invite')
+
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,10 +26,18 @@ export default function RegistroPage() {
     setLoading(true)
     setError('')
 
+    const signUpOptions: Parameters<typeof supabase.auth.signUp>[0]['options'] = {
+      data: { nombre },
+    }
+
+    if (inviteToken) {
+      signUpOptions.emailRedirectTo = `${window.location.origin}/invitacion?token=${inviteToken}`
+    }
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { nombre } },
+      options: signUpOptions,
     })
 
     if (error) {
@@ -48,7 +60,11 @@ export default function RegistroPage() {
     }
 
     sessionStorage.setItem('session_started', '1')
-    window.location.href = '/'
+    if (inviteToken) {
+      window.location.href = `/invitacion?token=${inviteToken}`
+    } else {
+      window.location.href = '/'
+    }
   }
 
   if (verificationSent) {
@@ -64,8 +80,9 @@ export default function RegistroPage() {
           </p>
           <p className="text-sm font-medium text-slate-800 mb-6">{email}</p>
           <p className="text-xs text-slate-400 mb-6">
-            Haz clic en el enlace del correo para activar tu cuenta y acceder al CRM.
-            Revisa también tu carpeta de spam.
+            Haz clic en el enlace del correo para activar tu cuenta
+            {inviteToken ? ' y aceptar tu invitación.' : ' y acceder al CRM.'}
+            {' '}Revisa también tu carpeta de spam.
           </p>
           <Link
             href="/login"
@@ -92,7 +109,9 @@ export default function RegistroPage() {
         </div>
 
         <h1 className="text-xl font-bold text-slate-900 mb-1">Crear cuenta</h1>
-        <p className="text-sm text-slate-500 mb-6">Configura tu acceso al CRM</p>
+        <p className="text-sm text-slate-500 mb-6">
+          {inviteToken ? 'Crea tu cuenta para aceptar la invitación' : 'Configura tu acceso al CRM'}
+        </p>
 
         <form onSubmit={handleRegistro} className="space-y-4">
           <div>
@@ -167,11 +186,26 @@ export default function RegistroPage() {
 
         <p className="text-center text-xs text-slate-400 mt-6">
           ¿Ya tienes cuenta?{' '}
-          <Link href="/login" className="text-emerald-600 hover:underline font-medium">
+          <Link
+            href={inviteToken ? `/login?invite=${inviteToken}` : '/login'}
+            className="text-emerald-600 hover:underline font-medium"
+          >
             Iniciar sesión
           </Link>
         </p>
       </div>
     </div>
+  )
+}
+
+export default function RegistroPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+      </div>
+    }>
+      <RegistroContent />
+    </Suspense>
   )
 }

@@ -1,12 +1,15 @@
 'use client'
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
-import { Shield, Eye, EyeOff } from 'lucide-react'
+import { Shield, Eye, EyeOff, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 
-export default function LoginPage() {
-  const router = useRouter()
+function LoginContent() {
+  const params = useSearchParams()
+  const inviteToken = params.get('invite')
+  const redirectUrl = params.get('redirect')
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -33,7 +36,14 @@ export default function LoginPage() {
       localStorage.setItem('noRemember', '1')
     }
     sessionStorage.setItem('session_started', '1')
-    window.location.href = '/'
+
+    if (inviteToken) {
+      window.location.href = `/invitacion?token=${inviteToken}`
+    } else if (redirectUrl) {
+      window.location.href = redirectUrl
+    } else {
+      window.location.href = '/'
+    }
   }
 
   return (
@@ -50,7 +60,9 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-xl font-bold text-slate-900 mb-1">Iniciar sesión</h1>
-        <p className="text-sm text-slate-500 mb-6">Accede a tu CRM</p>
+        <p className="text-sm text-slate-500 mb-6">
+          {inviteToken ? 'Inicia sesión para aceptar tu invitación' : 'Accede a tu CRM'}
+        </p>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
@@ -120,11 +132,26 @@ export default function LoginPage() {
 
         <p className="text-center text-xs text-slate-400 mt-6">
           ¿Primera vez?{' '}
-          <Link href="/registro" className="text-emerald-600 hover:underline font-medium">
+          <Link
+            href={inviteToken ? `/registro?invite=${inviteToken}` : '/registro'}
+            className="text-emerald-600 hover:underline font-medium"
+          >
             Crear cuenta
           </Link>
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   )
 }

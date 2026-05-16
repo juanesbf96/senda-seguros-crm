@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { Users, UserPlus, Mail, Trash2, Shield, Eye, User, Clock, X, Check, Copy, RefreshCw } from 'lucide-react'
+import { Users, UserPlus, Mail, Trash2, Shield, Eye, User, Clock, X, Check, Copy, RefreshCw, MessageCircle, Link as LinkIcon } from 'lucide-react'
 
 interface Member {
   id: string
@@ -39,6 +39,8 @@ export default function WorkspaceMembersView() {
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [copiedToken, setCopiedToken] = useState<string | null>(null)
+  const [inviteSuccessLink, setInviteSuccessLink] = useState<string | null>(null)
+  const [copiedSuccess, setCopiedSuccess] = useState(false)
   const [wsName, setWsName] = useState(currentWorkspace?.name || '')
   const [savingName, setSavingName] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
@@ -112,9 +114,8 @@ export default function WorkspaceMembersView() {
     if (error) {
       setInviteError(error.message)
     } else {
-      // Mostrar enlace para copiar
       const link = `${window.location.origin}/invitacion?token=${data.token}`
-      await navigator.clipboard.writeText(link).catch(() => {})
+      setInviteSuccessLink(link)
       setShowInviteForm(false)
       setInviteEmail('')
       setInviteRole('agente')
@@ -278,6 +279,65 @@ export default function WorkspaceMembersView() {
                 )}
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modal: link de invitación generado */}
+      {inviteSuccessLink && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
+                <Check className="w-4 h-4 text-emerald-600" /> Link de invitación generado
+              </h3>
+              <button onClick={() => { setInviteSuccessLink(null); setCopiedSuccess(false) }} className="text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-500">Comparte este enlace con la persona que quieres invitar. Es válido por 7 días.</p>
+              <div className="flex gap-2">
+                <input
+                  readOnly
+                  value={inviteSuccessLink}
+                  className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  onClick={e => (e.target as HTMLInputElement).select()}
+                />
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(inviteSuccessLink).then(() => {
+                      setCopiedSuccess(true)
+                      setTimeout(() => setCopiedSuccess(false), 2000)
+                    })
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors flex-shrink-0"
+                >
+                  {copiedSuccess ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  {copiedSuccess ? 'Copiado' : 'Copiar'}
+                </button>
+              </div>
+              <button
+                onClick={() => {
+                  const text = encodeURIComponent(
+                    `Te invito a unirte a ${currentWorkspace?.name} en Senda Seguros CRM. Acepta tu invitación aquí: ${inviteSuccessLink}`
+                  )
+                  window.open(`https://wa.me/?text=${text}`, '_blank')
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Enviar por WhatsApp
+              </button>
+            </div>
+            <div className="p-5 border-t border-slate-200">
+              <button
+                onClick={() => { setInviteSuccessLink(null); setCopiedSuccess(false) }}
+                className="w-full px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors"
+              >
+                Listo
+              </button>
+            </div>
           </div>
         </div>
       )}

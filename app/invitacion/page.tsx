@@ -2,51 +2,50 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { Shield, CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { Shield, CheckCircle2, XCircle, Loader2, UserPlus, LogIn } from 'lucide-react'
 import Link from 'next/link'
 
 function InvitacionContent() {
   const params = useSearchParams()
   const token = params.get('token')
-  const [status, setStatus] = useState<'loading' | 'found' | 'accepted' | 'error' | 'auth'>('loading')
+  const [status, setStatus] = useState<'loading' | 'found' | 'accepted' | 'error'>('loading')
   const [invitation, setInvitation] = useState<any>(null)
   const [error, setError] = useState('')
   const [accepting, setAccepting] = useState(false)
+  const [user, setUser] = useState<any>(null)
 
   useEffect(() => {
     if (!token) { setStatus('error'); setError('Token inválido'); return }
-    checkInvitation()
+    init()
   }, [token])
 
-  async function checkInvitation() {
-    const { data: inv, error } = await supabase
-      .from('workspace_invitations')
-      .select('*, workspace:workspaces(id, name)')
-      .eq('token', token!)
-      .gt('expires_at', new Date().toISOString())
-      .is('accepted_at', null)
-      .single()
+  async function init() {
+    const [{ data: { user } }, invResult] = await Promise.all([
+      supabase.auth.getUser(),
+      supabase
+        .from('workspace_invitations')
+        .select('*, workspace:workspaces(id, name)')
+        .eq('token', token!)
+        .gt('expires_at', new Date().toISOString())
+        .is('accepted_at', null)
+        .single(),
+    ])
 
-    if (error || !inv) {
+    setUser(user)
+
+    if (invResult.error || !invResult.data) {
       setStatus('error')
       setError('La invitación no existe, ya fue usada, o expiró.')
       return
     }
 
-    setInvitation(inv)
+    setInvitation(invResult.data)
     setStatus('found')
   }
 
   async function acceptInvitation() {
+    if (!user) return
     setAccepting(true)
-    const { data: { user } } = await supabase.auth.getUser()
-
-    if (!user) {
-      // Guardar token en sessionStorage y redirigir a registro
-      sessionStorage.setItem('pending_invitation', token!)
-      window.location.href = `/registro?invite=${token}`
-      return
-    }
 
     try {
       // Agregar al workspace
@@ -114,6 +113,7 @@ function InvitacionContent() {
     )
   }
 
+  // status === 'found'
   return (
     <div className="py-2">
       <h2 className="text-lg font-bold text-slate-900 mb-2">Te han invitado a un workspace</h2>
@@ -134,16 +134,39 @@ function InvitacionContent() {
         </p>
       )}
 
-      <button
-        onClick={acceptInvitation}
-        disabled={accepting}
-        className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-      >
-        {accepting ? 'Aceptando...' : 'Aceptar invitación'}
-      </button>
-      <p className="text-xs text-slate-400 text-center mt-3">
-        Si no tienes cuenta, se te pedirá que te registres primero.
-      </p>
+      {user ? (
+        // Authenticated: show accept button
+        <>
+          <button
+            onClick={acceptInvitation}
+            disabled={accepting}
+            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            {accepting ? 'Aceptando...' : 'Aceptar invitación'}
+          </button>
+        </>
+      ) : (
+        // Not authenticated: show register / login CTAs
+        <div className="space-y-3">
+          <p className="text-sm text-slate-500 text-center mb-4">
+            Para aceptar esta invitación necesitas una cuenta en Senda Seguros CRM.
+          </p>
+          <Link
+            href={`/registro?invite=${token}`}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            <UserPlus className="w-4 h-4" />
+            Crear cuenta
+          </Link>
+          <Link
+            href={`/login?invite=${token}`}
+            className="w-full flex items-center justify-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-2.5 rounded-lg text-sm font-medium transition-colors"
+          >
+            <LogIn className="w-4 h-4" />
+            Ya tengo cuenta — Iniciar sesión
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
