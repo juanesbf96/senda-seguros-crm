@@ -52,29 +52,51 @@ export default function OnboardingPage() {
     if (!user) return
 
     try {
+      let finalWorkspaceId = workspaceId
+
       if (workspaceId) {
         // Actualizar workspace existente (creado por trigger)
         const { error: err } = await supabase
           .from('workspaces')
           .update({ name: workspaceName.trim(), setup_completed: true })
           .eq('id', workspaceId)
-
         if (err) throw err
       } else {
-        // Crear workspace nuevo (si el trigger no corrió)
+        // Crear workspace nuevo (usuario existente antes del trigger)
         const { data: ws, error: err1 } = await supabase
           .from('workspaces')
           .insert({ name: workspaceName.trim(), owner_id: user.id, setup_completed: true })
           .select('id')
           .single()
-
         if (err1) throw err1
 
         const { error: err2 } = await supabase
           .from('workspace_members')
           .insert({ workspace_id: ws.id, user_id: user.id, role: 'admin' })
-
         if (err2) throw err2
+
+        finalWorkspaceId = ws.id
+      }
+
+      // Migrar datos existentes que no tienen workspace_id
+      if (finalWorkspaceId) {
+        const tables = [
+          'clientes','polizas','poliza_anexos','poliza_vinculados',
+          'actividades','tareas','cobros','recibos','solicitudes',
+          'remisiones','vendedores','liquidaciones','prospectos',
+          'prospecto_actividades','agenda_eventos','archivos',
+          'siniestros','siniestro_amparos','facturas','diligencias',
+          'diligencia_tareas','metas','configuracion','contactos',
+          'campanas_renovacion','gestiones_renovacion',
+        ]
+        await Promise.allSettled(
+          tables.map(table =>
+            (supabase as any)
+              .from(table)
+              .update({ workspace_id: finalWorkspaceId })
+              .is('workspace_id', null)
+          )
+        )
       }
 
       setStep('done')
