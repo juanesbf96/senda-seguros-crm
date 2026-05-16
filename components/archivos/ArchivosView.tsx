@@ -2,6 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Archivo, Cliente, Poliza, Prospecto } from '@/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
   Upload, Trash2, Download, Search, FileText,
   FileImage, File, Film, Music, X, Paperclip,
@@ -54,6 +55,7 @@ interface UploadForm {
 }
 
 export default function ArchivosView({ clienteId }: { clienteId?: string }) {
+  const { currentWorkspace } = useWorkspace()
   const [archivos,    setArchivos]    = useState<Archivo[]>([])
   const [clientes,    setClientes]    = useState<Pick<Cliente,  'id'|'nombre'>[]>([])
   const [polizas,     setPolizas]     = useState<Pick<Poliza,   'id'|'numero_poliza'|'aseguradora'>[]>([])
@@ -126,6 +128,7 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
       client_id:       uploadForm.client_id    || null,
       poliza_id:       uploadForm.poliza_id    || null,
       prospecto_id:    uploadForm.prospecto_id || null,
+      workspace_id:    currentWorkspace?.id,
     })
 
     if (dbErr) { setError(dbErr.message); setUploading(false); return }

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
   Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2,
   SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet, TrendingUp,
@@ -100,6 +101,7 @@ function downloadCSV(content: string, filename: string) {
 }
 
 export default function ClientesList() {
+  const { currentWorkspace } = useWorkspace()
   const [clientes,      setClientes]      = useState<Cliente[]>([])
   const [loading,       setLoading]       = useState(true)
   const [search,        setSearch]        = useState('')
@@ -120,7 +122,7 @@ export default function ClientesList() {
   const menuRef = useRef<HTMLDivElement>(null)
 
   async function load() {
-    const { data } = await supabase.from('clientes').select('*').order('created_at', { ascending: false })
+    const { data } = await supabase.from('clientes').select('*').eq('workspace_id', currentWorkspace?.id || '').order('created_at', { ascending: false })
     setClientes(data || [])
     setLoading(false)
   }
@@ -130,7 +132,7 @@ export default function ClientesList() {
     setContactCount(count || 0)
   }
 
-  useEffect(() => { load(); loadContactCount() }, [])
+  useEffect(() => { load(); loadContactCount() }, [currentWorkspace?.id])
 
   // Close dropdown on outside click
   useEffect(() => {

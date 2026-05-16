@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { PolizaVinculado, Poliza } from '@/types'
 import { X } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   vinculado?: PolizaVinculado
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function PolizaVinculadoModal({ vinculado, polizaId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [polizas, setPolizas] = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
 
   const [form, setForm] = useState({
@@ -44,6 +46,7 @@ export default function PolizaVinculadoModal({ vinculado, polizaId, onClose, onS
       numero_afiliado_objeto: form.numero_afiliado_objeto.trim() || null,
       fecha_inicio:           form.fecha_inicio                  || null,
       beneficiario:           form.beneficiario.trim()           || null,
+      workspace_id:           currentWorkspace?.id,
     }
     const { error: err } = vinculado
       ? await supabase.from('poliza_vinculados').update(payload).eq('id', vinculado.id)

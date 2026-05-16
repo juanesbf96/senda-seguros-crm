@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Prospecto, EtapaProspecto, FuenteProspecto } from '@/types'
 import { X } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   prospecto?: Prospecto
@@ -35,6 +36,7 @@ const RAMOS = [
 ]
 
 export default function ProspectoModal({ prospecto, etapaInicial, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [form, setForm] = useState({
     nombre:          prospecto?.nombre          || '',
     empresa:         prospecto?.empresa         || '',
@@ -69,6 +71,7 @@ export default function ProspectoModal({ prospecto, etapaInicial, onClose, onSav
       valor_estimado: form.valor_estimado ? parseFloat(form.valor_estimado) : null,
       asignado_a:     form.asignado_a.trim()    || null,
       notas:          form.notas.trim()         || null,
+      workspace_id:   currentWorkspace?.id,
     }
 
     const { error: err } = prospecto

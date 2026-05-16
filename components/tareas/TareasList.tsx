@@ -5,6 +5,7 @@ import { Tarea, PrioridadTarea } from '@/types'
 import { Plus, Search, Pencil, Trash2, CheckSquare, Square, AlertCircle, ArrowUp, Minus, CheckCircle2, Clock, X, Filter, Check } from 'lucide-react'
 import Link from 'next/link'
 import TareaModal from './TareaModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const PRIORIDAD_ICON: Record<PrioridadTarea, React.ElementType> = {
   normal: Minus, alta: ArrowUp, urgente: AlertCircle,
@@ -25,6 +26,7 @@ function formatFecha(s: string | null) {
 }
 
 export default function TareasList({ clienteId }: { clienteId?: string }) {
+  const { currentWorkspace } = useWorkspace()
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -49,12 +51,13 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
   async function load() {
     let q = supabase.from('tareas').select('*, cliente:clientes(id, nombre)').order('fecha_vencimiento', { ascending: true, nullsFirst: false })
     if (clienteId) q = q.eq('client_id', clienteId)
+    else q = q.eq('workspace_id', currentWorkspace?.id || '')
     const { data } = await q
     setTareas((data || []) as Tarea[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [clienteId])
+  useEffect(() => { load() }, [clienteId, currentWorkspace?.id])
 
   async function toggleComplete(t: Tarea) {
     await supabase.from('tareas').update({ completada: !t.completada }).eq('id', t.id)

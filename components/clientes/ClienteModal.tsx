@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
 import { X, ChevronDown } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   cliente?: Cliente
@@ -27,6 +28,7 @@ const TIPO_LABELS: Record<TipoCliente, string> = {
 const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 
 export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [tipo, setTipo] = useState<TipoCliente>(cliente?.tipo_cliente || 'persona_natural')
   const [form, setForm] = useState({
     nombre:                   cliente?.nombre || '',
@@ -96,6 +98,7 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
       tiene_hijos:              form.tiene_hijos,
       num_hijos:                form.tiene_hijos && form.num_hijos ? parseInt(form.num_hijos) : null,
       autoriza_datos:           form.autoriza_datos,
+      workspace_id:             currentWorkspace?.id,
     }
 
     const { error: err } = cliente

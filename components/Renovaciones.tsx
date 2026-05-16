@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, GestionRenovacion, EstadoGestion, CampanaRenovacion } from '@/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   AlertTriangle, Clock, CheckCircle, Phone, ChevronDown, ChevronUp,
@@ -280,6 +281,7 @@ function CampanaCard({
   onReactivar: (id: string) => void
   onDelete: (id: string) => void
 }) {
+  const { currentWorkspace } = useWorkspace()
   const [expanded, setExpanded]   = useState(false)
   const [polizas, setPolizas]     = useState<PolizaConCliente[]>([])
   const [gestiones, setGestiones] = useState<Record<string, GestionRenovacion>>({})
@@ -314,7 +316,7 @@ function CampanaCard({
   async function changeEstado(polizaId: string, estado: EstadoGestion) {
     setSavingId(polizaId)
     const nota = notas[polizaId]?.trim() || null
-    await supabase.from('gestiones_renovacion').insert({ poliza_id: polizaId, estado, notas: nota })
+    await supabase.from('gestiones_renovacion').insert({ poliza_id: polizaId, estado, notas: nota, workspace_id: currentWorkspace?.id })
     setGestiones(prev => ({
       ...prev,
       [polizaId]: { id: '', poliza_id: polizaId, estado, notas: nota, fecha: new Date().toISOString() },
@@ -495,6 +497,7 @@ function CampanaCard({
 
 /* ── Polizas60View ──────────────────────────────────────────── */
 function Polizas60View() {
+  const { currentWorkspace } = useWorkspace()
   const [polizas, setPolizas]     = useState<PolizaConCliente[]>([])
   const [gestiones, setGestiones] = useState<Record<string, GestionRenovacion>>({})
   const [loading, setLoading]     = useState(true)
@@ -526,7 +529,7 @@ function Polizas60View() {
   async function changeEstado(polizaId: string, estado: EstadoGestion) {
     setSavingId(polizaId)
     const nota = notas[polizaId]?.trim() || null
-    await supabase.from('gestiones_renovacion').insert({ poliza_id: polizaId, estado, notas: nota })
+    await supabase.from('gestiones_renovacion').insert({ poliza_id: polizaId, estado, notas: nota, workspace_id: currentWorkspace?.id })
     setGestiones(prev => ({
       ...prev,
       [polizaId]: { id: '', poliza_id: polizaId, estado, notas: nota, fecha: new Date().toISOString() },
@@ -605,6 +608,7 @@ function Polizas60View() {
 
 /* ── Main Component ─────────────────────────────────────────── */
 export default function Renovaciones() {
+  const { currentWorkspace } = useWorkspace()
   const [tab, setTab]               = useState<MainTab>('activas')
   const [campanas, setCampanas]     = useState<CampanaRenovacion[]>([])
   const [loading, setLoading]       = useState(true)
@@ -635,7 +639,7 @@ export default function Renovaciones() {
     if (editingC) {
       await supabase.from('campanas_renovacion').update(payload).eq('id', editingC.id)
     } else {
-      await supabase.from('campanas_renovacion').insert({ ...payload, estado: 'activa' })
+      await supabase.from('campanas_renovacion').insert({ ...payload, estado: 'activa', workspace_id: currentWorkspace?.id })
     }
     setShowModal(false)
     setEditingC(null)

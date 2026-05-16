@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, EstadoPoliza, Cliente, Vendedor } from '@/types'
 import { X, Calculator } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 /* ────────────────────────────────────────────────────────── */
 /*  Lists                                                     */
@@ -55,6 +56,7 @@ interface Props {
 /* ────────────────────────────────────────────────────────── */
 
 export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes,  setClientes]  = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [vendedores, setVendedores] = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
 
@@ -200,6 +202,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       recaudado_aseguradora: form.recaudado_aseguradora ? n(form.recaudado_aseguradora) : null,
       // notas
       notas: form.notas || null,
+      workspace_id: currentWorkspace?.id,
     }
 
     const { error: err } = poliza

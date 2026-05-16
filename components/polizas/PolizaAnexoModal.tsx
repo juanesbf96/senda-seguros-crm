@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { PolizaAnexo, Poliza, Cliente } from '@/types'
 import { X } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   anexo?: PolizaAnexo
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function PolizaAnexoModal({ anexo, polizaId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [polizas, setPolizas]   = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
 
@@ -47,6 +49,7 @@ export default function PolizaAnexoModal({ anexo, polizaId, onClose, onSaved }: 
       numero_anexo: form.numero_anexo.trim() || null,
       estado:       form.estado,
       documento:    form.documento.trim()    || null,
+      workspace_id: currentWorkspace?.id,
     }
     const { error: err } = anexo
       ? await supabase.from('poliza_anexos').update(payload).eq('id', anexo.id)

@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Prospecto, EtapaProspecto, FuenteProspecto } from '@/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { formatCOP } from '@/lib/utils'
 import {
   Plus, Search, Pencil, Trash2, LayoutGrid, List,
@@ -53,6 +54,7 @@ const FUENTE_LABELS: Record<FuenteProspecto, string> = {
 type ViewMode = 'kanban' | 'list'
 
 export default function ProspectosList() {
+  const { currentWorkspace } = useWorkspace()
   const [prospectos, setProspectos] = useState<Prospecto[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -67,12 +69,13 @@ export default function ProspectosList() {
     const { data } = await supabase
       .from('prospectos')
       .select('*')
+      .eq('workspace_id', currentWorkspace?.id || '')
       .order('created_at', { ascending: false })
     setProspectos((data || []) as Prospecto[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace?.id])
 
   async function deleteProspecto(id: string) {
     if (!confirm('¿Eliminar este prospecto?')) return

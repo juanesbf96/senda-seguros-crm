@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Recibo, FormaPago, TipoRecibo, Cliente, Cobro } from '@/types'
 import { X } from 'lucide-react'
 import { formatCOP } from '@/lib/utils'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const TIPO_LABELS: Record<TipoRecibo, string> = {
   anticipo:    'Anticipo',
@@ -28,6 +29,7 @@ const FORMA_LABELS: Record<FormaPago, string> = {
 const FORMA_REQUIERE_BANCO: FormaPago[] = ['transferencia', 'cheque', 'consignacion']
 
 export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [cobros, setCobros] = useState<Pick<Cobro, 'id' | 'concepto' | 'valor'>[]>([])
   const [form, setForm] = useState({
@@ -90,6 +92,7 @@ export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onS
       banco:              form.banco.trim() || null,
       referencia:         form.referencia.trim() || null,
       notas:              form.notas.trim() || null,
+      workspace_id:       currentWorkspace?.id,
     }
 
     const { error: err } = recibo

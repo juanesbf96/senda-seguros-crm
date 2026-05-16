@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Tarea, PrioridadTarea, Cliente } from '@/types'
 import { X, AlertCircle, ArrowUp, Minus } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   tarea?: Tarea
@@ -18,6 +19,7 @@ const PRIORIDAD_CONFIG: Record<PrioridadTarea, { label: string; cls: string; ico
 }
 
 export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [form, setForm] = useState({
     client_id:         tarea?.client_id || clienteId || '',
@@ -54,6 +56,7 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
       prioridad:         form.prioridad,
       completada:        form.completada,
       asignado_a:        form.asignado_a.trim() || null,
+      workspace_id:      currentWorkspace?.id,
     }
     const { error: err } = tarea
       ? await supabase.from('tareas').update(payload).eq('id', tarea.id)

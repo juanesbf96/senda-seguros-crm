@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { ProspectoActividad, TipoActividadProspecto } from '@/types'
 import { Phone, Mail, Users, FileText, Calculator, Plus, Trash2 } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const TIPO_ICONS: Record<TipoActividadProspecto, React.ElementType> = {
   llamada:    Phone,
@@ -33,6 +34,7 @@ interface Props {
 }
 
 export default function ProspectoActividades({ prospectoId }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [actividades, setActividades] = useState<ProspectoActividad[]>([])
   const [loading, setLoading]         = useState(true)
   const [showForm, setShowForm]       = useState(false)
@@ -63,6 +65,7 @@ export default function ProspectoActividades({ prospectoId }: Props) {
       tipo:         form.tipo,
       descripcion:  form.descripcion.trim(),
       fecha:        form.fecha,
+      workspace_id: currentWorkspace?.id,
     })
     setForm(f => ({ ...f, descripcion: '' }))
     setSaving(false)

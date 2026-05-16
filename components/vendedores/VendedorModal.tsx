@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Vendedor, ComisionAnio } from '@/types'
 import { X, Plus, Trash2 } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   vendedor?: Vendedor
@@ -16,6 +17,7 @@ const BANCOS = [
 ]
 
 export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [form, setForm] = useState({
     nombre:       vendedor?.nombre       || '',
     email:        vendedor?.email        || '',
@@ -82,6 +84,7 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
       numero_cuenta:       form.numero_cuenta.trim() || null,
       tipo_cuenta:         form.tipo_cuenta     || null,
       comisiones_por_anio: comisiones,
+      workspace_id:        currentWorkspace?.id,
     }
 
     const { error: err } = vendedor

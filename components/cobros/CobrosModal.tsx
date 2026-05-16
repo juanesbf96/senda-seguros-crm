@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cobro, EstadoCobro, TipoCobro, Cliente, Poliza } from '@/types'
 import { X } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   cobro?: Cobro
@@ -29,6 +30,7 @@ const ASEGURADORAS = [
 ]
 
 export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [polizas, setPolizas]   = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
 
@@ -85,6 +87,7 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
       ramo:                form.ramo.trim()               || null,
       numero_poliza:       form.numero_poliza.trim()      || null,
       porcentaje_comision: form.porcentaje_comision ? parseFloat(form.porcentaje_comision) : null,
+      workspace_id:        currentWorkspace?.id,
     }
     const { error: err } = cobro
       ? await supabase.from('cobros').update(payload).eq('id', cobro.id)

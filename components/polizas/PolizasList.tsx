@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, EstadoPoliza, PolizaAnexo, PolizaVinculado } from '@/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Search, AlertTriangle, Plus, Pencil, Trash2,
@@ -49,6 +50,7 @@ function countExtra(f: ExtraFilters) {
 }
 
 export default function PolizasList() {
+  const { currentWorkspace } = useWorkspace()
   const [polizas, setPolizas]       = useState<PolizaConCliente[]>([])
   const [eliminadas, setEliminadas] = useState<PolizaConCliente[]>([])
   const [anexos, setAnexos]         = useState<PolizaAnexo[]>([])
@@ -73,6 +75,7 @@ export default function PolizasList() {
       .from('polizas')
       .select('*, cliente:clientes(id, nombre)')
       .eq('eliminada', false)
+      .eq('workspace_id', currentWorkspace?.id || '')
       .order('fecha_fin', { ascending: true, nullsFirst: false })
     setPolizas((data as PolizaConCliente[]) || [])
   }
@@ -82,6 +85,7 @@ export default function PolizasList() {
       .from('polizas')
       .select('*, cliente:clientes(id, nombre)')
       .eq('eliminada', true)
+      .eq('workspace_id', currentWorkspace?.id || '')
       .order('created_at', { ascending: false })
     setEliminadas((data as PolizaConCliente[]) || [])
   }
@@ -90,6 +94,7 @@ export default function PolizasList() {
     const { data } = await supabase
       .from('poliza_anexos')
       .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo), cliente:clientes(id, nombre)')
+      .eq('workspace_id', currentWorkspace?.id || '')
       .order('created_at', { ascending: false })
     setAnexos((data || []) as PolizaAnexo[])
   }
@@ -98,6 +103,7 @@ export default function PolizasList() {
     const { data } = await supabase
       .from('poliza_vinculados')
       .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .eq('workspace_id', currentWorkspace?.id || '')
       .order('created_at', { ascending: false })
     setVinculados((data || []) as PolizaVinculado[])
   }
@@ -108,7 +114,7 @@ export default function PolizasList() {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace?.id])
 
   async function softDelete(id: string) {
     if (!confirm('¿Mover esta póliza a Eliminadas?')) return

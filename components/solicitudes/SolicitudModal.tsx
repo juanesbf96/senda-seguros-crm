@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Solicitud, TipoSolicitud, EstadoSolicitud, PrioridadSolicitud, Cliente, Poliza } from '@/types'
 import { X } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   solicitud?: Solicitud
@@ -33,6 +34,7 @@ const ESTADO_OPTIONS: { value: EstadoSolicitud; label: string }[] = [
 ]
 
 export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [polizas, setPolizas]   = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
 
@@ -88,6 +90,7 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
       asignado_a:   form.asignado_a.trim()   || null,
       ramo:         form.ramo.trim()         || null,
       riesgo:       form.riesgo.trim()       || null,
+      workspace_id: currentWorkspace?.id,
     }
     const { error: err } = solicitud
       ? await supabase.from('solicitudes').update(payload).eq('id', solicitud.id)

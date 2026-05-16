@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Liquidacion, EstadoLiquidacion, Vendedor } from '@/types'
 import { X } from 'lucide-react'
 import { formatCOP } from '@/lib/utils'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   liquidacion?: Liquidacion
@@ -19,6 +20,7 @@ const ESTADO_LABELS: Record<EstadoLiquidacion, string> = {
 }
 
 export default function LiquidacionModal({ liquidacion, vendedorId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [vendedores, setVendedores] = useState<Pick<Vendedor, 'id' | 'nombre' | 'porcentaje_comision'>[]>([])
   const [form, setForm] = useState({
     vendedor_id:    liquidacion?.vendedor_id || vendedorId || '',
@@ -70,6 +72,7 @@ export default function LiquidacionModal({ liquidacion, vendedorId, onClose, onS
       estado:         form.estado,
       fecha_pago:     form.fecha_pago || null,
       notas:          form.notas.trim() || null,
+      workspace_id:   currentWorkspace?.id,
     }
 
     const { error: err } = liquidacion

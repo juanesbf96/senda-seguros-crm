@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Siniestro, EstadoSiniestro, SiniestroAmparo, Cliente, Poliza } from '@/types'
 import { X, Plus, Trash2, CheckCircle, XCircle, Clock } from 'lucide-react'
 import { formatCOP } from '@/lib/utils'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   siniestro?: Siniestro
@@ -31,6 +32,7 @@ const ESTADO_COLORS: Record<EstadoSiniestro, string> = {
 const ASEGURADORAS = ['Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria','La Equidad','Mapfre','Positiva','Previsora','Seguros del Estado','Otro']
 
 export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente,'id'|'nombre'>[]>([])
   const [polizas,  setPolizas]  = useState<Pick<Poliza,'id'|'numero_poliza'|'aseguradora'|'ramo'>[]>([])
   const [amparos,  setAmparos]  = useState<Omit<SiniestroAmparo,'id'|'siniestro_id'|'created_at'>[]>(
@@ -105,6 +107,7 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
       valor_aprobado:   form.valor_aprobado   ? parseFloat(form.valor_aprobado)   : null,
       estado:           form.estado,
       notas:            form.notas.trim()     || null,
+      workspace_id:     currentWorkspace?.id,
     }
 
     let siniestroId = siniestro?.id
