@@ -29,9 +29,14 @@ export default function RegistroPage() {
     })
 
     if (error) {
-      setError(error.message === 'User already registered'
-        ? 'Este correo ya tiene una cuenta registrada'
-        : 'Error al crear la cuenta. Intenta de nuevo.')
+      const msg = error.message || ''
+      if (msg.includes('already registered') || msg.includes('already been registered')) {
+        setError('Este correo ya tiene una cuenta registrada')
+      } else if (msg.includes('Password should')) {
+        setError('La contraseña debe tener al menos 6 caracteres')
+      } else {
+        setError(msg || 'Error al crear la cuenta. Intenta de nuevo.')
+      }
       setLoading(false)
       return
     }
