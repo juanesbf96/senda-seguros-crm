@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users } from 'lucide-react'
 import { ConfigItem } from '@/types'
 import WorkspaceMembersView from '@/components/workspace/WorkspaceMembersView'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const AGENCY_KEYS = ['nombre_agencia', 'nit', 'telefono', 'email', 'ciudad', 'departamento', 'direccion']
 const AGENCY_LABELS: Record<string, string> = {
@@ -358,6 +359,7 @@ function ModulosEditor({ config, onToggle }: {
 type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'workspace'
 
 export default function ConfiguracionView() {
+  const { currentWorkspace } = useWorkspace()
   const [config, setConfig]   = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
@@ -365,12 +367,16 @@ export default function ConfiguracionView() {
   const [tab, setTab]         = useState<TabKey>('agencia')
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('configuracion').select('*')
+    if (!currentWorkspace) return
+    const { data } = await supabase
+      .from('configuracion')
+      .select('*')
+      .eq('workspace_id', currentWorkspace.id)
     const map: Record<string, string> = {}
     ;(data as ConfigItem[] || []).forEach(c => { map[c.clave] = c.valor || '' })
     setConfig(map)
     setLoading(false)
-  }, [])
+  }, [currentWorkspace?.id])
 
   useEffect(() => { load() }, [load])
 
@@ -379,9 +385,10 @@ export default function ConfiguracionView() {
   }
 
   async function saveAll() {
+    if (!currentWorkspace) return
     setSaving(true)
     const updates = Object.entries(config).map(([clave, valor]) => ({
-      clave, valor, updated_at: new Date().toISOString(),
+      clave, valor, workspace_id: currentWorkspace.id, updated_at: new Date().toISOString(),
     }))
     await supabase.from('configuracion').upsert(updates, { onConflict: 'clave' })
     setSaving(false)

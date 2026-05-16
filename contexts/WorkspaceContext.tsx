@@ -37,6 +37,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [rolesMap, setRolesMap] = useState<Record<string, WorkspaceRole>>({})
   const [currentWorkspace, setCurrentWs] = useState<Workspace | null>(null)
   const [currentRole, setCurrentRole] = useState<WorkspaceRole | null>(null)
   const [loading, setLoading] = useState(true)
@@ -67,6 +68,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     })
 
     setWorkspaces(wsList)
+    setRolesMap(roles)
 
     // Restaurar workspace activo desde localStorage
     const savedId = typeof window !== 'undefined'
@@ -100,20 +102,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
 
   function setCurrentWorkspace(ws: Workspace) {
     setCurrentWs(ws)
-    // Obtener rol para el nuevo workspace
-    const idx = workspaces.findIndex(w => w.id === ws.id)
-    if (idx >= 0) {
-      // El rol se guarda en el contexto; aquí lo buscamos del state actual
-      supabase
-        .from('workspace_members')
-        .select('role')
-        .eq('workspace_id', ws.id)
-        .eq('user_id', supabase.auth.getUser().then(r => r.data.user?.id))
-        .single()
-        .then(({ data }) => {
-          if (data) setCurrentRole(data.role as WorkspaceRole)
-        })
-    }
+    setCurrentRole(rolesMap[ws.id] ?? null)
     if (typeof window !== 'undefined') {
       localStorage.setItem('active_workspace_id', ws.id)
     }

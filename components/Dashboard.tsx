@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Cliente, Poliza, Etapa } from '@/types'
 import { formatCOP, daysUntil } from '@/lib/utils'
 import Link from 'next/link'
@@ -22,6 +23,7 @@ const ETAPA_COLORS: Record<Etapa, string> = {
 }
 
 export default function Dashboard() {
+  const { currentWorkspace } = useWorkspace()
   const [clientes,   setClientes]   = useState<Cliente[]>([])
   const [polizas,    setPolizas]    = useState<Poliza[]>([])
   const [todasPolizas, setTodasPolizas] = useState<{ estado: string }[]>([])
@@ -41,7 +43,9 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!currentWorkspace) return
     async function load() {
+      const wsId     = currentWorkspace.id
       const today    = new Date().toISOString().split('T')[0]
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
       const in7days  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
@@ -58,19 +62,20 @@ export default function Dashboard() {
         { data: liqs },
         { data: sols },
       ] = await Promise.all([
-        supabase.from('clientes').select('*').order('created_at', { ascending: false }),
+        supabase.from('clientes').select('*').eq('workspace_id', wsId).order('created_at', { ascending: false }),
         supabase.from('polizas')
           .select('*, cliente:clientes(nombre)')
+          .eq('workspace_id', wsId)
           .eq('estado', 'activa')
           .eq('eliminada', false),
-        supabase.from('polizas').select('estado').eq('eliminada', false),
-        supabase.from('siniestros').select('id').eq('finalizado', false),
-        supabase.from('tareas').select('id').eq('completada', false).lt('fecha_vencimiento', today),
-        supabase.from('tareas').select('id').eq('completada', false).eq('fecha_vencimiento', today),
-        supabase.from('tareas').select('id').eq('completada', false).eq('fecha_vencimiento', tomorrow),
-        supabase.from('cobros').select('valor, estado, tipo').neq('estado', 'anulado'),
-        supabase.from('liquidaciones').select('total_comision, estado').eq('estado', 'pendiente'),
-        supabase.from('solicitudes').select('id, estado, prioridad, fecha_limite'),
+        supabase.from('polizas').select('estado').eq('workspace_id', wsId).eq('eliminada', false),
+        supabase.from('siniestros').select('id').eq('workspace_id', wsId).eq('finalizado', false),
+        supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).lt('fecha_vencimiento', today),
+        supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', today),
+        supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', tomorrow),
+        supabase.from('cobros').select('valor, estado, tipo').eq('workspace_id', wsId).neq('estado', 'anulado'),
+        supabase.from('liquidaciones').select('total_comision, estado').eq('workspace_id', wsId).eq('estado', 'pendiente'),
+        supabase.from('solicitudes').select('id, estado, prioridad, fecha_limite').eq('workspace_id', wsId),
       ])
 
       setClientes(c || [])
@@ -104,7 +109,7 @@ export default function Dashboard() {
       setLoading(false)
     }
     load()
-  }, [])
+  }, [currentWorkspace?.id])
 
   const porEtapa = (e: Etapa) => clientes.filter(c => c.etapa === e).length
 
