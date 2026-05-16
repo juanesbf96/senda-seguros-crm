@@ -45,7 +45,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (!currentWorkspace) return
     async function load() {
-      const wsId     = currentWorkspace.id
+      const wsId     = currentWorkspace!.id
       const today    = new Date().toISOString().split('T')[0]
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
       const in7days  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
