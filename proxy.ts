@@ -44,17 +44,9 @@ export async function proxy(request: NextRequest) {
 
   // Autenticado en ruta protegida → verificar workspace configurado
   if (user && !isPublic) {
-    const { data: members } = await supabase
-      .from('workspace_members')
-      .select('workspace_id, workspace:workspaces(setup_completed)')
-      .eq('user_id', user.id)
-      .limit(5)
+    const { data: hasWorkspace } = await supabase.rpc('user_has_workspace')
 
-    const hasSetupWorkspace = (members as any[] | null)?.some(
-      (m: any) => m.workspace?.setup_completed === true
-    )
-
-    if (!hasSetupWorkspace) {
+    if (!hasWorkspace) {
       const url = request.nextUrl.clone()
       url.pathname = '/onboarding'
       return NextResponse.redirect(url)
