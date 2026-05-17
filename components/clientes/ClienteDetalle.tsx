@@ -447,7 +447,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
                 {cliente.cedula    && <DataItem label="Cédula" value={cliente.cedula} />}
                 {cliente.nit       && <DataItem label="NIT" value={cliente.nit} />}
                 {cliente.fecha_nacimiento && <DataItem label="Fecha nacimiento" value={formatDate(cliente.fecha_nacimiento)} />}
-                {cliente.fecha_vencimiento_cedula && <DataItem label="Vencimiento cédula" value={formatDate(cliente.fecha_vencimiento_cedula)} />}
+                {cliente.fecha_expedicion_cedula && <DataItem label="Expedición cédula" value={formatDate(cliente.fecha_expedicion_cedula)} />}
                 {cliente.genero    && <DataItem label="Género" value={cliente.genero} icon={<User className="w-3.5 h-3.5" />} />}
                 {cliente.estado_civil && <DataItem label="Estado civil" value={cliente.estado_civil} />}
                 {cliente.sobrenombre && <DataItem label="Alias" value={cliente.sobrenombre} />}

@@ -24,7 +24,7 @@ export interface Cliente {
   fecha_nacimiento: string | null
   // Sprint A
   genero: string | null
-  fecha_vencimiento_cedula: string | null
+  fecha_expedicion_cedula: string | null
   estado_civil: string | null
   tiene_vehiculo: boolean
   tiene_hijos: boolean

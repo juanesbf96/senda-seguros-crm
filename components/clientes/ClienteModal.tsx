@@ -56,7 +56,7 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
     razon_social:             cliente?.razon_social || '',
     sobrenombre:              cliente?.sobrenombre || '',
     fecha_nacimiento:         cliente?.fecha_nacimiento || '',
-    fecha_vencimiento_cedula: cliente?.fecha_vencimiento_cedula || '',
+    fecha_expedicion_cedula:  cliente?.fecha_expedicion_cedula || '',
     fecha_constitucion:       cliente?.fecha_constitucion || '',
     genero:                   cliente?.genero || '',
     estado_civil:             cliente?.estado_civil || '',
@@ -106,7 +106,7 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
       cedula:                   tipo === 'persona_natural' ? form.cedula.trim() || null : null,
       nit:                      tipo !== 'persona_natural' ? form.nit.trim() || null : null,
       fecha_nacimiento:         tipo === 'persona_natural' && form.fecha_nacimiento ? form.fecha_nacimiento : null,
-      fecha_vencimiento_cedula: tipo === 'persona_natural' && form.fecha_vencimiento_cedula ? form.fecha_vencimiento_cedula : null,
+      fecha_expedicion_cedula:  tipo === 'persona_natural' && form.fecha_expedicion_cedula ? form.fecha_expedicion_cedula : null,
       fecha_constitucion:       tipo !== 'persona_natural' && form.fecha_constitucion ? form.fecha_constitucion : null,
       genero:                   tipo === 'persona_natural' ? form.genero || null : null,
       estado_civil:             tipo === 'persona_natural' ? form.estado_civil || null : null,
@@ -178,9 +178,9 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
                     <input value={form.cedula} onChange={e => set('cedula', e.target.value)}
                       placeholder="12345678" className={cls} />
                   </Field>
-                  <Field label="Fecha vencimiento cédula">
-                    <input type="date" value={form.fecha_vencimiento_cedula}
-                      onChange={e => set('fecha_vencimiento_cedula', e.target.value)} className={cls} />
+                  <Field label="Fecha expedición cédula">
+                    <input type="date" value={form.fecha_expedicion_cedula}
+                      onChange={e => set('fecha_expedicion_cedula', e.target.value)} className={cls} />
                   </Field>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
