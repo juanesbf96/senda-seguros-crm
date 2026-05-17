@@ -181,8 +181,7 @@ export async function GET(req: NextRequest) {
     .from('notificaciones_renovacion')
     .select('poliza_id, dias_alerta')
     .in('poliza_id', polizaIds)
-    .gte('enviada_at', `${hoy}T00:00:00Z`)
-    .lte('enviada_at', `${hoy}T23:59:59Z`)
+    .eq('fecha_envio', hoy)
 
   const enviadas = new Set((yaEnviadas || []).map(n => `${n.poliza_id}-${n.dias_alerta}`))
 
@@ -220,7 +219,7 @@ export async function GET(req: NextRequest) {
 
   // 7. Enviar un email por workspace y registrar
   let emailsSent = 0
-  const logEntries: { workspace_id: string; poliza_id: string; dias_alerta: number; email_destino: string }[] = []
+  const logEntries: { workspace_id: string; poliza_id: string; dias_alerta: number; fecha_envio: string; email_destino: string }[] = []
 
   for (const [wsId, { polizas: mapaUmbral, admin }] of porWorkspace) {
     const rows7  = mapaUmbral.get(7)  || []
@@ -247,9 +246,9 @@ export async function GET(req: NextRequest) {
     emailsSent++
 
     // Registrar cada póliza notificada
-    for (const p of rows7)  logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 7,  email_destino: admin.admin_email })
-    for (const p of rows15) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 15, email_destino: admin.admin_email })
-    for (const p of rows30) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 30, email_destino: admin.admin_email })
+    for (const p of rows7)  logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 7,  fecha_envio: hoy, email_destino: admin.admin_email })
+    for (const p of rows15) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 15, fecha_envio: hoy, email_destino: admin.admin_email })
+    for (const p of rows30) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 30, fecha_envio: hoy, email_destino: admin.admin_email })
   }
 
   // 8. Guardar log (con service role, ignora RLS)

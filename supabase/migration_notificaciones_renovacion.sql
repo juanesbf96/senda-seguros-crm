@@ -9,9 +9,10 @@ CREATE TABLE IF NOT EXISTS notificaciones_renovacion (
   workspace_id    uuid NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
   poliza_id       uuid NOT NULL REFERENCES polizas(id) ON DELETE CASCADE,
   dias_alerta     int  NOT NULL,    -- 30, 15 o 7
+  fecha_envio     date NOT NULL DEFAULT CURRENT_DATE,
   enviada_at      timestamptz DEFAULT now(),
   email_destino   text NOT NULL,
-  UNIQUE (poliza_id, dias_alerta, enviada_at::date)
+  UNIQUE (poliza_id, dias_alerta, fecha_envio)
 );
 
 -- Index para consultas rápidas
