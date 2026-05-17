@@ -135,7 +135,8 @@ export default function ClientesList() {
   }
 
   async function loadContactCount() {
-    const { count } = await supabase.from('contactos').select('*', { count: 'exact', head: true })
+    if (!currentWorkspace) return
+    const { count } = await supabase.from('contactos').select('*', { count: 'exact', head: true }).eq('workspace_id', currentWorkspace.id)
     setContactCount(count || 0)
   }
 

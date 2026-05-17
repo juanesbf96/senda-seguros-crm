@@ -229,9 +229,13 @@ ${renovsStr}
     setThinking(true)
 
     try {
+      const { data: { session } } = await supabase.auth.getSession()
       const resp = await fetch('/api/asistente', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({
           contexto,
           // Enviamos historial (últimos 10 mensajes) para que Groq recuerde el contexto de la conversación

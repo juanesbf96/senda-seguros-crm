@@ -31,11 +31,12 @@ const ESTADO_ORDER: EstadoGestion[] = ['pendiente', 'contactado', 'en_negociacio
 /* ── Shared helpers ─────────────────────────────────────────── */
 const iCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white'
 
-async function loadGestiones(polizaIds: string[]): Promise<Record<string, GestionRenovacion>> {
+async function loadGestiones(polizaIds: string[], workspaceId: string): Promise<Record<string, GestionRenovacion>> {
   if (!polizaIds.length) return {}
   const { data } = await supabase
     .from('gestiones_renovacion')
     .select('*')
+    .eq('workspace_id', workspaceId)
     .in('poliza_id', polizaIds)
     .order('fecha', { ascending: false })
   const map: Record<string, GestionRenovacion> = {}
@@ -296,6 +297,7 @@ function CampanaCard({
       let q = supabase
         .from('polizas')
         .select('*, cliente:clientes(id, nombre, telefono)')
+        .eq('workspace_id', currentWorkspace?.id || '')
         .eq('estado', 'activa')
         .eq('eliminada', false)
         .gte('fecha_fin', campana.fecha_inicio_periodo)
@@ -305,7 +307,7 @@ function CampanaCard({
       if (campana.ramo)        q = q.ilike('ramo', `%${campana.ramo}%`)
       const { data } = await q
       const pols = (data || []) as PolizaConCliente[]
-      const gest = await loadGestiones(pols.map(p => p.id))
+      const gest = await loadGestiones(pols.map(p => p.id), currentWorkspace?.id || '')
       setPolizas(pols)
       setGestiones(gest)
       setLoadingP(false)
@@ -512,17 +514,18 @@ function Polizas60View() {
     const { data } = await supabase
       .from('polizas')
       .select('*, cliente:clientes(id, nombre, telefono)')
+      .eq('workspace_id', currentWorkspace?.id || '')
       .eq('estado', 'activa')
       .eq('eliminada', false)
       .gte('fecha_fin', today)
       .lte('fecha_fin', in60)
       .order('fecha_fin', { ascending: true })
     const pols = (data || []) as PolizaConCliente[]
-    const gest = await loadGestiones(pols.map(p => p.id))
+    const gest = await loadGestiones(pols.map(p => p.id), currentWorkspace?.id || '')
     setPolizas(pols)
     setGestiones(gest)
     setLoading(false)
-  }, [])
+  }, [currentWorkspace])
 
   useEffect(() => { load() }, [load])
 
@@ -616,13 +619,15 @@ export default function Renovaciones() {
   const [editingC, setEditingC]     = useState<CampanaRenovacion | null>(null)
 
   const load = useCallback(async () => {
+    if (!currentWorkspace) return
     const { data } = await supabase
       .from('campanas_renovacion')
       .select('*')
+      .eq('workspace_id', currentWorkspace.id)
       .order('created_at', { ascending: false })
     setCampanas((data || []) as CampanaRenovacion[])
     setLoading(false)
-  }, [])
+  }, [currentWorkspace])
 
   useEffect(() => { load() }, [load])
 
@@ -637,7 +642,7 @@ export default function Renovaciones() {
       notas: form.notas.trim() || null,
     }
     if (editingC) {
-      await supabase.from('campanas_renovacion').update(payload).eq('id', editingC.id)
+      await supabase.from('campanas_renovacion').update(payload).eq('id', editingC.id).eq('workspace_id', currentWorkspace?.id || '')
     } else {
       await supabase.from('campanas_renovacion').insert({ ...payload, estado: 'activa', workspace_id: currentWorkspace?.id })
     }

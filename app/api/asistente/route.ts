@@ -1,6 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
+  // Verificar autenticación — la cookie de sesión viene en el header
+  const authHeader = req.headers.get('authorization') || ''
+  const token = authHeader.replace('Bearer ', '')
+
+  if (!token) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { global: { headers: { Authorization: `Bearer ${token}` } } }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
+  }
+
   const GROQ_API_KEY = process.env.GROQ_API_KEY
   if (!GROQ_API_KEY) {
     return NextResponse.json({ error: 'GROQ_API_KEY no configurado en .env.local' }, { status: 500 })

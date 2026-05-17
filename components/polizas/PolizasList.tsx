@@ -118,13 +118,13 @@ export default function PolizasList() {
 
   async function softDelete(id: string) {
     if (!confirm('¿Mover esta póliza a Eliminadas?')) return
-    await supabase.from('polizas').update({ eliminada: true }).eq('id', id)
+    await supabase.from('polizas').update({ eliminada: true }).eq('id', id).eq('workspace_id', currentWorkspace?.id || '')
     setPolizas(prev => prev.filter(p => p.id !== id))
     await loadEliminadas()
   }
 
   async function restorePoliza(id: string) {
-    await supabase.from('polizas').update({ eliminada: false }).eq('id', id)
+    await supabase.from('polizas').update({ eliminada: false }).eq('id', id).eq('workspace_id', currentWorkspace?.id || '')
     setEliminadas(prev => prev.filter(p => p.id !== id))
     await loadPolizas()
   }

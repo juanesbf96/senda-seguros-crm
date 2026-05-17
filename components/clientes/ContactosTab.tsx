@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Contacto } from '@/types'
 import { Plus, Search, Pencil, Trash2, Download, Building2, User } from 'lucide-react'
 import ContactoModal from './ContactoModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
   /** Called when the contact count changes so parent can update the badge */
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function ContactosTab({ onCountChange, clienteId }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [contactos, setContactos] = useState<Contacto[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -20,9 +22,11 @@ export default function ContactosTab({ onCountChange, clienteId }: Props) {
   const [editing, setEditing] = useState<Contacto | undefined>()
 
   async function load() {
+    if (!currentWorkspace) return
     let query = supabase
       .from('contactos')
       .select('*, cliente:clientes(id, nombre)')
+      .eq('workspace_id', currentWorkspace.id)
       .order('nombre')
 
     if (clienteId) {
@@ -36,7 +40,7 @@ export default function ContactosTab({ onCountChange, clienteId }: Props) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [clienteId])
+  useEffect(() => { load() }, [clienteId, currentWorkspace])
 
   async function deleteContacto(id: string) {
     if (!confirm('¿Eliminar este contacto?')) return
