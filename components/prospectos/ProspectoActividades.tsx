@@ -22,11 +22,11 @@ const TIPO_LABELS: Record<TipoActividadProspecto, string> = {
 }
 
 const TIPO_COLORS: Record<TipoActividadProspecto, string> = {
-  llamada:    'bg-blue-100 text-blue-600',
+  llamada:    'bg-info/20 text-info',
   email:      'bg-violet-100 text-violet-600',
-  reunion:    'bg-amber-100 text-amber-600',
-  nota:       'bg-slate-100 text-slate-600',
-  cotizacion: 'bg-emerald-100 text-emerald-600',
+  reunion:    'bg-warning-soft text-ink-700',
+  nota:       'bg-cream-200 text-ink-500',
+  cotizacion: 'bg-primary-100 text-primary-500',
 }
 
 interface Props {
@@ -78,23 +78,23 @@ export default function ProspectoActividades({ prospectoId }: Props) {
     setActividades(prev => prev.filter(a => a.id !== id))
   }
 
-  if (loading) return <div className="text-center py-4 text-slate-400 text-sm">Cargando actividades...</div>
+  if (loading) return <div className="text-center py-4 text-ink-400 text-sm">Cargando actividades...</div>
 
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-slate-700 text-sm">Actividades</h3>
+        <h3 className="font-medium text-ink-600 text-sm">Actividades</h3>
         <button onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+          className="flex items-center gap-1 text-xs text-primary-500 hover:text-primary-700 font-medium">
           <Plus className="w-3 h-3" /> Registrar
         </button>
       </div>
 
       {showForm && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 space-y-3">
+        <div className="bg-cream-100 border border-ink-200 rounded-xl p-4 mb-4 space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Tipo</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1">Tipo</label>
               <select value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoActividadProspecto }))}
                 className={cls}>
                 {(Object.entries(TIPO_LABELS) as [TipoActividadProspecto, string][]).map(([k, v]) => (
@@ -103,24 +103,24 @@ export default function ProspectoActividades({ prospectoId }: Props) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Fecha</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1">Fecha</label>
               <input type="datetime-local" value={form.fecha}
                 onChange={e => setForm(f => ({ ...f, fecha: e.target.value }))}
                 className={cls} />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Descripción *</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Descripción *</label>
             <textarea value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))}
               placeholder="Describe la actividad..." rows={2} className={cls} />
           </div>
           <div className="flex gap-2 justify-end">
             <button onClick={() => setShowForm(false)}
-              className="px-3 py-1.5 text-xs border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-100">
+              className="px-3 py-1.5 text-xs border border-ink-200 rounded-lg text-ink-500 hover:bg-cream-200">
               Cancelar
             </button>
             <button onClick={addActividad} disabled={saving}
-              className="px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-60">
+              className="px-3 py-1.5 text-xs bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-60">
               {saving ? 'Guardando...' : 'Guardar'}
             </button>
           </div>
@@ -128,7 +128,7 @@ export default function ProspectoActividades({ prospectoId }: Props) {
       )}
 
       {actividades.length === 0 ? (
-        <p className="text-xs text-slate-400 text-center py-4">Sin actividades registradas</p>
+        <p className="text-xs text-ink-400 text-center py-4">Sin actividades registradas</p>
       ) : (
         <div className="space-y-2">
           {actividades.map(act => {
@@ -140,13 +140,13 @@ export default function ProspectoActividades({ prospectoId }: Props) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm text-slate-700">{act.descripcion}</p>
+                    <p className="text-sm text-ink-600">{act.descripcion}</p>
                     <button onClick={() => deleteActividad(act.id)}
-                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all flex-shrink-0">
+                      className="opacity-0 group-hover:opacity-100 text-ink-300 hover:text-error transition-all flex-shrink-0">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
+                  <p className="text-xs text-ink-400 mt-0.5">
                     {TIPO_LABELS[act.tipo]} · {new Date(act.fecha).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}
                   </p>
                 </div>
@@ -159,4 +159,4 @@ export default function ProspectoActividades({ prospectoId }: Props) {
   )
 }
 
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

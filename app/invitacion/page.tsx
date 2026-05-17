@@ -71,8 +71,8 @@ function InvitacionContent() {
   if (status === 'loading') {
     return (
       <div className="flex flex-col items-center gap-3 py-8">
-        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
-        <p className="text-sm text-slate-500">Verificando invitación...</p>
+        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
+        <p className="text-sm text-ink-400">Verificando invitación...</p>
       </div>
     )
   }
@@ -80,9 +80,9 @@ function InvitacionContent() {
   if (status === 'accepted') {
     return (
       <div className="text-center py-8">
-        <CheckCircle2 className="w-12 h-12 text-emerald-600 mx-auto mb-4" />
-        <h2 className="text-lg font-bold text-slate-900 mb-2">¡Invitación aceptada!</h2>
-        <p className="text-sm text-slate-500">Redirigiendo al CRM...</p>
+        <CheckCircle2 className="w-12 h-12 text-primary-500 mx-auto mb-4" />
+        <h2 className="text-lg font-bold text-ink-700 mb-2">¡Invitación aceptada!</h2>
+        <p className="text-sm text-ink-400">Redirigiendo al CRM...</p>
       </div>
     )
   }
@@ -90,10 +90,10 @@ function InvitacionContent() {
   if (status === 'error') {
     return (
       <div className="text-center py-8">
-        <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h2 className="text-lg font-bold text-slate-900 mb-2">Invitación inválida</h2>
-        <p className="text-sm text-slate-500 mb-6">{error}</p>
-        <Link href="/login" className="text-emerald-600 text-sm hover:underline">
+        <XCircle className="w-12 h-12 text-error mx-auto mb-4" />
+        <h2 className="text-lg font-bold text-ink-700 mb-2">Invitación inválida</h2>
+        <p className="text-sm text-ink-400 mb-6">{error}</p>
+        <Link href="/login" className="text-primary-500 text-sm hover:underline">
           Ir al inicio de sesión
         </Link>
       </div>
@@ -103,20 +103,20 @@ function InvitacionContent() {
   // status === 'found'
   return (
     <div className="py-2">
-      <h2 className="text-lg font-bold text-slate-900 mb-2">Te han invitado a un workspace</h2>
-      <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 mb-6">
-        <p className="text-sm text-slate-500 mb-1">Workspace</p>
-        <p className="font-semibold text-slate-900">{invitation?.workspace?.name}</p>
-        <div className="mt-2 pt-2 border-t border-slate-100">
-          <p className="text-sm text-slate-500 mb-1">Tu rol</p>
-          <span className="inline-block bg-emerald-100 text-emerald-700 text-xs font-semibold px-2.5 py-1 rounded-full">
+      <h2 className="text-lg font-bold text-ink-700 mb-2">Te han invitado a un workspace</h2>
+      <div className="bg-cream-100 rounded-xl border border-ink-200 p-4 mb-6">
+        <p className="text-sm text-ink-400 mb-1">Workspace</p>
+        <p className="font-semibold text-ink-700">{invitation?.workspace?.name}</p>
+        <div className="mt-2 pt-2 border-t border-cream-200">
+          <p className="text-sm text-ink-400 mb-1">Tu rol</p>
+          <span className="inline-block bg-primary-100 text-primary-700 text-xs font-semibold px-2.5 py-1 rounded-full">
             {ROLE_LABELS[invitation?.role] || invitation?.role}
           </span>
         </div>
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2 mb-4">
+        <p className="text-sm text-error bg-error-soft border border-error/20 rounded-lg px-3 py-2 mb-4">
           {error}
         </p>
       )}
@@ -126,26 +126,26 @@ function InvitacionContent() {
         <button
           onClick={acceptInvitation}
           disabled={accepting}
-          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+          className="w-full bg-primary-500 hover:bg-primary-700 disabled:bg-primary-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
         >
           {accepting ? 'Aceptando...' : 'Aceptar invitación'}
         </button>
       ) : (
         // Not authenticated: show register / login CTAs
         <div className="space-y-3">
-          <p className="text-sm text-slate-500 text-center mb-4">
+          <p className="text-sm text-ink-400 text-center mb-4">
             Para aceptar esta invitación necesitas una cuenta en Senda Seguros CRM.
           </p>
           <Link
             href={`/registro?invite=${token}`}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
             <UserPlus className="w-4 h-4" />
             Crear cuenta
           </Link>
           <Link
             href={`/login?invite=${token}`}
-            className="w-full flex items-center justify-center gap-2 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 border border-ink-200 bg-white hover:bg-cream-100 text-ink-600 py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
             <LogIn className="w-4 h-4" />
             Ya tengo cuenta — Iniciar sesión
@@ -158,20 +158,20 @@ function InvitacionContent() {
 
 export default function InvitacionPage() {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-sm p-8">
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl border border-ink-200 shadow-sm w-full max-w-sm p-8">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center">
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 leading-tight">Senda Seguros</p>
-            <p className="text-xs text-slate-500">CRM</p>
+            <p className="font-bold text-ink-700 leading-tight">Senda Seguros</p>
+            <p className="text-xs text-ink-400">CRM</p>
           </div>
         </div>
         <Suspense fallback={
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-6 h-6 text-emerald-600 animate-spin" />
+            <Loader2 className="w-6 h-6 text-primary-500 animate-spin" />
           </div>
         }>
           <InvitacionContent />

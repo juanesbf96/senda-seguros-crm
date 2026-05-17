@@ -15,10 +15,10 @@ import PolizaAnexoModal from './PolizaAnexoModal'
 import PolizaVinculadoModal from './PolizaVinculadoModal'
 
 const ESTADO_COLORS: Record<EstadoPoliza, string> = {
-  activa:    'bg-emerald-100 text-emerald-700',
-  vencida:   'bg-red-100 text-red-700',
-  cancelada: 'bg-slate-100 text-slate-600',
-  pendiente: 'bg-amber-100 text-amber-700',
+  activa:    'bg-primary-100 text-primary-700',
+  vencida:   'bg-error-soft text-error',
+  cancelada: 'bg-cream-200 text-ink-500',
+  pendiente: 'bg-warning-soft text-ink-700',
 }
 const ESTADO_LABELS: Record<EstadoPoliza, string> = {
   activa: 'Activa', vencida: 'Vencida', cancelada: 'Cancelada', pendiente: 'Pendiente',
@@ -203,7 +203,7 @@ export default function PolizasList() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -212,8 +212,8 @@ export default function PolizasList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Pólizas</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-ink-700">Pólizas</h1>
+          <p className="text-ink-400 text-sm mt-1">
             {polizasNormales.filter(p => p.estado === 'activa').length} activas ·{' '}
             Prima: {formatCOP(polizasNormales.filter(p => p.estado === 'activa').reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0))}
           </p>
@@ -222,19 +222,19 @@ export default function PolizasList() {
           {activeTab === 'polizas' || activeTab === 'cumplimiento' ? (
             <button
               onClick={() => { setEditingPoliza(undefined); setShowPolizaModal(true) }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
               <Plus className="w-4 h-4" /> Nueva póliza
             </button>
           ) : activeTab === 'anexos' ? (
             <button
               onClick={() => { setEditingAnexo(undefined); setShowAnexoModal(true) }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
               <Plus className="w-4 h-4" /> Nuevo anexo
             </button>
           ) : activeTab === 'vinculados' ? (
             <button
               onClick={() => { setEditingVinculado(undefined); setShowVinculadoModal(true) }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
               <Plus className="w-4 h-4" /> Nuevo vinculado
             </button>
           ) : null}
@@ -242,18 +242,18 @@ export default function PolizasList() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+      <div className="flex gap-1 mb-5 border-b border-ink-200 overflow-x-auto">
         {TABS.map(({ key, label, icon: Icon, count }) => (
           <button key={key} onClick={() => { setActiveTab(key); setSearch('') }}
             className={[
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',
               activeTab === key
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700',
+                ? 'border-primary-500 text-primary-500'
+                : 'border-transparent text-ink-400 hover:text-ink-600',
             ].join(' ')}>
             <Icon className="w-4 h-4" />
             {label}
-            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
               {count}
             </span>
           </button>
@@ -263,10 +263,10 @@ export default function PolizasList() {
       {/* ── Filters ── */}
       <div className="flex gap-3 mb-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por cliente, aseguradora, N° póliza..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
         </div>
 
         {(activeTab === 'polizas' || activeTab === 'cumplimiento') && (
@@ -284,13 +284,13 @@ export default function PolizasList() {
             className={[
               'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors',
               showFilters || countExtra(extra) > 0
-                ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+                ? 'bg-primary-50 border-primary-300 text-primary-700'
+                : 'bg-white border-ink-200 text-ink-500 hover:bg-cream-100',
             ].join(' ')}>
             <SlidersHorizontal className="w-4 h-4" />
             Filtros
             {countExtra(extra) > 0 && (
-              <span className="bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="bg-primary-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                 {countExtra(extra)}
               </span>
             )}
@@ -299,7 +299,7 @@ export default function PolizasList() {
 
         {(countExtra(extra) > 0 || filterEstado !== 'all' || search) && (
           <button onClick={() => { setExtra(defaultExtra); setFilterEstado('all'); setSearch('') }}
-            className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors px-2">
+            className="flex items-center gap-1 text-xs text-ink-400 hover:text-error transition-colors px-2">
             <X className="w-3.5 h-3.5" /> Limpiar
           </button>
         )}
@@ -307,7 +307,7 @@ export default function PolizasList() {
 
       {/* ── Panel filtros avanzados ── */}
       {showFilters && (activeTab === 'polizas' || activeTab === 'cumplimiento') && (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-cream-100 border border-ink-200 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <FiltroSelect label="Aseguradora" value={extra.aseguradora} onChange={v => setExtra(e => ({ ...e, aseguradora: v }))}>
             <option value="">Todas</option>
             {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
@@ -348,10 +348,10 @@ export default function PolizasList() {
 
       {/* ── Tab: Anexos ── */}
       {activeTab === 'anexos' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
+            <thead className="bg-cream-100 border-b border-ink-200">
+              <tr className="text-left text-xs text-ink-400">
                 <th className="px-4 py-3 font-medium">N° Póliza</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="px-4 py-3 font-medium hidden md:table-cell">Cliente</th>
@@ -362,32 +362,32 @@ export default function PolizasList() {
             </thead>
             <tbody>
               {filteredAnexos.map(a => (
-                <tr key={a.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-slate-700 text-xs font-mono">{a.poliza?.numero_poliza || '—'}</td>
+                <tr key={a.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
+                  <td className="px-4 py-3 text-ink-600 text-xs font-mono">{a.poliza?.numero_poliza || '—'}</td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      a.estado === 'activo' ? 'bg-emerald-100 text-emerald-700' :
-                      a.estado === 'cancelado' ? 'bg-red-100 text-red-700' :
-                      'bg-slate-100 text-slate-500'
+                      a.estado === 'activo' ? 'bg-primary-100 text-primary-700' :
+                      a.estado === 'cancelado' ? 'bg-error-soft text-error' :
+                      'bg-cream-200 text-ink-400'
                     }`}>
                       {a.estado.charAt(0).toUpperCase() + a.estado.slice(1)}
                     </span>
                   </td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     {a.client_id
-                      ? <Link href={`/clientes/${a.client_id}`} className="text-slate-700 hover:text-emerald-600">{a.cliente?.nombre || '—'}</Link>
-                      : <span className="text-slate-400">—</span>}
+                      ? <Link href={`/clientes/${a.client_id}`} className="text-ink-600 hover:text-primary-500">{a.cliente?.nombre || '—'}</Link>
+                      : <span className="text-ink-400">—</span>}
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{a.documento || '—'}</td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">{a.numero_anexo || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{a.documento || '—'}</td>
+                  <td className="px-4 py-3 text-ink-500 text-xs">{a.numero_anexo || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => { setEditingAnexo(a); setShowAnexoModal(true) }}
-                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        className="text-ink-400 hover:text-ink-600 transition-colors">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => deleteAnexo(a.id)}
-                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        className="text-ink-400 hover:text-error transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -397,7 +397,7 @@ export default function PolizasList() {
             </tbody>
           </table>
           {filteredAnexos.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-ink-400">
               <Paperclip className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No hay anexos registrados</p>
             </div>
@@ -407,10 +407,10 @@ export default function PolizasList() {
 
       {/* ── Tab: Vinculados ── */}
       {activeTab === 'vinculados' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
+            <thead className="bg-cream-100 border-b border-ink-200">
+              <tr className="text-left text-xs text-ink-400">
                 <th className="px-4 py-3 font-medium">Póliza</th>
                 <th className="px-4 py-3 font-medium">N° Anexo / Pago</th>
                 <th className="px-4 py-3 font-medium hidden md:table-cell">N° Afiliado / Objeto</th>
@@ -421,23 +421,23 @@ export default function PolizasList() {
             </thead>
             <tbody>
               {filteredVinculados.map(v => (
-                <tr key={v.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <tr key={v.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
                   <td className="px-4 py-3">
-                    <p className="text-slate-700 text-xs font-mono">{v.poliza?.numero_poliza || '—'}</p>
-                    <p className="text-slate-400 text-xs">{v.poliza?.aseguradora}</p>
+                    <p className="text-ink-600 text-xs font-mono">{v.poliza?.numero_poliza || '—'}</p>
+                    <p className="text-ink-400 text-xs">{v.poliza?.aseguradora}</p>
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">{v.numero_anexo_pago || '—'}</td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{v.numero_afiliado_objeto || '—'}</td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{formatDate(v.fecha_inicio)}</td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-600 text-xs">{v.beneficiario || '—'}</td>
+                  <td className="px-4 py-3 text-ink-500 text-xs">{v.numero_anexo_pago || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-500 text-xs">{v.numero_afiliado_objeto || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{formatDate(v.fecha_inicio)}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-ink-500 text-xs">{v.beneficiario || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => { setEditingVinculado(v); setShowVinculadoModal(true) }}
-                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        className="text-ink-400 hover:text-ink-600 transition-colors">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => deleteVinculado(v.id)}
-                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        className="text-ink-400 hover:text-error transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -447,7 +447,7 @@ export default function PolizasList() {
             </tbody>
           </table>
           {filteredVinculados.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-ink-400">
               <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No hay vinculados registrados</p>
             </div>
@@ -457,15 +457,15 @@ export default function PolizasList() {
 
       {/* ── Tab: Eliminadas ── */}
       {activeTab === 'eliminadas' && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           {filteredEliminadas.length > 0 && (
-            <div className="px-4 py-3 bg-amber-50 border-b border-amber-100 flex items-center justify-between">
-              <span className="text-xs text-amber-700">{filteredEliminadas.length} póliza{filteredEliminadas.length !== 1 ? 's' : ''} eliminada{filteredEliminadas.length !== 1 ? 's' : ''}</span>
+            <div className="px-4 py-3 bg-warning-soft border-b border-warning/30 flex items-center justify-between">
+              <span className="text-xs text-ink-700">{filteredEliminadas.length} póliza{filteredEliminadas.length !== 1 ? 's' : ''} eliminada{filteredEliminadas.length !== 1 ? 's' : ''}</span>
             </div>
           )}
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
+            <thead className="bg-cream-100 border-b border-ink-200">
+              <tr className="text-left text-xs text-ink-400">
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 font-medium">Aseg. / Ramo</th>
                 <th className="px-4 py-3 font-medium hidden md:table-cell">N° Póliza</th>
@@ -475,22 +475,22 @@ export default function PolizasList() {
             </thead>
             <tbody>
               {filteredEliminadas.map(p => (
-                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors opacity-70">
+                <tr key={p.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors opacity-70">
                   <td className="px-4 py-3">
                     {p.client_id
-                      ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-700 hover:text-emerald-600">{p.cliente?.nombre || '—'}</Link>
-                      : <span className="text-slate-400">—</span>}
+                      ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-ink-600 hover:text-primary-500">{p.cliente?.nombre || '—'}</Link>
+                      : <span className="text-ink-400">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="text-slate-700">{p.aseguradora}</p>
-                    <p className="text-xs text-slate-400">{p.ramo}</p>
+                    <p className="text-ink-600">{p.aseguradora}</p>
+                    <p className="text-xs text-ink-400">{p.ramo}</p>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{p.numero_poliza || '—'}</td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-600">{p.prima ? formatCOP(p.prima) : '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{p.numero_poliza || '—'}</td>
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-500">{p.prima ? formatCOP(p.prima) : '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={() => restorePoliza(p.id)}
                       title="Restaurar póliza"
-                      className="inline-flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                      className="inline-flex items-center gap-1 text-xs text-primary-500 hover:text-primary-700 font-medium">
                       <RefreshCw className="w-3.5 h-3.5" /> Restaurar
                     </button>
                   </td>
@@ -499,7 +499,7 @@ export default function PolizasList() {
             </tbody>
           </table>
           {filteredEliminadas.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-ink-400">
               <Archive className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No hay pólizas eliminadas</p>
             </div>
@@ -520,13 +520,13 @@ export default function PolizasList() {
             return (
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'Activas',       val: `${activas.length} pólizas`, color: 'text-emerald-700' },
-                  { label: 'Prima neta',    val: formatCOP(primaNeta),        color: 'text-slate-800'   },
-                  { label: 'Total prima',   val: formatCOP(totalPrima),       color: 'text-slate-800'   },
+                  { label: 'Activas',       val: `${activas.length} pólizas`, color: 'text-primary-700' },
+                  { label: 'Prima neta',    val: formatCOP(primaNeta),        color: 'text-ink-700'   },
+                  { label: 'Total prima',   val: formatCOP(totalPrima),       color: 'text-ink-700'   },
                   { label: 'Comisión',      val: formatCOP(comision),         color: 'text-indigo-700'  },
                 ].map(({ label, val, color }) => (
-                  <div key={label} className="bg-white rounded-xl border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+                  <div key={label} className="bg-white rounded-xl border border-ink-200 px-4 py-3">
+                    <p className="text-xs text-ink-400 mb-0.5">{label}</p>
                     <p className={`font-bold text-sm ${color}`}>{val}</p>
                   </div>
                 ))}
@@ -535,10 +535,10 @@ export default function PolizasList() {
           })()}
 
           {/* Table */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr className="text-left text-xs text-slate-500">
+              <thead className="bg-cream-100 border-b border-ink-200">
+                <tr className="text-left text-xs text-ink-400">
                   <th className="px-4 py-3 font-medium">N° Póliza</th>
                   <th className="px-4 py-3 font-medium">Asegurado / Cliente</th>
                   <th className="px-4 py-3 font-medium hidden md:table-cell">Tomador</th>
@@ -558,21 +558,21 @@ export default function PolizasList() {
                   const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
                   const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
                   return (
-                    <tr key={p.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${urgent ? 'bg-amber-50/30' : ''}`}>
-                      <td className="px-4 py-3 text-xs font-mono text-slate-600">{p.numero_poliza || '—'}</td>
+                    <tr key={p.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${urgent ? 'bg-warning-soft/30' : ''}`}>
+                      <td className="px-4 py-3 text-xs font-mono text-ink-500">{p.numero_poliza || '—'}</td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-700 text-sm">
+                        <p className="font-medium text-ink-600 text-sm">
                           {p.asegurado_nombre || (p.client_id
-                            ? <Link href={`/clientes/${p.client_id}`} className="hover:text-emerald-600">{p.cliente?.nombre}</Link>
+                            ? <Link href={`/clientes/${p.client_id}`} className="hover:text-primary-500">{p.cliente?.nombre}</Link>
                             : '—')}
                         </p>
                         {p.asegurado_nombre && p.client_id && (
-                          <Link href={`/clientes/${p.client_id}`} className="text-xs text-slate-400 hover:text-emerald-600">
+                          <Link href={`/clientes/${p.client_id}`} className="text-xs text-ink-400 hover:text-primary-500">
                             {p.cliente?.nombre}
                           </Link>
                         )}
                       </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-slate-600 text-xs">{p.nombre_tomador || '—'}</td>
+                      <td className="px-4 py-3 hidden md:table-cell text-ink-500 text-xs">{p.nombre_tomador || '—'}</td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[p.estado]}`}>
                           {ESTADO_LABELS[p.estado]}
@@ -580,40 +580,40 @@ export default function PolizasList() {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
                         <div className="flex items-center gap-1.5">
-                          <span className={urgent ? 'text-amber-700 font-medium text-xs' : warn ? 'text-amber-600 text-xs' : 'text-slate-600 text-xs'}>
+                          <span className={urgent ? 'text-ink-700 font-medium text-xs' : warn ? 'text-ink-700 text-xs' : 'text-ink-500 text-xs'}>
                             {formatDate(p.fecha_fin)}
                           </span>
-                          {urgent && <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />}
+                          {urgent && <AlertTriangle className="w-3.5 h-3.5 text-ink-700 flex-shrink-0" />}
                           {(urgent || warn) && days !== null && (
-                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                            <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-error-soft text-error' : 'bg-warning-soft text-ink-700'}`}>
                               {days}d
                             </span>
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell font-medium text-slate-800 text-sm">
+                      <td className="px-4 py-3 hidden lg:table-cell font-medium text-ink-700 text-sm">
                         {p.prima_neta ? formatCOP(p.prima_neta) : p.prima ? formatCOP(p.prima) : '—'}
                       </td>
-                      <td className="px-4 py-3 hidden lg:table-cell text-slate-600 text-sm">
+                      <td className="px-4 py-3 hidden lg:table-cell text-ink-500 text-sm">
                         {p.total_prima ? formatCOP(p.total_prima) : '—'}
                       </td>
-                      <td className="px-4 py-3 hidden xl:table-cell text-slate-600 text-sm">
+                      <td className="px-4 py-3 hidden xl:table-cell text-ink-500 text-sm">
                         {p.comision_agencia ? formatCOP(p.comision_agencia) : p.comision ? formatCOP(p.comision) : '—'}
                       </td>
-                      <td className="px-4 py-3 hidden xl:table-cell text-slate-600 text-sm">
+                      <td className="px-4 py-3 hidden xl:table-cell text-ink-500 text-sm">
                         {p.recaudado_oficina ? formatCOP(p.recaudado_oficina) : '—'}
                       </td>
-                      <td className="px-4 py-3 hidden xl:table-cell text-slate-600 text-sm">
+                      <td className="px-4 py-3 hidden xl:table-cell text-ink-500 text-sm">
                         {p.recaudado_aseguradora ? formatCOP(p.recaudado_aseguradora) : '—'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button onClick={() => { setEditingPoliza(p); setShowPolizaModal(true) }}
-                            className="text-slate-400 hover:text-slate-700 transition-colors">
+                            className="text-ink-400 hover:text-ink-600 transition-colors">
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button onClick={() => softDelete(p.id)}
-                            className="text-slate-400 hover:text-red-600 transition-colors">
+                            className="text-ink-400 hover:text-error transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -624,10 +624,10 @@ export default function PolizasList() {
               </tbody>
             </table>
             {filteredCumplimiento.length === 0 && (
-              <div className="text-center py-14 text-slate-400">
+              <div className="text-center py-14 text-ink-400">
                 <ShieldCheck className="w-10 h-10 mx-auto mb-3 opacity-25" />
                 <p className="text-sm font-medium">No hay pólizas de cumplimiento</p>
-                <p className="text-xs mt-1 text-slate-400">Las pólizas de ramo Fianzas y Cumplimiento aparecen aquí automáticamente</p>
+                <p className="text-xs mt-1 text-ink-400">Las pólizas de ramo Fianzas y Cumplimiento aparecen aquí automáticamente</p>
               </div>
             )}
           </div>
@@ -665,8 +665,8 @@ export default function PolizasList() {
 /* ── helpers ── */
 function selCls(active: boolean) {
   return [
-    'px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-colors',
-    active ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600',
+    'px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors',
+    active ? 'border-primary-400 bg-primary-50 text-primary-800' : 'border-ink-200 bg-white text-ink-500',
   ].join(' ')
 }
 
@@ -675,9 +675,9 @@ function FiltroSelect({ label, value, onChange, children }: {
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</label>
+      <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-400 mb-1">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+        className="w-full px-2 py-1.5 text-xs border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white">
         {children}
       </select>
     </div>
@@ -694,10 +694,10 @@ function PolizasTable({
   showRiesgo: boolean
 }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
       <table className="w-full text-sm">
-        <thead className="bg-slate-50 border-b border-slate-200">
-          <tr className="text-left text-xs text-slate-500">
+        <thead className="bg-cream-100 border-b border-ink-200">
+          <tr className="text-left text-xs text-ink-400">
             <th className="px-4 py-3 font-medium">Tipo póliza</th>
             <th className="px-4 py-3 font-medium">N° Póliza</th>
             <th className="px-4 py-3 font-medium">Aseguradora</th>
@@ -714,27 +714,27 @@ function PolizasTable({
             const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
             const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
             return (
-              <tr key={p.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${urgent ? 'bg-amber-50/30' : ''}`}>
-                <td className="px-4 py-3 text-slate-600 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>
-                <td className="px-4 py-3 text-slate-600 font-mono text-xs">{p.numero_poliza || '—'}</td>
-                <td className="px-4 py-3 text-slate-700">{p.aseguradora}</td>
-                <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{p.ramo}</td>
-                <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs max-w-[140px]">
+              <tr key={p.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${urgent ? 'bg-warning-soft/30' : ''}`}>
+                <td className="px-4 py-3 text-ink-500 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>
+                <td className="px-4 py-3 text-ink-500 font-mono text-xs">{p.numero_poliza || '—'}</td>
+                <td className="px-4 py-3 text-ink-600">{p.aseguradora}</td>
+                <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{p.ramo}</td>
+                <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs max-w-[140px]">
                   <span className="line-clamp-2">{p.riesgo || '—'}</span>
                 </td>
                 <td className="px-4 py-3">
                   {p.client_id
-                    ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">{p.cliente?.nombre || '—'}</Link>
-                    : <span className="text-slate-400">—</span>}
+                    ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{p.cliente?.nombre || '—'}</Link>
+                    : <span className="text-ink-400">—</span>}
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell">
                   <div className="flex items-center gap-1.5">
-                    <span className={urgent ? 'text-amber-700 font-medium' : warn ? 'text-amber-600' : 'text-slate-600'}>
+                    <span className={urgent ? 'text-ink-700 font-medium' : warn ? 'text-ink-700' : 'text-ink-500'}>
                       {formatDate(p.fecha_fin)}
                     </span>
-                    {urgent && <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />}
+                    {urgent && <AlertTriangle className="w-3.5 h-3.5 text-ink-700" />}
                     {(urgent || warn) && days !== null && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${urgent ? 'bg-error-soft text-error' : 'bg-warning-soft text-ink-700'}`}>
                         {days}d
                       </span>
                     )}
@@ -742,10 +742,10 @@ function PolizasTable({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => onEdit(p)} className="text-slate-400 hover:text-slate-700 transition-colors">
+                    <button onClick={() => onEdit(p)} className="text-ink-400 hover:text-ink-600 transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
-                    <button onClick={() => onDelete(p.id)} className="text-slate-400 hover:text-red-600 transition-colors">
+                    <button onClick={() => onDelete(p.id)} className="text-ink-400 hover:text-error transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -756,7 +756,7 @@ function PolizasTable({
         </tbody>
       </table>
       {polizas.length === 0 && (
-        <div className="text-center py-12 text-slate-400">
+        <div className="text-center py-12 text-ink-400">
           <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No se encontraron pólizas</p>
         </div>

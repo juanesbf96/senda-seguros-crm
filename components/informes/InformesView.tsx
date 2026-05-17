@@ -27,12 +27,12 @@ function MetricCard({ label, value, sub, icon: Icon, color }: {
   label: string; value: string; sub?: string; icon: React.ElementType; color: string
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl p-5">
+    <div className="bg-white border border-ink-200 rounded-xl p-5">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-xs font-medium text-slate-500 mb-1">{label}</p>
-          <p className="text-2xl font-bold text-slate-900">{value}</p>
-          {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+          <p className="text-xs font-medium text-ink-400 mb-1">{label}</p>
+          <p className="text-2xl font-bold text-ink-700">{value}</p>
+          {sub && <p className="text-xs text-ink-400 mt-1">{sub}</p>}
         </div>
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${color}`}>
           <Icon className="w-5 h-5" />
@@ -182,7 +182,7 @@ export default function InformesView() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -192,13 +192,13 @@ export default function InformesView() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Informes</h1>
-          <p className="text-slate-500 text-sm mt-1">Resumen de actividad y métricas clave</p>
+          <h1 className="text-2xl font-bold text-ink-700">Informes</h1>
+          <p className="text-ink-400 text-sm mt-1">Resumen de actividad y métricas clave</p>
         </div>
-        <div className="flex border border-slate-200 rounded-lg overflow-hidden">
+        <div className="flex border border-ink-200 rounded-lg overflow-hidden">
           {(Object.entries(PERIODO_LABELS) as [Periodo, string][]).map(([k, v]) => (
             <button key={k} onClick={() => setPeriodo(k)}
-              className={`px-3 py-1.5 text-sm transition-colors ${periodo === k ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+              className={`px-3 py-1.5 text-sm transition-colors ${periodo === k ? 'bg-primary-500 text-white' : 'text-ink-400 hover:bg-cream-100'}`}>
               {v}
             </button>
           ))}
@@ -208,15 +208,15 @@ export default function InformesView() {
       {/* Métricas */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <MetricCard label="Prima neta activa" value={formatCOP(metricas.totalPrimas)}
-          icon={DollarSign} color="bg-emerald-100 text-emerald-600" />
+          icon={DollarSign} color="bg-primary-100 text-primary-500" />
         <MetricCard label="Comisión agencia" value={formatCOP(metricas.totalComision)}
-          icon={TrendingUp} color="bg-blue-100 text-blue-600" />
+          icon={TrendingUp} color="bg-info/20 text-info" />
         <MetricCard label="Pólizas activas" value={String(metricas.polizasActivas)}
           icon={FileText} color="bg-violet-100 text-violet-600" />
         <MetricCard label="Cobros pendientes" value={formatCOP(metricas.cobrosPendientes)}
-          icon={Clock} color="bg-amber-100 text-amber-600" />
+          icon={Clock} color="bg-warning-soft text-ink-700" />
         <MetricCard label="Cobros vencidos" value={formatCOP(metricas.cobrosVencidos)}
-          icon={AlertTriangle} color="bg-red-100 text-red-600" />
+          icon={AlertTriangle} color="bg-error-soft text-error" />
         <MetricCard label="Clientes" value={String(metricas.totalClientes)}
           icon={Users} color="bg-teal-100 text-teal-600" />
       </div>
@@ -225,8 +225,8 @@ export default function InformesView() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Primas por mes */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-800 mb-4">Primas por mes</h3>
+        <div className="bg-white border border-ink-200 rounded-xl p-5">
+          <h3 className="font-semibold text-ink-700 mb-4">Primas por mes</h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={primasPorMes} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -239,8 +239,8 @@ export default function InformesView() {
         </div>
 
         {/* Cobros por estado */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-800 mb-4">Cobros por estado</h3>
+        <div className="bg-white border border-ink-200 rounded-xl p-5">
+          <h3 className="font-semibold text-ink-700 mb-4">Cobros por estado</h3>
           {cobrosPorEstado.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
@@ -256,7 +256,7 @@ export default function InformesView() {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">Sin datos</div>
+            <div className="h-[220px] flex items-center justify-center text-ink-400 text-sm">Sin datos</div>
           )}
         </div>
       </div>
@@ -265,8 +265,8 @@ export default function InformesView() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
         {/* Pólizas por ramo */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5 lg:col-span-2">
-          <h3 className="font-semibold text-slate-800 mb-4">Pólizas por ramo</h3>
+        <div className="bg-white border border-ink-200 rounded-xl p-5 lg:col-span-2">
+          <h3 className="font-semibold text-ink-700 mb-4">Pólizas por ramo</h3>
           {polizasPorRamo.length > 0 ? (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={polizasPorRamo} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
@@ -282,39 +282,39 @@ export default function InformesView() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-slate-400 text-sm">Sin datos</div>
+            <div className="h-[220px] flex items-center justify-center text-ink-400 text-sm">Sin datos</div>
           )}
         </div>
 
         {/* Prospectos por etapa */}
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-800 mb-4">Prospectos por etapa</h3>
+        <div className="bg-white border border-ink-200 rounded-xl p-5">
+          <h3 className="font-semibold text-ink-700 mb-4">Prospectos por etapa</h3>
           {prospectosPorEtapa.length > 0 ? (
             <div className="space-y-2">
               {prospectosPorEtapa.map((p, i) => (
                 <div key={p.etapa} className="flex items-center gap-2">
-                  <span className="text-xs text-slate-500 w-20 truncate">{p.etapa}</span>
-                  <div className="flex-1 bg-slate-100 rounded-full h-2">
+                  <span className="text-xs text-ink-400 w-20 truncate">{p.etapa}</span>
+                  <div className="flex-1 bg-cream-200 rounded-full h-2">
                     <div className="h-2 rounded-full transition-all"
                       style={{
                         width: `${(p.total / Math.max(...prospectosPorEtapa.map(x => x.total))) * 100}%`,
                         background: RAMO_COLORS[i % RAMO_COLORS.length],
                       }} />
                   </div>
-                  <span className="text-xs font-semibold text-slate-700 w-4 text-right">{p.total}</span>
+                  <span className="text-xs font-semibold text-ink-600 w-4 text-right">{p.total}</span>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-[180px] text-slate-400 text-sm">Sin datos</div>
+            <div className="flex items-center justify-center h-[180px] text-ink-400 text-sm">Sin datos</div>
           )}
         </div>
       </div>
 
       {/* Comisiones por vendedor */}
       {comisionesPorVendedor.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-800 mb-4">Comisiones por vendedor</h3>
+        <div className="bg-white border border-ink-200 rounded-xl p-5">
+          <h3 className="font-semibold text-ink-700 mb-4">Comisiones por vendedor</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={comisionesPorVendedor} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />

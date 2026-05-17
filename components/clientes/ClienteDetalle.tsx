@@ -22,24 +22,24 @@ import SiniestrosList from '@/components/siniestros/SiniestrosList'
 /* ────────────────────────────────── constants ── */
 
 const TIPO_ICONS: Record<TipoActividad, React.ReactNode> = {
-  llamada: <PhoneCall className="w-4 h-4 text-blue-500" />,
+  llamada: <PhoneCall className="w-4 h-4 text-info" />,
   email:   <AtSign    className="w-4 h-4 text-purple-500" />,
-  reunion: <Users     className="w-4 h-4 text-emerald-500" />,
-  nota:    <StickyNote className="w-4 h-4 text-amber-500" />,
+  reunion: <Users     className="w-4 h-4 text-primary-500" />,
+  nota:    <StickyNote className="w-4 h-4 text-warning" />,
 }
 
 const ESTADO_COLORS: Record<string, string> = {
-  activa:    'bg-emerald-100 text-emerald-700',
-  vencida:   'bg-red-100 text-red-700',
-  cancelada: 'bg-slate-100 text-slate-600',
-  pendiente: 'bg-amber-100 text-amber-700',
+  activa:    'bg-primary-100 text-primary-700',
+  vencida:   'bg-error-soft text-error',
+  cancelada: 'bg-cream-200 text-ink-500',
+  pendiente: 'bg-warning-soft text-ink-700',
 }
 
 const ETAPA_COLORS: Record<string, string> = {
-  nuevo:      'bg-blue-100 text-blue-700',
-  contactado: 'bg-amber-100 text-amber-700',
+  nuevo:      'bg-info/20 text-info',
+  contactado: 'bg-warning-soft text-ink-700',
   cotizacion: 'bg-purple-100 text-purple-700',
-  cerrado:    'bg-emerald-100 text-emerald-700',
+  cerrado:    'bg-primary-100 text-primary-700',
 }
 const ETAPA_LABELS: Record<string, string> = {
   nuevo: 'Nuevo', contactado: 'Contactado', cotizacion: 'Cotización', cerrado: 'Cerrado',
@@ -48,16 +48,16 @@ const ETAPA_LABELS: Record<string, string> = {
 const CATEGORIA_COLORS: Record<string, string> = {
   VIP:         'bg-yellow-100 text-yellow-700 border-yellow-200',
   Preferencial:'bg-violet-100 text-violet-700 border-violet-200',
-  Estándar:    'bg-slate-100 text-slate-600 border-slate-200',
-  Nuevo:       'bg-sky-100 text-sky-700 border-sky-200',
-  Inactivo:    'bg-red-100 text-red-500 border-red-200',
+  Estándar:    'bg-cream-200 text-ink-500 border-ink-200',
+  Nuevo:       'bg-sky-100 text-info border-sky-200',
+  Inactivo:    'bg-error-soft text-error border-error/30',
 }
 
 const COBRO_ESTADO_COLORS: Record<string, string> = {
-  pendiente: 'bg-amber-100 text-amber-700',
-  pagado:    'bg-emerald-100 text-emerald-700',
-  vencido:   'bg-red-100 text-red-700',
-  anulado:   'bg-slate-100 text-slate-500',
+  pendiente: 'bg-warning-soft text-ink-700',
+  pagado:    'bg-primary-100 text-primary-700',
+  vencido:   'bg-error-soft text-error',
+  anulado:   'bg-cream-200 text-ink-400',
 }
 
 const COBRO_TIPO_LABELS: Record<string, string> = {
@@ -68,12 +68,12 @@ const COBRO_TIPO_LABELS: Record<string, string> = {
 }
 
 const REMISION_ESTADO_COLORS: Record<string, string> = {
-  borrador:  'bg-slate-100 text-slate-600',
-  enviada:   'bg-blue-100 text-blue-700',
+  borrador:  'bg-cream-200 text-ink-500',
+  enviada:   'bg-info/20 text-info',
   recibida:  'bg-purple-100 text-purple-700',
-  aprobada:  'bg-emerald-100 text-emerald-700',
-  rechazada: 'bg-red-100 text-red-700',
-  anulada:   'bg-red-100 text-red-700',
+  aprobada:  'bg-primary-100 text-primary-700',
+  rechazada: 'bg-error-soft text-error',
+  anulada:   'bg-error-soft text-error',
 }
 
 type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros' | 'cobros' | 'remisiones'
@@ -95,7 +95,7 @@ function ClienteCobros({ id }: { id: string }) {
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -104,17 +104,17 @@ function ClienteCobros({ id }: { id: string }) {
 
   return (
     <div className="p-6">
-      <h2 className="font-semibold text-slate-800 text-sm mb-4">Cobros ({cobros.length})</h2>
+      <h2 className="font-semibold text-ink-700 text-sm mb-4">Cobros ({cobros.length})</h2>
       {cobros.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+        <div className="bg-white rounded-xl border border-dashed border-ink-300 p-12 text-center text-ink-400">
           <Wallet className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">Sin cobros registrados</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
+            <thead className="bg-cream-100 border-b border-ink-200">
+              <tr className="text-left text-xs text-ink-400">
                 <th className="px-4 py-3 font-medium">Concepto</th>
                 <th className="px-4 py-3 font-medium hidden sm:table-cell">Tipo</th>
                 <th className="px-4 py-3 font-medium">Valor</th>
@@ -124,30 +124,30 @@ function ClienteCobros({ id }: { id: string }) {
             </thead>
             <tbody>
               {cobros.map(c => (
-                <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-slate-700 font-medium">{c.concepto}</td>
-                  <td className="px-4 py-3 text-slate-500 hidden sm:table-cell text-xs">
+                <tr key={c.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
+                  <td className="px-4 py-3 text-ink-600 font-medium">{c.concepto}</td>
+                  <td className="px-4 py-3 text-ink-400 hidden sm:table-cell text-xs">
                     {COBRO_TIPO_LABELS[c.tipo] ?? c.tipo}
                   </td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCOP(c.valor)}</td>
-                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell text-xs">
+                  <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.valor)}</td>
+                  <td className="px-4 py-3 text-ink-400 hidden md:table-cell text-xs">
                     {c.fecha_vencimiento ? formatDate(c.fecha_vencimiento) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COBRO_ESTADO_COLORS[c.estado] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COBRO_ESTADO_COLORS[c.estado] ?? 'bg-cream-200 text-ink-500'}`}>
                       {c.estado}
                     </span>
                   </td>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-slate-50 border-t border-slate-200">
-              <tr className="text-xs text-slate-500">
+            <tfoot className="bg-cream-100 border-t border-ink-200">
+              <tr className="text-xs text-ink-400">
                 <td colSpan={2} className="px-4 py-2.5 font-semibold">Subtotales</td>
                 <td colSpan={3} className="px-4 py-2.5">
                   <div className="flex gap-4">
-                    <span>Pendiente: <strong className="text-amber-700">{totalPendiente > 0 ? formatCOP(totalPendiente) : '—'}</strong></span>
-                    <span>Pagado: <strong className="text-emerald-700">{totalPagado > 0 ? formatCOP(totalPagado) : '—'}</strong></span>
+                    <span>Pendiente: <strong className="text-ink-700">{totalPendiente > 0 ? formatCOP(totalPendiente) : '—'}</strong></span>
+                    <span>Pagado: <strong className="text-primary-700">{totalPagado > 0 ? formatCOP(totalPagado) : '—'}</strong></span>
                   </div>
                 </td>
               </tr>
@@ -174,23 +174,23 @@ function ClienteRemisiones({ id }: { id: string }) {
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500" />
     </div>
   )
 
   return (
     <div className="p-6">
-      <h2 className="font-semibold text-slate-800 text-sm mb-4">Remisiones ({remisiones.length})</h2>
+      <h2 className="font-semibold text-ink-700 text-sm mb-4">Remisiones ({remisiones.length})</h2>
       {remisiones.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+        <div className="bg-white rounded-xl border border-dashed border-ink-300 p-12 text-center text-ink-400">
           <FileCheck className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">Sin remisiones registradas</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
+            <thead className="bg-cream-100 border-b border-ink-200">
+              <tr className="text-left text-xs text-ink-400">
                 <th className="px-4 py-3 font-medium">N° Remisión</th>
                 <th className="px-4 py-3 font-medium hidden sm:table-cell">Aseguradora</th>
                 <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
@@ -201,21 +201,21 @@ function ClienteRemisiones({ id }: { id: string }) {
             </thead>
             <tbody>
               {remisiones.map(r => (
-                <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-slate-700">
+                <tr key={r.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
+                  <td className="px-4 py-3 font-medium text-ink-600">
                     {r.numero_remision ? `#${r.numero_remision}` : '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 hidden sm:table-cell">{r.aseguradora}</td>
-                  <td className="px-4 py-3 text-slate-500 hidden md:table-cell text-xs">{r.ramo}</td>
+                  <td className="px-4 py-3 text-ink-500 hidden sm:table-cell">{r.aseguradora}</td>
+                  <td className="px-4 py-3 text-ink-400 hidden md:table-cell text-xs">{r.ramo}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${REMISION_ESTADO_COLORS[r.estado] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${REMISION_ESTADO_COLORS[r.estado] ?? 'bg-cream-200 text-ink-500'}`}>
                       {r.estado}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-500 hidden lg:table-cell text-xs">
+                  <td className="px-4 py-3 text-ink-400 hidden lg:table-cell text-xs">
                     {r.fecha ? formatDate(r.fecha) : formatDate(r.created_at)}
                   </td>
-                  <td className="px-4 py-3 text-slate-400 hidden xl:table-cell text-xs truncate max-w-[180px]">
+                  <td className="px-4 py-3 text-ink-400 hidden xl:table-cell text-xs truncate max-w-[180px]">
                     {r.notas || '—'}
                   </td>
                 </tr>
@@ -291,10 +291,10 @@ export default function ClienteDetalle({ id }: { id: string }) {
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
-  if (!cliente) return <div className="p-6 text-slate-500">Cliente no encontrado.</div>
+  if (!cliente) return <div className="p-6 text-ink-400">Cliente no encontrado.</div>
 
   /* derived */
   const polizasActivas = polizas.filter(p => p.estado === 'activa')
@@ -322,28 +322,28 @@ export default function ClienteDetalle({ id }: { id: string }) {
     <div className="flex flex-col h-full overflow-hidden">
 
       {/* ── Header ── */}
-      <div className="flex-shrink-0 bg-white border-b border-slate-200 px-6 pt-5 pb-0">
-        <Link href="/clientes" className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 mb-3 w-fit">
+      <div className="flex-shrink-0 bg-white border-b border-ink-200 px-6 pt-5 pb-0">
+        <Link href="/clientes" className="flex items-center gap-1.5 text-xs text-ink-400 hover:text-ink-500 mb-3 w-fit">
           <ArrowLeft className="w-3.5 h-3.5" /> Volver a clientes
         </Link>
 
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-start gap-4">
             {/* Avatar */}
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
               {cliente.tipo_cliente === 'persona_natural'
-                ? <User className="w-6 h-6 text-emerald-600" />
-                : <Building2 className="w-6 h-6 text-emerald-600" />
+                ? <User className="w-6 h-6 text-primary-500" />
+                : <Building2 className="w-6 h-6 text-primary-500" />
               }
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl font-bold text-slate-900">{cliente.nombre}</h1>
+                <h1 className="text-xl font-bold text-ink-700">{cliente.nombre}</h1>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ETAPA_COLORS[cliente.etapa]}`}>
                   {ETAPA_LABELS[cliente.etapa]}
                 </span>
                 {cliente.categoria && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${CATEGORIA_COLORS[cliente.categoria] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${CATEGORIA_COLORS[cliente.categoria] || 'bg-cream-200 text-ink-500 border-ink-200'}`}>
                     {cliente.categoria}
                   </span>
                 )}
@@ -352,7 +352,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
               <div className="flex flex-wrap gap-2 mt-2">
                 {cliente.telefono && (
                   <a href={`tel:${cliente.telefono}`}
-                    className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 text-slate-600 transition-colors">
+                    className="flex items-center gap-1.5 text-xs bg-white border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-cream-100 text-ink-500 transition-colors">
                     <Phone className="w-3.5 h-3.5" />{cliente.telefono}
                   </a>
                 )}
@@ -360,23 +360,23 @@ export default function ClienteDetalle({ id }: { id: string }) {
                   <a href={`https://wa.me/57${cliente.telefono.replace(/\D/g, '')}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 text-emerald-600 transition-colors">
+                    className="flex items-center gap-1.5 text-xs bg-white border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-cream-100 text-primary-500 transition-colors">
                     <MessageCircle className="w-3.5 h-3.5" /> WhatsApp
                   </a>
                 )}
                 {cliente.email && (
                   <a href={`mailto:${cliente.email}`}
-                    className="flex items-center gap-1.5 text-xs bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 hover:bg-slate-50 text-slate-600 transition-colors">
+                    className="flex items-center gap-1.5 text-xs bg-white border border-ink-200 rounded-lg px-2.5 py-1.5 hover:bg-cream-100 text-ink-500 transition-colors">
                     <Mail className="w-3.5 h-3.5" />{cliente.email}
                   </a>
                 )}
                 {cliente.ciudad && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500 px-1">
+                  <span className="flex items-center gap-1 text-xs text-ink-400 px-1">
                     <MapPin className="w-3 h-3" />{cliente.ciudad}{cliente.departamento ? `, ${cliente.departamento}` : ''}
                   </span>
                 )}
                 {cliente.cedula && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500 px-1">
+                  <span className="flex items-center gap-1 text-xs text-ink-400 px-1">
                     <IdCard className="w-3 h-3" />CC {cliente.cedula}
                   </span>
                 )}
@@ -385,7 +385,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
           </div>
 
           <button onClick={() => setShowEditCliente(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs text-slate-600 hover:bg-slate-50 transition-colors flex-shrink-0">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-ink-200 text-xs text-ink-500 hover:bg-cream-100 transition-colors flex-shrink-0">
             <Pencil className="w-3.5 h-3.5" /> Editar
           </button>
         </div>
@@ -415,13 +415,13 @@ export default function ClienteDetalle({ id }: { id: string }) {
               className={[
                 'flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',
                 activeTab === key
-                  ? 'border-emerald-600 text-emerald-600'
-                  : 'border-transparent text-slate-500 hover:text-slate-700',
+                  ? 'border-primary-500 text-primary-500'
+                  : 'border-transparent text-ink-400 hover:text-ink-600',
               ].join(' ')}>
               <Icon className="w-3.5 h-3.5" />
               {label}
               {count !== undefined && (
-                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${activeTab === key ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
                   {count}
                 </span>
               )}
@@ -512,7 +512,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
 
             {cliente.notas && (
               <DataSection title="Notas">
-                <p className="text-sm text-slate-600 leading-relaxed">{cliente.notas}</p>
+                <p className="text-sm text-ink-500 leading-relaxed">{cliente.notas}</p>
               </DataSection>
             )}
           </div>
@@ -522,20 +522,20 @@ export default function ClienteDetalle({ id }: { id: string }) {
         {activeTab === 'polizas' && (
           <div className="p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-slate-800 text-sm">Pólizas ({polizas.length})</h2>
+              <h2 className="font-semibold text-ink-700 text-sm">Pólizas ({polizas.length})</h2>
               <button
                 onClick={() => { setEditingPoliza(undefined); setShowPolizaModal(true) }}
-                className="flex items-center gap-1.5 text-xs bg-emerald-600 text-white px-3 py-1.5 rounded-lg hover:bg-emerald-700 transition-colors">
+                className="flex items-center gap-1.5 text-xs bg-primary-500 text-white px-3 py-1.5 rounded-lg hover:bg-primary-700 transition-colors">
                 <Plus className="w-3.5 h-3.5" /> Nueva póliza
               </button>
             </div>
 
             {polizas.length === 0 ? (
-              <div className="bg-white rounded-xl border border-dashed border-slate-300 p-12 text-center text-slate-400">
+              <div className="bg-white rounded-xl border border-dashed border-ink-300 p-12 text-center text-ink-400">
                 <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">Sin pólizas registradas</p>
                 <button onClick={() => setShowPolizaModal(true)}
-                  className="mt-3 text-xs text-emerald-600 hover:underline">+ Agregar primera póliza</button>
+                  className="mt-3 text-xs text-primary-500 hover:underline">+ Agregar primera póliza</button>
               </div>
             ) : (
               <div className="space-y-3">
@@ -544,81 +544,81 @@ export default function ClienteDetalle({ id }: { id: string }) {
                   const urgent = days !== null && days >= 0 && days <= 30
                   const primaDisplay = p.prima_neta ?? p.prima
                   return (
-                    <div key={p.id} className={`bg-white rounded-xl border p-4 ${urgent ? 'border-amber-300' : 'border-slate-200'}`}>
+                    <div key={p.id} className={`bg-white rounded-xl border p-4 ${urgent ? 'border-warning/40' : 'border-ink-200'}`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-slate-800">{p.aseguradora}</span>
-                            <span className="text-slate-400">·</span>
-                            <span className="text-slate-600 text-sm">{p.ramo}</span>
+                            <span className="font-semibold text-ink-700">{p.aseguradora}</span>
+                            <span className="text-ink-400">·</span>
+                            <span className="text-ink-500 text-sm">{p.ramo}</span>
                             <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[p.estado]}`}>
                               {p.estado}
                             </span>
                             {p.tipo_modalidad && (
-                              <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-slate-500 capitalize">
+                              <span className="px-2 py-0.5 rounded-full text-xs bg-cream-200 text-ink-400 capitalize">
                                 {p.tipo_modalidad}
                               </span>
                             )}
                             {urgent && (
-                              <span className="flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                              <span className="flex items-center gap-1 text-xs text-ink-700 bg-warning-soft px-2 py-0.5 rounded-full">
                                 <AlertTriangle className="w-3 h-3" /> Vence en {days}d
                               </span>
                             )}
                           </div>
-                          {p.numero_poliza && <p className="text-xs text-slate-400 mt-1">Póliza: {p.numero_poliza}</p>}
-                          {p.nombre_tomador && <p className="text-xs text-slate-400">Tomador: {p.nombre_tomador}</p>}
+                          {p.numero_poliza && <p className="text-xs text-ink-400 mt-1">Póliza: {p.numero_poliza}</p>}
+                          {p.nombre_tomador && <p className="text-xs text-ink-400">Tomador: {p.nombre_tomador}</p>}
                         </div>
                         <div className="flex gap-2 ml-3 flex-shrink-0">
                           <button onClick={() => { setEditingPoliza(p); setShowPolizaModal(true) }}
-                            className="text-slate-400 hover:text-slate-700">
+                            className="text-ink-400 hover:text-ink-600">
                             <Pencil className="w-4 h-4" />
                           </button>
                           <button onClick={() => deletePoliza(p.id)}
-                            className="text-slate-400 hover:text-red-600">
+                            className="text-ink-400 hover:text-error">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-slate-500">
+                      <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-ink-400">
                         {primaDisplay && (
                           <div>
-                            <p className="text-slate-400">Prima</p>
-                            <p className="font-semibold text-slate-700">{formatCOP(primaDisplay)}</p>
+                            <p className="text-ink-400">Prima</p>
+                            <p className="font-semibold text-ink-600">{formatCOP(primaDisplay)}</p>
                           </div>
                         )}
                         {p.total_prima && (
                           <div>
-                            <p className="text-slate-400">Total prima</p>
-                            <p className="font-semibold text-slate-700">{formatCOP(p.total_prima)}</p>
+                            <p className="text-ink-400">Total prima</p>
+                            <p className="font-semibold text-ink-600">{formatCOP(p.total_prima)}</p>
                           </div>
                         )}
                         {p.fecha_inicio && (
                           <div>
-                            <p className="text-slate-400">Inicio</p>
+                            <p className="text-ink-400">Inicio</p>
                             <p>{formatDate(p.fecha_inicio)}</p>
                           </div>
                         )}
                         {p.fecha_fin && (
                           <div>
-                            <p className="text-slate-400">Vencimiento</p>
-                            <p className={urgent ? 'text-amber-700 font-medium' : ''}>{formatDate(p.fecha_fin)}</p>
+                            <p className="text-ink-400">Vencimiento</p>
+                            <p className={urgent ? 'text-ink-700 font-medium' : ''}>{formatDate(p.fecha_fin)}</p>
                           </div>
                         )}
                         {p.comision_agencia && (
                           <div>
-                            <p className="text-slate-400">Comisión agencia</p>
-                            <p className="font-semibold text-emerald-700">{formatCOP(p.comision_agencia)}</p>
+                            <p className="text-ink-400">Comisión agencia</p>
+                            <p className="font-semibold text-primary-700">{formatCOP(p.comision_agencia)}</p>
                           </div>
                         )}
                         {p.periodicidad_pago && (
                           <div>
-                            <p className="text-slate-400">Periodicidad</p>
+                            <p className="text-ink-400">Periodicidad</p>
                             <p>{p.periodicidad_pago}</p>
                           </div>
                         )}
                       </div>
-                      {p.notas && <p className="mt-2 text-xs text-slate-400 italic">{p.notas}</p>}
+                      {p.notas && <p className="mt-2 text-xs text-ink-400 italic">{p.notas}</p>}
                     </div>
                   )
                 })}
@@ -631,13 +631,13 @@ export default function ClienteDetalle({ id }: { id: string }) {
         {activeTab === 'actividades' && (
           <div className="p-6 max-w-2xl">
             {/* Form nueva actividad */}
-            <div className="bg-white rounded-xl border border-slate-200 p-4 mb-5">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Nueva actividad</p>
+            <div className="bg-white rounded-xl border border-ink-200 p-4 mb-5">
+              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-3">Nueva actividad</p>
               <div className="flex gap-2 mb-3">
                 {(['llamada','email','reunion','nota'] as TipoActividad[]).map(t => (
                   <button key={t} onClick={() => setActForm(f => ({ ...f, tipo: t }))}
                     className={`flex-1 py-1.5 text-xs rounded-lg capitalize transition-colors ${
-                      actForm.tipo === t ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      actForm.tipo === t ? 'bg-primary-500 text-white' : 'bg-cream-200 text-ink-500 hover:bg-ink-200'
                     }`}>
                     {t}
                   </button>
@@ -648,15 +648,15 @@ export default function ClienteDetalle({ id }: { id: string }) {
                 onChange={e => setActForm(f => ({ ...f, descripcion: e.target.value }))}
                 placeholder="Descripción de la actividad..."
                 rows={2}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none mb-2"
+                className="w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none mb-2"
               />
               <div className="flex gap-2 items-center">
                 <input type="date" value={actForm.fecha}
                   onChange={e => setActForm(f => ({ ...f, fecha: e.target.value }))}
-                  className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="flex-1 px-2 py-1.5 text-xs border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
                 <button onClick={saveActividad} disabled={savingAct || !actForm.descripcion.trim()}
-                  className="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors">
+                  className="px-3 py-1.5 bg-primary-500 text-white text-xs rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">
                   {savingAct ? '...' : 'Registrar'}
                 </button>
               </div>
@@ -665,21 +665,21 @@ export default function ClienteDetalle({ id }: { id: string }) {
             {/* Timeline */}
             <div className="space-y-3">
               {actividades.length === 0 ? (
-                <p className="text-center text-sm text-slate-400 py-10">Sin actividades registradas</p>
+                <p className="text-center text-sm text-ink-400 py-10">Sin actividades registradas</p>
               ) : actividades.map(a => (
-                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-3">
+                <div key={a.id} className="bg-white rounded-xl border border-ink-200 p-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2">
                       {TIPO_ICONS[a.tipo]}
-                      <span className="text-xs text-slate-500 capitalize">{a.tipo}</span>
-                      <span className="text-xs text-slate-400">·</span>
-                      <span className="text-xs text-slate-400">{new Date(a.fecha).toLocaleDateString('es-CO')}</span>
+                      <span className="text-xs text-ink-400 capitalize">{a.tipo}</span>
+                      <span className="text-xs text-ink-400">·</span>
+                      <span className="text-xs text-ink-400">{new Date(a.fecha).toLocaleDateString('es-CO')}</span>
                     </div>
-                    <button onClick={() => deleteActividad(a.id)} className="text-slate-300 hover:text-red-500">
+                    <button onClick={() => deleteActividad(a.id)} className="text-ink-300 hover:text-error">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
-                  <p className="text-sm text-slate-700 mt-1.5">{a.descripcion}</p>
+                  <p className="text-sm text-ink-600 mt-1.5">{a.descripcion}</p>
                 </div>
               ))}
             </div>
@@ -753,8 +753,8 @@ export default function ClienteDetalle({ id }: { id: string }) {
 function KPI({ label, value, accent, warn }: { label: string; value: string; accent?: boolean; warn?: boolean }) {
   return (
     <div className="flex flex-col">
-      <span className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</span>
-      <span className={`text-sm font-bold ${warn ? 'text-amber-600' : accent ? 'text-emerald-700' : 'text-slate-800'}`}>
+      <span className="text-[10px] text-ink-400 uppercase tracking-wide">{label}</span>
+      <span className={`text-sm font-bold ${warn ? 'text-ink-700' : accent ? 'text-primary-700' : 'text-ink-700'}`}>
         {value}
       </span>
     </div>
@@ -763,8 +763,8 @@ function KPI({ label, value, accent, warn }: { label: string; value: string; acc
 
 function DataSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4">
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">{title}</p>
+    <div className="bg-white rounded-xl border border-ink-200 p-4">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mb-3">{title}</p>
       {children}
     </div>
   )
@@ -779,10 +779,10 @@ function DataItem({ label, value, icon, accent }: {
 }) {
   return (
     <div>
-      <p className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+      <p className="text-[10px] text-ink-400 uppercase tracking-wide mb-0.5">{label}</p>
       <div className="flex items-center gap-1">
-        {icon && <span className={accent ? 'text-emerald-600' : 'text-slate-400'}>{icon}</span>}
-        <p className={`text-sm font-medium ${accent ? 'text-emerald-700' : 'text-slate-700'}`}>{value}</p>
+        {icon && <span className={accent ? 'text-primary-500' : 'text-ink-400'}>{icon}</span>}
+        <p className={`text-sm font-medium ${accent ? 'text-primary-700' : 'text-ink-600'}`}>{value}</p>
       </div>
     </div>
   )

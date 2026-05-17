@@ -142,22 +142,22 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-xl max-h-[95vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200 sticky top-0 bg-white z-10">
-          <h2 className="font-semibold text-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-ink-200 sticky top-0 bg-white z-10">
+          <h2 className="font-semibold text-ink-700">
             {factura ? `Factura #${factura.numero_factura}` : 'Nueva factura'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-5">
           {/* Tipo */}
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Tipo de factura</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1.5">Tipo de factura</label>
             <div className="grid grid-cols-2 gap-2">
               {(Object.entries(TIPO_LABELS) as [TipoFactura, string][]).map(([k, v]) => (
                 <button key={k} type="button" onClick={() => set('tipo', k)}
                   className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors ${
-                    form.tipo === k ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                    form.tipo === k ? 'bg-primary-500 border-primary-500 text-white' : 'bg-white border-ink-200 text-ink-500 hover:border-ink-400'
                   }`}>{v}</button>
               ))}
             </div>
@@ -187,8 +187,8 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
           </div>
 
           {/* Tributario */}
-          <div className="bg-slate-50 rounded-xl p-4 space-y-4">
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Valores tributarios</p>
+          <div className="bg-cream-100 rounded-xl p-4 space-y-4">
+            <p className="text-xs font-semibold text-ink-400 uppercase tracking-wide">Valores tributarios</p>
 
             <div className="grid grid-cols-2 gap-4">
               <F label="Comisión Gravada">
@@ -210,9 +210,9 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
                   onChange={e => set('pct_iva', e.target.value)} className={cls} />
               </F>
               <F label="IVA (calculado)">
-                <input readOnly value={formatCOP(iva)} className={`${cls} bg-slate-100 text-slate-500 cursor-default`} />
+                <input readOnly value={formatCOP(iva)} className={`${cls} bg-cream-200 text-ink-400 cursor-default`} />
               </F>
-              <div className="pb-0.5 text-xs text-slate-400 self-end">Base: gravada</div>
+              <div className="pb-0.5 text-xs text-ink-400 self-end">Base: gravada</div>
             </div>
 
             {/* Ret IVA */}
@@ -222,9 +222,9 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
                   onChange={e => set('pct_ret_iva', e.target.value)} className={cls} />
               </F>
               <F label="Ret. IVA (calculado)">
-                <input readOnly value={formatCOP(ret_iva)} className={`${cls} bg-slate-100 text-red-500 cursor-default`} />
+                <input readOnly value={formatCOP(ret_iva)} className={`${cls} bg-cream-200 text-error cursor-default`} />
               </F>
-              <div className="pb-0.5 text-xs text-slate-400 self-end">Base: IVA</div>
+              <div className="pb-0.5 text-xs text-ink-400 self-end">Base: IVA</div>
             </div>
 
             {/* Ret ICA */}
@@ -234,9 +234,9 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
                   onChange={e => set('pct_ret_ica', e.target.value)} className={cls} />
               </F>
               <F label="Ret. ICA (calculado)">
-                <input readOnly value={formatCOP(ret_ica)} className={`${cls} bg-slate-100 text-red-500 cursor-default`} />
+                <input readOnly value={formatCOP(ret_ica)} className={`${cls} bg-cream-200 text-error cursor-default`} />
               </F>
-              <div className="pb-0.5 text-xs text-slate-400 self-end">Base: gravada+no grav.</div>
+              <div className="pb-0.5 text-xs text-ink-400 self-end">Base: gravada+no grav.</div>
             </div>
 
             {/* Ret Fuente */}
@@ -246,9 +246,9 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
                   onChange={e => set('pct_ret_fuente', e.target.value)} className={cls} />
               </F>
               <F label="Ret. Fuente (calculado)">
-                <input readOnly value={formatCOP(ret_fuente)} className={`${cls} bg-slate-100 text-red-500 cursor-default`} />
+                <input readOnly value={formatCOP(ret_fuente)} className={`${cls} bg-cream-200 text-error cursor-default`} />
               </F>
-              <div className="pb-0.5 text-xs text-slate-400 self-end">Base: gravada+no grav.</div>
+              <div className="pb-0.5 text-xs text-ink-400 self-end">Base: gravada+no grav.</div>
             </div>
 
             <F label="Otros">
@@ -256,9 +256,9 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
             </F>
 
             {/* Gran Total */}
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg px-4 py-3 flex items-center justify-between">
-              <span className="text-sm font-semibold text-emerald-800">Gran Total</span>
-              <span className="text-xl font-bold text-emerald-700">{formatCOP(gran_total)}</span>
+            <div className="bg-primary-50 border border-primary-200 rounded-lg px-4 py-3 flex items-center justify-between">
+              <span className="text-sm font-semibold text-primary-800">Gran Total</span>
+              <span className="text-xl font-bold text-primary-700">{formatCOP(gran_total)}</span>
             </div>
           </div>
 
@@ -281,25 +281,25 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
               rows={2} placeholder="Observaciones opcionales..." className={cls} />
           </F>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
         {/* Footer — Cancelar / Crear borrador / Vista previa / Crear y salir */}
-        <div className="flex gap-2 p-5 border-t border-slate-200 flex-wrap">
+        <div className="flex gap-2 p-5 border-t border-ink-200 flex-wrap">
           <button onClick={onClose}
-            className="px-4 py-2 text-sm text-red-600 hover:text-red-700 font-medium">
+            className="px-4 py-2 text-sm text-error hover:text-error font-medium">
             Cancelar
           </button>
           <button onClick={() => saveFn(true)} disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-blue-300 text-blue-700 text-sm hover:bg-blue-50 disabled:opacity-50 transition-colors">
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-info/40 text-info text-sm hover:bg-info/10 disabled:opacity-50 transition-colors">
             <FileText className="w-4 h-4" /> Crear borrador
           </button>
           <button disabled
-            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-slate-200 text-slate-400 text-sm cursor-not-allowed">
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-ink-200 text-ink-400 text-sm cursor-not-allowed">
             <Eye className="w-4 h-4" /> Visualización Previa
           </button>
           <button onClick={() => saveFn(false)} disabled={saving}
-            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium disabled:opacity-60 transition-colors">
+            className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-700 text-white text-sm font-medium disabled:opacity-60 transition-colors">
             <Save className="w-4 h-4" />
             {saving ? 'Guardando...' : 'Crear y salir'}
           </button>
@@ -310,6 +310,6 @@ export default function FacturasModal({ factura, tipoInicial, onClose, onSaved }
 }
 
 function F({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>{children}</div>
 }
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"

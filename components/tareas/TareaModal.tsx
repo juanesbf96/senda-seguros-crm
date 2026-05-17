@@ -13,9 +13,9 @@ interface Props {
 }
 
 const PRIORIDAD_CONFIG: Record<PrioridadTarea, { label: string; cls: string; icon: React.ElementType }> = {
-  normal:  { label: 'Normal',  cls: 'bg-slate-100 text-slate-600 border-slate-200',   icon: Minus },
-  alta:    { label: 'Alta',    cls: 'bg-amber-100 text-amber-700 border-amber-200',   icon: ArrowUp },
-  urgente: { label: 'Urgente', cls: 'bg-red-100 text-red-700 border-red-200',         icon: AlertCircle },
+  normal:  { label: 'Normal',  cls: 'bg-cream-200 text-ink-500 border-ink-200',   icon: Minus },
+  alta:    { label: 'Alta',    cls: 'bg-warning-soft text-ink-700 border-warning/30',   icon: ArrowUp },
+  urgente: { label: 'Urgente', cls: 'bg-error-soft text-error border-error/30',         icon: AlertCircle },
 }
 
 export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props) {
@@ -68,9 +68,9 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800">{tarea ? 'Editar tarea' : 'Nueva tarea'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <h2 className="font-semibold text-ink-700">{tarea ? 'Editar tarea' : 'Nueva tarea'}</h2>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
           <Field label="Título *">
@@ -98,7 +98,7 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
                   <button key={key} type="button" onClick={() => set('prioridad', key)}
                     className={[
                       'flex-1 py-1.5 px-1 rounded-lg text-xs font-medium border transition-colors flex items-center justify-center gap-1',
-                      form.prioridad === key ? cls : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300',
+                      form.prioridad === key ? cls : 'bg-white border-ink-200 text-ink-400 hover:border-ink-300',
                     ].join(' ')}>
                     <Icon className="w-3 h-3" />{label}
                   </button>
@@ -121,20 +121,20 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
             <label className="flex items-center gap-2 cursor-pointer">
               <input type="checkbox" checked={form.completada}
                 onChange={e => set('completada', e.target.checked)}
-                className="w-4 h-4 rounded accent-emerald-600" />
-              <span className="text-sm text-slate-700">Marcar como completada</span>
+                className="w-4 h-4 rounded accent-primary-500" />
+              <span className="text-sm text-ink-600">Marcar como completada</span>
             </label>
           )}
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
-        <div className="flex gap-3 p-5 border-t border-slate-200">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
           <button onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">
             Cancelar
           </button>
           <button onClick={save} disabled={saving}
-            className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 transition-colors">
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -144,6 +144,6 @@ export default function TareaModal({ tarea, clienteId, onClose, onSaved }: Props
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>{children}</div>
 }
-const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const inputCls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

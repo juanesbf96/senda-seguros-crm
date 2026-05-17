@@ -21,11 +21,11 @@ const FORMA_ICONS: Record<FormaPago, React.ElementType> = {
   tarjeta: CreditCard, consignacion: Building2,
 }
 const FORMA_COLORS: Record<FormaPago, string> = {
-  efectivo:      'bg-emerald-100 text-emerald-700',
-  transferencia: 'bg-blue-100 text-blue-700',
+  efectivo:      'bg-primary-100 text-primary-700',
+  transferencia: 'bg-info/20 text-info',
   cheque:        'bg-purple-100 text-purple-700',
   tarjeta:       'bg-indigo-100 text-indigo-700',
-  consignacion:  'bg-amber-100 text-amber-700',
+  consignacion:  'bg-warning-soft text-ink-700',
 }
 
 type RecibosTab = TipoRecibo | 'cuadre'
@@ -108,7 +108,7 @@ export default function CajaView() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -117,28 +117,28 @@ export default function CajaView() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Caja</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-ink-700">Caja</h1>
+          <p className="text-ink-400 text-sm mt-1">
             {recibos.length} recibos · Total: {formatCOP(recibos.reduce((s, r) => s + r.valor, 0))}
           </p>
         </div>
         <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" /> Nuevo recibo
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+      <div className="flex gap-1 mb-5 border-b border-ink-200 overflow-x-auto">
         {RECIBO_TABS.map(({ key, label, icon: Icon }) => (
           <button key={key} onClick={() => { setActiveTab(key); setSearch('') }}
             className={[
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',
-              activeTab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+              activeTab === key ? 'border-primary-500 text-primary-500' : 'border-transparent text-ink-400 hover:text-ink-600',
             ].join(' ')}>
             <Icon className="w-4 h-4" />
             {label}
-            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
               {tabCounts[key]}
             </span>
           </button>
@@ -148,38 +148,38 @@ export default function CajaView() {
       {/* Filters (shared) */}
       <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar cliente, concepto, N° recibo..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
         </div>
         {!isCuadreTab && (
           <select value={filterForma} onChange={e => setFilterForma(e.target.value as FormaPago | 'all')}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400">
+            className="px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400">
             <option value="all">Todas las formas</option>
             {(Object.entries(FORMA_LABELS) as [FormaPago, string][]).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
         )}
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          className="px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          className="px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
       </div>
 
       {/* Total filtrado */}
       {(search || filterForma !== 'all' || dateFrom || dateTo) && (
-        <div className="mb-4 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-          <span className="text-sm text-emerald-700">{filtered.length} recibos en el filtro seleccionado</span>
-          <span className="font-bold text-emerald-800">{formatCOP(totalFiltrado)}</span>
+        <div className="mb-4 px-4 py-3 bg-primary-50 border border-primary-200 rounded-xl flex items-center justify-between">
+          <span className="text-sm text-primary-700">{filtered.length} recibos en el filtro seleccionado</span>
+          <span className="font-bold text-primary-800">{formatCOP(totalFiltrado)}</span>
         </div>
       )}
 
       {/* ── Tab: Recibos (anticipo / activos / pago_directo / anulados / certificados) ── */}
       {!isCuadreTab && (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-50 border-b border-slate-200">
-              <tr className="text-left text-xs text-slate-500">
+            <thead className="bg-cream-100 border-b border-ink-200">
+              <tr className="text-left text-xs text-ink-400">
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 font-medium">Concepto</th>
@@ -197,31 +197,31 @@ export default function CajaView() {
               {filtered.map(r => {
                 const FormaIcon = FORMA_ICONS[r.forma_pago]
                 return (
-                  <tr key={r.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${r.tipo === 'anulado' ? 'opacity-60' : ''}`}>
-                    <td className="px-4 py-3 text-slate-500 text-xs whitespace-nowrap">{formatDate(r.fecha_pago)}</td>
+                  <tr key={r.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${r.tipo === 'anulado' ? 'opacity-60' : ''}`}>
+                    <td className="px-4 py-3 text-ink-400 text-xs whitespace-nowrap">{formatDate(r.fecha_pago)}</td>
                     <td className="px-4 py-3">
                       {r.client_id
-                        ? <Link href={`/clientes/${r.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">{r.cliente?.nombre || '—'}</Link>
-                        : <span className="text-slate-400">—</span>}
+                        ? <Link href={`/clientes/${r.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{r.cliente?.nombre || '—'}</Link>
+                        : <span className="text-ink-400">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-slate-700 max-w-[180px]">
+                    <td className="px-4 py-3 text-ink-600 max-w-[180px]">
                       <span className="line-clamp-1">{r.concepto}</span>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{r.numero_recibo || '—'}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{r.numero_recibo || '—'}</td>
                     {activeTab === 'certificado' && (
-                      <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{r.numero_certificado || '—'}</td>
+                      <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{r.numero_certificado || '—'}</td>
                     )}
-                    <td className="px-4 py-3 font-semibold text-slate-800">{formatCOP(r.valor)}</td>
+                    <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(r.valor)}</td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-xs font-medium ${FORMA_COLORS[r.forma_pago]}`}>
                         <FormaIcon className="w-3 h-3" />{FORMA_LABELS[r.forma_pago]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">{r.referencia || r.banco || '—'}</td>
+                    <td className="px-4 py-3 hidden lg:table-cell text-ink-400 text-xs">{r.referencia || r.banco || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
-                        <button onClick={() => { setEditing(r); setShowModal(true) }} className="text-slate-400 hover:text-slate-700 transition-colors"><Pencil className="w-4 h-4" /></button>
-                        <button onClick={() => deleteRecibo(r.id)} className="text-slate-400 hover:text-red-600 transition-colors"><Trash2 className="w-4 h-4" /></button>
+                        <button onClick={() => { setEditing(r); setShowModal(true) }} className="text-ink-400 hover:text-ink-600 transition-colors"><Pencil className="w-4 h-4" /></button>
+                        <button onClick={() => deleteRecibo(r.id)} className="text-ink-400 hover:text-error transition-colors"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -230,7 +230,7 @@ export default function CajaView() {
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div className="text-center py-12 text-slate-400">
+            <div className="text-center py-12 text-ink-400">
               <Receipt className="w-8 h-8 mx-auto mb-2 opacity-30" />
               <p className="text-sm">No hay recibos en esta sección</p>
             </div>
@@ -243,18 +243,18 @@ export default function CajaView() {
         <div className="space-y-6">
           {/* Resumen por forma de pago */}
           <div>
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Resumen por forma de pago</h2>
+            <h2 className="text-sm font-semibold text-ink-600 mb-3">Resumen por forma de pago</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {(Object.keys(FORMA_LABELS) as FormaPago[]).map(f => {
                 const total = filtered.filter(r => r.forma_pago === f).reduce((s, r) => s + r.valor, 0)
                 const count = filtered.filter(r => r.forma_pago === f).length
                 const Icon  = FORMA_ICONS[f]
                 return (
-                  <div key={f} className="bg-white border border-slate-200 rounded-xl p-4 text-center">
-                    <Icon className="w-5 h-5 mx-auto mb-1 text-slate-500" />
-                    <p className="text-xs text-slate-500 mb-1">{FORMA_LABELS[f]}</p>
-                    <p className="font-bold text-slate-800 text-sm">{formatCOP(total)}</p>
-                    <p className="text-xs text-slate-400">{count} recibo{count !== 1 ? 's' : ''}</p>
+                  <div key={f} className="bg-white border border-ink-200 rounded-xl p-4 text-center">
+                    <Icon className="w-5 h-5 mx-auto mb-1 text-ink-400" />
+                    <p className="text-xs text-ink-400 mb-1">{FORMA_LABELS[f]}</p>
+                    <p className="font-bold text-ink-700 text-sm">{formatCOP(total)}</p>
+                    <p className="text-xs text-ink-400">{count} recibo{count !== 1 ? 's' : ''}</p>
                   </div>
                 )
               })}
@@ -262,44 +262,44 @@ export default function CajaView() {
           </div>
 
           {/* Total general */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-5 flex items-center justify-between">
+          <div className="bg-primary-50 border border-primary-200 rounded-xl p-5 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-emerald-700">Total recaudado</p>
-              <p className="text-xs text-emerald-600 mt-0.5">{filtered.length} recibos en el período</p>
+              <p className="text-sm font-medium text-primary-700">Total recaudado</p>
+              <p className="text-xs text-primary-500 mt-0.5">{filtered.length} recibos en el período</p>
             </div>
-            <p className="text-2xl font-bold text-emerald-800">{formatCOP(totalFiltrado)}</p>
+            <p className="text-2xl font-bold text-primary-800">{formatCOP(totalFiltrado)}</p>
           </div>
 
           {/* Por día */}
           <div>
-            <h2 className="text-sm font-semibold text-slate-700 mb-3">Detalle por día</h2>
+            <h2 className="text-sm font-semibold text-ink-600 mb-3">Detalle por día</h2>
             <div className="space-y-3">
               {grouped.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
+                <div className="text-center py-10 text-ink-400 bg-white rounded-xl border border-dashed border-ink-200">
                   <BarChart3 className="w-8 h-8 mx-auto mb-2 opacity-30" />
                   <p className="text-sm">Sin movimientos en el período</p>
                 </div>
               ) : grouped.map(([date, items]) => {
                 const dayTotal = items.reduce((s, r) => s + r.valor, 0)
                 return (
-                  <div key={date} className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-b border-slate-100">
-                      <span className="text-sm font-semibold text-slate-700">{formatDate(date)}</span>
-                      <span className="text-sm font-bold text-slate-800">{formatCOP(dayTotal)}</span>
+                  <div key={date} className="bg-white border border-ink-200 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-cream-100 border-b border-cream-200">
+                      <span className="text-sm font-semibold text-ink-600">{formatDate(date)}</span>
+                      <span className="text-sm font-bold text-ink-700">{formatCOP(dayTotal)}</span>
                     </div>
-                    <div className="divide-y divide-slate-50">
+                    <div className="divide-y divide-cream-100">
                       {items.map(r => {
                         const Icon = FORMA_ICONS[r.forma_pago]
                         return (
                           <div key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                             <div className="flex items-center gap-2 min-w-0">
-                              <Icon className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" />
-                              <span className="text-slate-700 truncate">{r.concepto}</span>
+                              <Icon className="w-3.5 h-3.5 text-ink-400 flex-shrink-0" />
+                              <span className="text-ink-600 truncate">{r.concepto}</span>
                               {r.cliente && (
-                                <span className="text-slate-400 text-xs hidden md:inline">· {r.cliente.nombre}</span>
+                                <span className="text-ink-400 text-xs hidden md:inline">· {r.cliente.nombre}</span>
                               )}
                             </div>
-                            <span className="font-medium text-slate-800 flex-shrink-0 ml-4">{formatCOP(r.valor)}</span>
+                            <span className="font-medium text-ink-700 flex-shrink-0 ml-4">{formatCOP(r.valor)}</span>
                           </div>
                         )
                       })}

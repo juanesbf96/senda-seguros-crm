@@ -135,19 +135,19 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
 
         {/* Header con color */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-cream-200">
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: form.color }} />
-            <h2 className="font-semibold text-slate-800">{isNew ? 'Nuevo evento' : 'Editar evento'}</h2>
+            <h2 className="font-semibold text-ink-700">{isNew ? 'Nuevo evento' : 'Editar evento'}</h2>
           </div>
           <div className="flex items-center gap-2">
             {!isNew && (
               <button onClick={handleDelete} disabled={deleting}
-                className="text-slate-300 hover:text-red-500 transition-colors p-1">
+                className="text-ink-300 hover:text-error transition-colors p-1">
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
-            <button onClick={onClose} className="text-slate-300 hover:text-slate-600 transition-colors p-1">
+            <button onClick={onClose} className="text-ink-300 hover:text-ink-500 transition-colors p-1">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -160,18 +160,18 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
             value={form.titulo}
             onChange={e => set('titulo', e.target.value)}
             placeholder="Título del evento..."
-            className="w-full text-lg font-medium placeholder-slate-300 border-0 border-b border-slate-200 pb-2 focus:outline-none focus:border-emerald-400 transition-colors"
+            className="w-full text-lg font-medium placeholder-ink-300 border-0 border-b border-ink-200 pb-2 focus:outline-none focus:border-primary-400 transition-colors"
           />
 
           {/* Tipo */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Tag className="w-4 h-4 text-slate-400 flex-shrink-0" />
+            <Tag className="w-4 h-4 text-ink-400 flex-shrink-0" />
             {(Object.entries(TIPO_LABELS) as [TipoEvento, string][]).map(([k, v]) => (
               <button key={k} type="button" onClick={() => set('tipo', k)}
                 className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                   form.tipo === k
                     ? 'text-white border-transparent'
-                    : 'bg-white border-slate-200 text-slate-500 hover:border-slate-400'
+                    : 'bg-white border-ink-200 text-ink-400 hover:border-ink-400'
                 }`}
                 style={form.tipo === k ? { background: form.color } : {}}>
                 {v}
@@ -181,12 +181,12 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
 
           {/* Color */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 w-12">Color</span>
+            <span className="text-xs text-ink-400 w-12">Color</span>
             <div className="flex gap-1.5">
               {COLORES.map(c => (
                 <button key={c.val} type="button" onClick={() => set('color', c.val)}
                   title={c.label}
-                  className={`w-5 h-5 rounded-full transition-transform ${form.color === c.val ? 'scale-125 ring-2 ring-offset-1 ring-slate-400' : 'hover:scale-110'}`}
+                  className={`w-5 h-5 rounded-full transition-transform ${form.color === c.val ? 'scale-125 ring-2 ring-offset-1 ring-ink-400' : 'hover:scale-110'}`}
                   style={{ background: c.val }} />
               ))}
             </div>
@@ -196,17 +196,17 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
           <div className="flex items-center gap-2">
             <input type="checkbox" id="todo_el_dia" checked={form.todo_el_dia}
               onChange={e => set('todo_el_dia', e.target.checked)}
-              className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400" />
-            <label htmlFor="todo_el_dia" className="text-sm text-slate-600">Todo el día</label>
+              className="rounded border-ink-300 text-primary-500 focus:ring-primary-400" />
+            <label htmlFor="todo_el_dia" className="text-sm text-ink-500">Todo el día</label>
           </div>
 
           {/* Fechas */}
-          <div className="bg-slate-50 rounded-xl p-3 space-y-2">
+          <div className="bg-cream-100 rounded-xl p-3 space-y-2">
             <div className="flex items-center gap-3">
-              <Calendar className="w-4 h-4 text-slate-400 flex-shrink-0" />
+              <Calendar className="w-4 h-4 text-ink-400 flex-shrink-0" />
               <div className="flex-1 grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Inicio</label>
+                  <label className="text-xs text-ink-400 block mb-1">Inicio</label>
                   {form.todo_el_dia
                     ? <input type="date" value={toDateInput(form.fecha_inicio)}
                         onChange={e => set('fecha_inicio', e.target.value + 'T00:00')}
@@ -217,7 +217,7 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
                   }
                 </div>
                 <div>
-                  <label className="text-xs text-slate-400 block mb-1">Fin</label>
+                  <label className="text-xs text-ink-400 block mb-1">Fin</label>
                   {form.todo_el_dia
                     ? <input type="date" value={toDateInput(form.fecha_fin)}
                         onChange={e => set('fecha_fin', e.target.value + 'T23:59')}
@@ -238,16 +238,16 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
               onChange={e => set('descripcion', e.target.value)}
               placeholder="Descripción del evento..."
               rows={3}
-              className="w-full text-sm text-slate-700 placeholder-slate-300 border border-slate-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none"
+              className="w-full text-sm text-ink-600 placeholder-ink-300 border border-ink-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
             />
           </div>
 
           {/* Vincular a CRM */}
           <div className="space-y-3 pt-1">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Vincular al CRM</p>
+            <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider">Vincular al CRM</p>
 
             <div className="flex items-center gap-2">
-              <User className="w-4 h-4 text-slate-300 flex-shrink-0" />
+              <User className="w-4 h-4 text-ink-300 flex-shrink-0" />
               <select value={form.client_id} onChange={e => { set('client_id', e.target.value); set('poliza_id', '') }}
                 className={selectCls}>
                 <option value="">Sin cliente</option>
@@ -257,7 +257,7 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
 
             {polizas.length > 0 && (
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-slate-300 flex-shrink-0" />
+                <FileText className="w-4 h-4 text-ink-300 flex-shrink-0" />
                 <select value={form.poliza_id} onChange={e => set('poliza_id', e.target.value)}
                   className={selectCls}>
                   <option value="">Sin póliza</option>
@@ -269,7 +269,7 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
             )}
 
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-slate-300 flex-shrink-0" />
+              <TrendingUp className="w-4 h-4 text-ink-300 flex-shrink-0" />
               <select value={form.prospecto_id} onChange={e => set('prospecto_id', e.target.value)}
                 className={selectCls}>
                 <option value="">Sin prospecto</option>
@@ -285,16 +285,16 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
               onChange={e => set('notas', e.target.value)}
               placeholder="Notas adicionales, recordatorios, detalles..."
               rows={3}
-              className="w-full text-sm text-slate-600 placeholder-slate-300 border border-slate-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none"
+              className="w-full text-sm text-ink-500 placeholder-ink-300 border border-ink-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
             />
           </div>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
         <div className="flex gap-3 px-5 pb-5">
           <button onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
+            className="flex-1 px-4 py-2.5 rounded-xl border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">
             Cancelar
           </button>
           <button onClick={save} disabled={saving}
@@ -308,5 +308,5 @@ export default function AgendaEventoModal({ evento, fechaInicial, onClose, onSav
   )
 }
 
-const inputCls = "w-full px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-const selectCls = "flex-1 px-2 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white text-slate-600"
+const inputCls = "w-full px-2 py-1.5 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+const selectCls = "flex-1 px-2 py-1.5 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white text-ink-500"

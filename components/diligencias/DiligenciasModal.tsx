@@ -29,10 +29,10 @@ const ESTADO_LABELS: Record<EstadoDiligencia, string> = {
 }
 
 const ESTADO_COLORS: Record<EstadoDiligencia, string> = {
-  pendiente:   'bg-amber-500 border-amber-500 text-white',
-  en_proceso:  'bg-blue-600 border-blue-600 text-white',
-  completada:  'bg-emerald-600 border-emerald-600 text-white',
-  cancelada:   'bg-slate-500 border-slate-500 text-white',
+  pendiente:   'bg-warning border-warning text-white',
+  en_proceso:  'bg-info border-blue-600 text-white',
+  completada:  'bg-primary-500 border-primary-500 text-white',
+  cancelada:   'bg-ink-400 border-ink-400 text-white',
 }
 
 export default function DiligenciasModal({ diligencia, clienteId, onClose, onSaved }: Props) {
@@ -90,11 +90,11 @@ export default function DiligenciasModal({ diligencia, clienteId, onClose, onSav
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <h2 className="font-semibold text-ink-700">
             {diligencia ? `Diligencia #${diligencia.numero_diligencia}` : 'Nueva diligencia'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-5 space-y-4">
 
@@ -144,7 +144,7 @@ export default function DiligenciasModal({ diligencia, clienteId, onClose, onSav
               {(Object.entries(ESTADO_LABELS) as [EstadoDiligencia,string][]).map(([k,v]) => (
                 <button key={k} type="button" onClick={() => set('estado', k)}
                   className={`py-2 px-3 rounded-lg text-xs font-medium border transition-colors ${
-                    form.estado === k ? ESTADO_COLORS[k] : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400'
+                    form.estado === k ? ESTADO_COLORS[k] : 'bg-white border-ink-200 text-ink-500 hover:border-ink-400'
                   }`}>{v}</button>
               ))}
             </div>
@@ -155,11 +155,11 @@ export default function DiligenciasModal({ diligencia, clienteId, onClose, onSav
               placeholder="Observaciones..." rows={2} className={cls} />
           </Field>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
-        <div className="flex gap-3 p-5 border-t border-slate-200">
-          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">Cancelar</button>
-          <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100">Cancelar</button>
+          <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60">
             {saving ? 'Guardando...' : 'Guardar diligencia'}
           </button>
         </div>
@@ -169,6 +169,6 @@ export default function DiligenciasModal({ diligencia, clienteId, onClose, onSav
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>{children}</div>
 }
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

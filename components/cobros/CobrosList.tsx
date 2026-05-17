@@ -12,10 +12,10 @@ import CobrosModal from './CobrosModal'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoCobro, string> = {
-  pendiente: 'bg-amber-100 text-amber-700',
-  pagado:    'bg-emerald-100 text-emerald-700',
-  vencido:   'bg-red-100 text-red-700',
-  anulado:   'bg-slate-100 text-slate-500',
+  pendiente: 'bg-warning-soft text-ink-700',
+  pagado:    'bg-primary-100 text-primary-700',
+  vencido:   'bg-error-soft text-error',
+  anulado:   'bg-cream-200 text-ink-400',
 }
 const ESTADO_LABELS: Record<EstadoCobro, string> = {
   pendiente: 'Pendiente', pagado: 'Pagado', vencido: 'Vencido', anulado: 'Anulado',
@@ -94,7 +94,7 @@ export default function CobrosList() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -103,31 +103,31 @@ export default function CobrosList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Cobros</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-ink-700">Cobros</h1>
+          <p className="text-ink-400 text-sm mt-1">
             {filtered.filter(c => c.estado === 'pendiente').length} pendientes · {formatCOP(totalPendiente)}
           </p>
         </div>
         <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" /> Nuevo cobro
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200 overflow-x-auto">
+      <div className="flex gap-1 mb-5 border-b border-ink-200 overflow-x-auto">
         {TABS.map(({ key, label, icon: Icon, desc }) => {
           const cnt = counts[key]
           return (
             <button key={key} onClick={() => { setActiveTab(key); setFilterEstado('all') }}
               className={[
                 'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px whitespace-nowrap transition-colors',
-                activeTab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+                activeTab === key ? 'border-primary-500 text-primary-500' : 'border-transparent text-ink-400 hover:text-ink-600',
               ].join(' ')}>
               <Icon className="w-4 h-4" />
               {label}
               <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
-                activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                activeTab === key ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'
               }`}>
                 {cnt.total}
               </span>
@@ -138,33 +138,33 @@ export default function CobrosList() {
 
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="bg-white border border-amber-200 rounded-xl p-4">
-          <p className="text-xs text-amber-600 font-medium mb-1">Pendiente</p>
-          <p className="text-xl font-bold text-amber-700">{formatCOP(filtered.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0))}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{filtered.filter(c => c.estado === 'pendiente').length} cobros</p>
+        <div className="bg-white border border-warning/30 rounded-xl p-4">
+          <p className="text-xs text-ink-700 font-medium mb-1">Pendiente</p>
+          <p className="text-xl font-bold text-ink-700">{formatCOP(filtered.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0))}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => c.estado === 'pendiente').length} cobros</p>
         </div>
-        <div className="bg-white border border-red-200 rounded-xl p-4">
-          <p className="text-xs text-red-600 font-medium mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Vencidos</p>
-          <p className="text-xl font-bold text-red-700">{formatCOP(filtered.filter(c => c.estado === 'vencido').reduce((s, c) => s + c.valor, 0))}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{filtered.filter(c => c.estado === 'vencido').length} cobros</p>
+        <div className="bg-white border border-error/30 rounded-xl p-4">
+          <p className="text-xs text-error font-medium mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Vencidos</p>
+          <p className="text-xl font-bold text-error">{formatCOP(filtered.filter(c => c.estado === 'vencido').reduce((s, c) => s + c.valor, 0))}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => c.estado === 'vencido').length} cobros</p>
         </div>
-        <div className="bg-white border border-emerald-200 rounded-xl p-4">
-          <p className="text-xs text-emerald-600 font-medium mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Pagado</p>
-          <p className="text-xl font-bold text-emerald-700">{formatCOP(filtered.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.valor, 0))}</p>
-          <p className="text-xs text-slate-400 mt-0.5">{filtered.filter(c => c.estado === 'pagado').length} cobros</p>
+        <div className="bg-white border border-primary-200 rounded-xl p-4">
+          <p className="text-xs text-primary-500 font-medium mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Pagado</p>
+          <p className="text-xl font-bold text-primary-700">{formatCOP(filtered.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.valor, 0))}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => c.estado === 'pagado').length} cobros</p>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar por cliente, concepto, N° póliza..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+            className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
         </div>
         <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as EstadoCobro | 'all')}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400">
+          className="px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400">
           <option value="all">Todos los estados</option>
           {(Object.entries(ESTADO_LABELS) as [EstadoCobro, string][]).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
@@ -173,10 +173,10 @@ export default function CobrosList() {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-left text-xs text-slate-500">
+          <thead className="bg-cream-100 border-b border-ink-200">
+            <tr className="text-left text-xs text-ink-400">
               <th className="px-4 py-3 font-medium w-16">N°</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium">Concepto</th>
@@ -194,34 +194,34 @@ export default function CobrosList() {
               const days = c.fecha_vencimiento ? daysUntil(c.fecha_vencimiento) : null
               const overdue = days !== null && days < 0 && c.estado === 'pendiente'
               return (
-                <tr key={c.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${overdue ? 'bg-red-50/30' : ''}`}>
-                  <td className="px-4 py-3 text-slate-400 text-xs font-mono">
+                <tr key={c.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${overdue ? 'bg-error-soft/30' : ''}`}>
+                  <td className="px-4 py-3 text-ink-400 text-xs font-mono">
                     {c.numero_cobro ? `#${c.numero_cobro}` : '—'}
                   </td>
                   <td className="px-4 py-3">
                     {c.client_id
-                      ? <Link href={`/clientes/${c.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">{c.cliente?.nombre || '—'}</Link>
-                      : <span className="text-slate-400">—</span>}
+                      ? <Link href={`/clientes/${c.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{c.cliente?.nombre || '—'}</Link>
+                      : <span className="text-ink-400">—</span>}
                   </td>
-                  <td className="px-4 py-3 text-slate-700 max-w-[180px]">
+                  <td className="px-4 py-3 text-ink-600 max-w-[180px]">
                     <span className="line-clamp-1">{c.concepto}</span>
                   </td>
                   {isAseguradoraTab && (
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">
+                    <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">
                       {c.aseguradora || c.poliza?.aseguradora || '—'}
                     </td>
                   )}
                   {isComisionTab && (
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">
+                    <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">
                       {c.porcentaje_comision ? `${c.porcentaje_comision}%` : '—'}
                     </td>
                   )}
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs font-mono">
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs font-mono">
                     {c.numero_poliza || c.poliza?.numero_poliza || '—'}
                   </td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{formatCOP(c.valor)}</td>
+                  <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.valor)}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
-                    <span className={`text-xs ${overdue ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                    <span className={`text-xs ${overdue ? 'text-error font-medium' : 'text-ink-400'}`}>
                       {formatDate(c.fecha_vencimiento)}
                       {overdue && <span className="ml-1">(vencido)</span>}
                     </span>
@@ -234,11 +234,11 @@ export default function CobrosList() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => { setEditing(c); setShowModal(true) }}
-                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        className="text-ink-400 hover:text-ink-600 transition-colors">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => deleteCobro(c.id)}
-                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        className="text-ink-400 hover:text-error transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -249,7 +249,7 @@ export default function CobrosList() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-ink-400">
             <DollarSign className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p className="text-sm">No hay cobros en esta sección</p>
           </div>

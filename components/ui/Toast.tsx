@@ -21,10 +21,10 @@ export function useToast() { return useContext(ToastContext) }
 
 /* ── Config ─────────────────────────────────────────── */
 const CFG: Record<ToastType, { icon: React.ElementType; bg: string; border: string; iconCls: string; titleCls: string }> = {
-  success: { icon: CheckCircle,   bg: 'bg-white',     border: 'border-emerald-200', iconCls: 'text-emerald-500', titleCls: 'text-emerald-800' },
-  error:   { icon: AlertCircle,   bg: 'bg-white',     border: 'border-red-200',     iconCls: 'text-red-500',     titleCls: 'text-red-800'     },
-  warning: { icon: AlertTriangle, bg: 'bg-white',     border: 'border-amber-200',   iconCls: 'text-amber-500',   titleCls: 'text-amber-800'   },
-  info:    { icon: Info,          bg: 'bg-white',     border: 'border-blue-200',    iconCls: 'text-blue-500',    titleCls: 'text-blue-800'    },
+  success: { icon: CheckCircle,   bg: 'bg-white',     border: 'border-primary-200', iconCls: 'text-primary-500', titleCls: 'text-primary-800' },
+  error:   { icon: AlertCircle,   bg: 'bg-white',     border: 'border-error/30',     iconCls: 'text-error',     titleCls: 'text-error'     },
+  warning: { icon: AlertTriangle, bg: 'bg-white',     border: 'border-warning/30',   iconCls: 'text-warning',   titleCls: 'text-ink-700'   },
+  info:    { icon: Info,          bg: 'bg-white',     border: 'border-info/30',    iconCls: 'text-info',    titleCls: 'text-info'    },
 }
 
 /* ── Single Toast ───────────────────────────────────── */
@@ -49,10 +49,10 @@ function Toast({ item, onDismiss }: { item: ToastItem; onDismiss: (id: string) =
       <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconCls}`} />
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-semibold ${titleCls}`}>{item.title}</p>
-        {item.message && <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{item.message}</p>}
+        {item.message && <p className="text-xs text-ink-400 mt-0.5 line-clamp-2">{item.message}</p>}
       </div>
       <button onClick={() => { setVisible(false); setTimeout(() => onDismiss(item.id), 300) }}
-        className="text-slate-400 hover:text-slate-600 flex-shrink-0 ml-1">
+        className="text-ink-400 hover:text-ink-500 flex-shrink-0 ml-1">
         <X className="w-4 h-4" />
       </button>
     </div>

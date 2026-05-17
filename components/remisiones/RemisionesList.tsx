@@ -12,12 +12,12 @@ import RemisionModal from './RemisionModal'
 type Tab = 'activas' | 'anuladas'
 
 const ESTADO_CONFIG: Record<EstadoRemision, { label: string; cls: string; icon: React.ElementType }> = {
-  borrador:  { label: 'Borrador',  cls: 'bg-slate-100 text-slate-600',     icon: FileEdit     },
-  enviada:   { label: 'Enviada',   cls: 'bg-blue-100 text-blue-700',       icon: SendHorizonal },
-  recibida:  { label: 'Recibida',  cls: 'bg-amber-100 text-amber-700',     icon: FileClock    },
-  aprobada:  { label: 'Aprobada',  cls: 'bg-emerald-100 text-emerald-700', icon: FileCheck2   },
-  rechazada: { label: 'Rechazada', cls: 'bg-red-100 text-red-700',         icon: FileX2       },
-  anulada:   { label: 'Anulada',   cls: 'bg-slate-100 text-slate-400',     icon: Ban          },
+  borrador:  { label: 'Borrador',  cls: 'bg-cream-200 text-ink-500',     icon: FileEdit     },
+  enviada:   { label: 'Enviada',   cls: 'bg-info/20 text-info',       icon: SendHorizonal },
+  recibida:  { label: 'Recibida',  cls: 'bg-warning-soft text-ink-700',     icon: FileClock    },
+  aprobada:  { label: 'Aprobada',  cls: 'bg-primary-100 text-primary-700', icon: FileCheck2   },
+  rechazada: { label: 'Rechazada', cls: 'bg-error-soft text-error',         icon: FileX2       },
+  anulada:   { label: 'Anulada',   cls: 'bg-cream-200 text-ink-400',     icon: Ban          },
 }
 
 const ESTADOS_ACTIVOS: EstadoRemision[] = ['borrador', 'enviada', 'recibida', 'aprobada', 'rechazada']
@@ -77,7 +77,7 @@ export default function RemisionesList() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -86,19 +86,19 @@ export default function RemisionesList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Remisiones</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-ink-700">Remisiones</h1>
+          <p className="text-ink-400 text-sm mt-1">
             {activas.length} activas · {anuladas.length} anuladas
           </p>
         </div>
         <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" /> Nueva remisión
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200">
+      <div className="flex gap-1 mb-5 border-b border-ink-200">
         {([
           { key: 'activas',  label: 'Activas',  count: activas.length },
           { key: 'anuladas', label: 'Anuladas', count: anuladas.length },
@@ -106,10 +106,10 @@ export default function RemisionesList() {
           <button key={key} onClick={() => { setActiveTab(key); setFilterEstado('all') }}
             className={[
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-              activeTab === key ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+              activeTab === key ? 'border-primary-500 text-primary-500' : 'border-transparent text-ink-400 hover:text-ink-600',
             ].join(' ')}>
             {label}
-            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
               {count}
             </span>
           </button>
@@ -127,11 +127,11 @@ export default function RemisionesList() {
                 onClick={() => setFilterEstado(filterEstado === key ? 'all' : key)}
                 className={[
                   'rounded-xl p-3 text-center border transition-all',
-                  filterEstado === key ? `${cls} border-current` : 'bg-white border-slate-200 hover:border-slate-300',
+                  filterEstado === key ? `${cls} border-current` : 'bg-white border-ink-200 hover:border-ink-300',
                 ].join(' ')}>
-                <Icon className={`w-4 h-4 mx-auto mb-1 ${filterEstado === key ? '' : 'text-slate-400'}`} />
-                <p className={`text-lg font-bold ${filterEstado === key ? '' : 'text-slate-700'}`}>{cnt}</p>
-                <p className={`text-xs truncate ${filterEstado === key ? '' : 'text-slate-500'}`}>{label}</p>
+                <Icon className={`w-4 h-4 mx-auto mb-1 ${filterEstado === key ? '' : 'text-ink-400'}`} />
+                <p className={`text-lg font-bold ${filterEstado === key ? '' : 'text-ink-600'}`}>{cnt}</p>
+                <p className={`text-xs truncate ${filterEstado === key ? '' : 'text-ink-400'}`}>{label}</p>
               </button>
             )
           })}
@@ -140,17 +140,17 @@ export default function RemisionesList() {
 
       {/* Search */}
       <div className="relative mb-5">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
         <input value={search} onChange={e => setSearch(e.target.value)}
           placeholder="Buscar por N°, cliente, aseguradora, ramo..."
-          className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+          className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-left text-xs text-slate-500">
+          <thead className="bg-cream-100 border-b border-ink-200">
+            <tr className="text-left text-xs text-ink-400">
               <th className="px-4 py-3 font-medium w-16">N°</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium">Aseg. / Ramo</th>
@@ -164,23 +164,23 @@ export default function RemisionesList() {
             {filtered.map(r => {
               const { label, cls, icon: Icon } = ESTADO_CONFIG[r.estado]
               return (
-                <tr key={r.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 text-slate-400 text-xs font-mono">
+                <tr key={r.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
+                  <td className="px-4 py-3 text-ink-400 text-xs font-mono">
                     {r.numero_remision ? `#${r.numero_remision}` : '—'}
                   </td>
                   <td className="px-4 py-3">
                     {r.client_id
-                      ? <Link href={`/clientes/${r.client_id}`} className="font-medium text-slate-800 hover:text-emerald-600">{r.cliente?.nombre || '—'}</Link>
-                      : <span className="text-slate-400">—</span>}
+                      ? <Link href={`/clientes/${r.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{r.cliente?.nombre || '—'}</Link>
+                      : <span className="text-ink-400">—</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-medium text-slate-700">{r.aseguradora}</p>
-                    <p className="text-xs text-slate-400">{r.ramo}</p>
+                    <p className="font-medium text-ink-600">{r.aseguradora}</p>
+                    <p className="text-xs text-ink-400">{r.ramo}</p>
                   </td>
-                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs max-w-[200px]">
+                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs max-w-[200px]">
                     <span className="line-clamp-2">{r.descripcion || '—'}</span>
                   </td>
-                  <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs">{formatFecha(r.fecha)}</td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-ink-400 text-xs">{formatFecha(r.fecha)}</td>
                   <td className="px-4 py-3">
                     <span className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
                       <Icon className="w-3 h-3" />{label}
@@ -189,11 +189,11 @@ export default function RemisionesList() {
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
                       <button onClick={() => { setEditing(r); setShowModal(true) }}
-                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        className="text-ink-400 hover:text-ink-600 transition-colors">
                         <Pencil className="w-4 h-4" />
                       </button>
                       <button onClick={() => deleteRemision(r.id)}
-                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        className="text-ink-400 hover:text-error transition-colors">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
@@ -204,7 +204,7 @@ export default function RemisionesList() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-ink-400">
             <SendHorizonal className="w-8 h-8 mx-auto mb-2 opacity-30" />
             <p className="text-sm">No hay remisiones en esta sección</p>
           </div>
