@@ -165,7 +165,6 @@ export async function GET(req: NextRequest) {
   }
 
   // 5. Agrupar por workspace + filtrar por umbral (7, 15, 30 días)
-  //    Solo enviar si ya pasamos el umbral exacto (vence EN 7d, EN 15d, EN 30d)
   //    Para evitar duplicados: verificar tabla notificaciones_renovacion
   const umbrales = [7, 15, 30]
   const hoy = new Date().toISOString().split('T')[0]
