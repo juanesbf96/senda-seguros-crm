@@ -106,21 +106,31 @@ export default function WorkspaceMembersView() {
   }
 
   async function changeRole(memberId: string, newRole: 'admin' | 'supervisor' | 'agente') {
-    await supabase
-      .from('workspace_members')
-      .update({ role: newRole })
-      .eq('id', memberId)
+    if (!currentWorkspace) return
+    await supabase.rpc('change_member_role', {
+      p_workspace_id: currentWorkspace.id,
+      p_member_id:    memberId,
+      p_new_role:     newRole,
+    })
     loadData()
   }
 
   async function removeMember(memberId: string) {
+    if (!currentWorkspace) return
     if (!confirm('¿Remover este miembro del workspace?')) return
-    await supabase.from('workspace_members').delete().eq('id', memberId)
+    await supabase.rpc('remove_workspace_member', {
+      p_workspace_id: currentWorkspace.id,
+      p_member_id:    memberId,
+    })
     loadData()
   }
 
   async function cancelInvitation(invId: string) {
-    await supabase.from('workspace_invitations').delete().eq('id', invId)
+    if (!currentWorkspace) return
+    await supabase.rpc('cancel_workspace_invitation', {
+      p_workspace_id:  currentWorkspace.id,
+      p_invitation_id: invId,
+    })
     loadData()
   }
 
