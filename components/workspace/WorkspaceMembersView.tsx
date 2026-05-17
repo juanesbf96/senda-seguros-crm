@@ -56,27 +56,14 @@ export default function WorkspaceMembersView() {
     if (!currentWorkspace) return
     setLoading(true)
 
-    // Cargar miembros
-    const { data: membersData } = await supabase
-      .from('workspace_members')
-      .select('id, user_id, role, joined_at')
-      .eq('workspace_id', currentWorkspace.id)
-      .order('joined_at')
+    // Usar RPCs SECURITY DEFINER para leer miembros e invitaciones con email real
+    const [{ data: membersData }, { data: invData }] = await Promise.all([
+      supabase.rpc('get_workspace_members',    { p_workspace_id: currentWorkspace.id }),
+      supabase.rpc('get_workspace_invitations', { p_workspace_id: currentWorkspace.id }),
+    ])
 
-    // Cargar datos de usuarios (email/nombre desde auth.users no es accesible directamente)
-    // Usamos una función RPC si la tenemos, o mostramos user_id truncado
-    setMembers((membersData || []) as Member[])
-
-    // Cargar invitaciones pendientes
-    const { data: invData } = await supabase
-      .from('workspace_invitations')
-      .select('id, email, role, expires_at, created_at, token')
-      .eq('workspace_id', currentWorkspace.id)
-      .is('accepted_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .order('created_at', { ascending: false })
-
-    setInvitations((invData || []) as Invitation[])
+    setMembers(Array.isArray(membersData) ? membersData as Member[] : [])
+    setInvitations(Array.isArray(invData) ? invData as Invitation[] : [])
     setLoading(false)
   }
 
