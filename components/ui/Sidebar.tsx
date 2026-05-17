@@ -8,7 +8,7 @@ import {
   LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
   BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
-  Target, Bot, Settings, Building2, Check, ChevronsUpDown,
+  Target, Bot, Settings, Building2, Check, ChevronsUpDown, FlaskConical,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -26,6 +26,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Principal',
     items: [
       { href: '/',           label: 'Dashboard',  icon: LayoutDashboard },
+      { href: '/testeo123',   label: 'testeo123',  icon: FlaskConical },
       { href: '/asistente',  label: 'Asistente',  icon: Bot },
       { href: '/leads',      label: 'Pipeline',   icon: Kanban,  perm: 'pipeline_ver' },
       { href: '/clientes',   label: 'Clientes',   icon: Users,   perm: 'clientes_ver_todos' },
