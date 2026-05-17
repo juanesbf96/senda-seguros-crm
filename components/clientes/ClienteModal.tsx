@@ -1,10 +1,12 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
-import { X, ChevronDown } from 'lucide-react'
+import { X, ChevronDown, UserCircle2 } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
+
+interface Member { user_id: string; nombre: string; email: string; role: string }
 
 interface Props {
   cliente?: Cliente
@@ -29,11 +31,22 @@ const TIPO_LABELS: Record<TipoCliente, string> = {
 const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 
 export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, currentUserId, isSupervisor, isAdmin } = useWorkspace()
   const { can } = usePermissions()
-  const canEdit = can('clientes_editar_todos') || can('clientes_editar_propios')
+
+  // RBAC: puede editar si tiene permiso global, O si tiene permiso de propios Y es el dueño
+  const isOwner = !!cliente && cliente.assigned_to === currentUserId
+  const canEdit = !cliente /* crear siempre OK */
+    || can('clientes_editar_todos')
+    || (can('clientes_editar_propios') && isOwner)
   const saveDisabled = !!cliente && !canEdit
+
+  // Puede reasignar el cliente a otro usuario (admin/supervisor)
+  const canReassign = isAdmin || isSupervisor
+
   const [tipo, setTipo] = useState<TipoCliente>(cliente?.tipo_cliente || 'persona_natural')
+  const [assignedTo, setAssignedTo] = useState<string>(cliente?.assigned_to || '')
+  const [members, setMembers] = useState<Member[]>([])
   const [form, setForm] = useState({
     nombre:                   cliente?.nombre || '',
     email:                    cliente?.email || '',
@@ -62,6 +75,20 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Cargar miembros del workspace para el dropdown de asignación
+  useEffect(() => {
+    if (!currentWorkspace || !canReassign) return
+    supabase.rpc('get_assignable_members', { p_workspace_id: currentWorkspace.id })
+      .then(({ data }) => { if (data) setMembers(data as Member[]) })
+  }, [currentWorkspace?.id, canReassign])
+
+  // Al crear un nuevo cliente, pre-asignar al usuario actual
+  useEffect(() => {
+    if (!cliente && currentUserId && !assignedTo) {
+      setAssignedTo(currentUserId)
+    }
+  }, [currentUserId, cliente])
 
   function set(field: string, val: string | boolean) {
     setForm(f => ({ ...f, [field]: val }))
@@ -103,6 +130,7 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
       num_hijos:                form.tiene_hijos && form.num_hijos ? parseInt(form.num_hijos) : null,
       autoriza_datos:           form.autoriza_datos,
       workspace_id:             currentWorkspace?.id,
+      assigned_to:              assignedTo || currentUserId || null,
     }
 
     const { error: err } = cliente
@@ -302,6 +330,37 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
 
           {/* ── Sección: CRM ── */}
           <Section title="CRM">
+            {/* Asignación — solo visible para admin/supervisor, o al crear */}
+            {(canReassign || !cliente) && (
+              <Field label={<span className="flex items-center gap-1.5"><UserCircle2 className="w-3.5 h-3.5" />Asesor responsable</span>}>
+                {canReassign && members.length > 0 ? (
+                  <select
+                    value={assignedTo}
+                    onChange={e => setAssignedTo(e.target.value)}
+                    className={cls}
+                    disabled={!canReassign}
+                  >
+                    <option value="">Sin asignar</option>
+                    {members.map(m => (
+                      <option key={m.user_id} value={m.user_id}>
+                        {m.nombre} ({m.role})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-sm text-slate-500 py-2">
+                    {members.length === 0 ? 'Cargando miembros...' : 'Se asignará a ti automáticamente'}
+                  </p>
+                )}
+              </Field>
+            )}
+            {/* Para agentes: mostrar a quién está asignado (solo lectura) */}
+            {!canReassign && cliente?.assigned_to && (
+              <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                <UserCircle2 className="w-4 h-4 text-slate-400" />
+                {isOwner ? 'Este cliente está asignado a ti' : 'Este cliente pertenece a otro asesor'}
+              </div>
+            )}
             <Field label="Etapa">
               <select value={form.etapa} onChange={e => set('etapa', e.target.value as Etapa)} className={cls}>
                 <option value="nuevo">Nuevo</option>
@@ -352,7 +411,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>

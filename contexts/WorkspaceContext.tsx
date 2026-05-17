@@ -17,6 +17,7 @@ interface WorkspaceContextType {
   workspaces: Workspace[]
   currentWorkspace: Workspace | null
   currentRole: WorkspaceRole | null
+  currentUserId: string | null
   loading: boolean
   setCurrentWorkspace: (ws: Workspace) => void
   refreshWorkspaces: () => Promise<void>
@@ -28,6 +29,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
   workspaces: [],
   currentWorkspace: null,
   currentRole: null,
+  currentUserId: null,
   loading: true,
   setCurrentWorkspace: () => {},
   refreshWorkspaces: async () => {},
@@ -40,11 +42,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [rolesMap, setRolesMap] = useState<Record<string, WorkspaceRole>>({})
   const [currentWorkspace, setCurrentWs] = useState<Workspace | null>(null)
   const [currentRole, setCurrentRole] = useState<WorkspaceRole | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   const loadWorkspaces = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
+    setCurrentUserId(user.id)
 
     // Usamos RPC SECURITY DEFINER para evitar bloqueos de RLS en
     // workspace_members y workspaces al leer desde el cliente (anon key)
@@ -92,6 +96,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         setWorkspaces([])
         setCurrentWs(null)
         setCurrentRole(null)
+        setCurrentUserId(null)
       }
     })
     return () => subscription.unsubscribe()
@@ -113,6 +118,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       workspaces,
       currentWorkspace,
       currentRole,
+      currentUserId,
       loading,
       setCurrentWorkspace,
       refreshWorkspaces: loadWorkspaces,

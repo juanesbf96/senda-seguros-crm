@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
+
+interface Member { user_id: string; nombre: string; email: string; role: string }
 import {
   Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2,
   SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet, TrendingUp,
@@ -50,10 +52,11 @@ interface Filters {
   genero:      string
   vehiculo:    string   // 'all' | 'si' | 'no'
   autoriza:    string   // 'all' | 'si' | 'no'
+  assignedTo:  string   // '' = todos, uuid = filtrar por asesor
 }
 
 const defaultFilters: Filters = {
-  etapa: 'all', tipo: 'all', categoria: '', departamento: '', genero: '', vehiculo: 'all', autoriza: 'all',
+  etapa: 'all', tipo: 'all', categoria: '', departamento: '', genero: '', vehiculo: 'all', autoriza: 'all', assignedTo: '',
 }
 
 function countActiveFilters(f: Filters) {
@@ -65,6 +68,7 @@ function countActiveFilters(f: Filters) {
     !!f.genero,
     f.vehiculo !== 'all',
     f.autoriza !== 'all',
+    !!f.assignedTo,
   ].filter(Boolean).length
 }
 
@@ -102,8 +106,9 @@ function downloadCSV(content: string, filename: string) {
 }
 
 export default function ClientesList() {
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, currentUserId } = useWorkspace()
   const { can } = usePermissions()
+  const [members, setMembers] = useState<Member[]>([])
   const [clientes,      setClientes]      = useState<Cliente[]>([])
   const [loading,       setLoading]       = useState(true)
   const [search,        setSearch]        = useState('')
@@ -134,7 +139,15 @@ export default function ClientesList() {
     setContactCount(count || 0)
   }
 
-  useEffect(() => { load(); loadContactCount() }, [currentWorkspace?.id])
+  useEffect(() => {
+    load()
+    loadContactCount()
+    // Cargar miembros para filtro y visualización
+    if (currentWorkspace) {
+      supabase.rpc('get_assignable_members', { p_workspace_id: currentWorkspace.id })
+        .then(({ data }) => { if (data) setMembers(data as Member[]) })
+    }
+  }, [currentWorkspace?.id])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -179,8 +192,9 @@ export default function ClientesList() {
       (filters.vehiculo === 'si' ? c.tiene_vehiculo : !c.tiene_vehiculo)
     const matchAutoriza    = filters.autoriza === 'all'  ||
       (filters.autoriza === 'si' ? c.autoriza_datos : !c.autoriza_datos)
+    const matchAssigned    = !filters.assignedTo || c.assigned_to === filters.assignedTo
 
-    return matchSearch && matchEtapa && matchTipo && matchCategoria && matchDepto && matchGenero && matchVehiculo && matchAutoriza
+    return matchSearch && matchEtapa && matchTipo && matchCategoria && matchDepto && matchGenero && matchVehiculo && matchAutoriza && matchAssigned
   })
 
   const activeFilterCount = countActiveFilters(filters)
@@ -402,6 +416,16 @@ export default function ClientesList() {
                 <option value="si">Autoriza</option>
                 <option value="no">No autoriza</option>
               </FilterSelect>
+
+              {members.length > 1 && (
+                <FilterSelect label="Asesor asignado" value={filters.assignedTo} onChange={v => setF('assignedTo', v)}>
+                  <option value="">Todos los asesores</option>
+                  <option value={currentUserId || ''}>Mis clientes</option>
+                  {members.filter(m => m.user_id !== currentUserId).map(m => (
+                    <option key={m.user_id} value={m.user_id}>{m.nombre}</option>
+                  ))}
+                </FilterSelect>
+              )}
             </div>
           )}
 
@@ -425,6 +449,7 @@ export default function ClientesList() {
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">Ciudad</th>
                   <th className="px-4 py-3 font-medium">Etapa</th>
                   <th className="px-4 py-3 font-medium hidden xl:table-cell">Categoría</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Asesor</th>
                   <th className="px-4 py-3 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
@@ -481,6 +506,19 @@ export default function ClientesList() {
                       {c.categoria
                         ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">{c.categoria}</span>
                         : <span className="text-slate-300 text-xs">—</span>}
+                    </td>
+                    {/* Asesor asignado */}
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      {(() => {
+                        const m = members.find(m => m.user_id === c.assigned_to)
+                        if (!m) return <span className="text-slate-300 text-xs">—</span>
+                        const isMe = c.assigned_to === currentUserId
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isMe ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {isMe ? 'Yo' : m.nombre.split(' ')[0]}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">

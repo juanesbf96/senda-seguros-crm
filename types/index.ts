@@ -34,6 +34,7 @@ export interface Cliente {
   ingresos_aprox: number | null
   categoria: string | null
   autoriza_datos: boolean
+  assigned_to: string | null   // user_id del responsable del cliente
   created_at: string
   updated_at: string
 }
