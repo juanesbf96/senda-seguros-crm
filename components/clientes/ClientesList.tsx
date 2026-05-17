@@ -144,7 +144,7 @@ export default function ClientesList() {
     loadContactCount()
     // Cargar miembros para filtro y visualización
     if (currentWorkspace) {
-      supabase.rpc('get_assignable_members', { p_workspace_id: currentWorkspace.id })
+      supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
         .then(({ data }) => { if (data) setMembers(data as Member[]) })
     }
   }, [currentWorkspace?.id])

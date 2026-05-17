@@ -86,11 +86,12 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   }, [currentUserId])
 
   // Cargar miembros solo si el usuario puede reasignar
+  // Usamos get_workspace_members (RPC ya probado) en lugar de get_assignable_members
   useEffect(() => {
     if (!currentWorkspace || !canReassign) return
     setLoadingMembers(true)
     setMembersError(false)
-    supabase.rpc('get_assignable_members', { p_workspace_id: currentWorkspace.id })
+    supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
       .then(({ data, error }) => {
         if (error || !data) { setMembersError(true) }
         else { setMembers(data as Member[]) }
