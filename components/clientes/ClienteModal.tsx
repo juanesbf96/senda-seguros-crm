@@ -47,6 +47,8 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   const [tipo, setTipo] = useState<TipoCliente>(cliente?.tipo_cliente || 'persona_natural')
   const [assignedTo, setAssignedTo] = useState<string>(cliente?.assigned_to || '')
   const [members, setMembers] = useState<Member[]>([])
+  const [loadingMembers, setLoadingMembers] = useState(false)
+  const [membersError, setMembersError] = useState(false)
   const [form, setForm] = useState({
     nombre:                   cliente?.nombre || '',
     email:                    cliente?.email || '',
@@ -76,19 +78,25 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
-  // Cargar miembros del workspace para el dropdown de asignación
-  useEffect(() => {
-    if (!currentWorkspace || !canReassign) return
-    supabase.rpc('get_assignable_members', { p_workspace_id: currentWorkspace.id })
-      .then(({ data }) => { if (data) setMembers(data as Member[]) })
-  }, [currentWorkspace?.id, canReassign])
-
-  // Al crear un nuevo cliente, pre-asignar al usuario actual
+  // Pre-asignar al usuario actual cuando se crea un cliente nuevo
   useEffect(() => {
     if (!cliente && currentUserId && !assignedTo) {
       setAssignedTo(currentUserId)
     }
-  }, [currentUserId, cliente])
+  }, [currentUserId])
+
+  // Cargar miembros solo si el usuario puede reasignar
+  useEffect(() => {
+    if (!currentWorkspace || !canReassign) return
+    setLoadingMembers(true)
+    setMembersError(false)
+    supabase.rpc('get_assignable_members', { p_workspace_id: currentWorkspace.id })
+      .then(({ data, error }) => {
+        if (error || !data) { setMembersError(true) }
+        else { setMembers(data as Member[]) }
+        setLoadingMembers(false)
+      })
+  }, [currentWorkspace?.id, canReassign])
 
   function set(field: string, val: string | boolean) {
     setForm(f => ({ ...f, [field]: val }))
@@ -330,31 +338,31 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
 
           {/* ── Sección: CRM ── */}
           <Section title="CRM">
-            {/* Asignación — solo visible para admin/supervisor, o al crear */}
-            {(canReassign || !cliente) && (
+            {/* Asignación — solo admin/supervisor pueden ver y cambiar */}
+            {canReassign && (
               <Field label={<span className="flex items-center gap-1.5"><UserCircle2 className="w-3.5 h-3.5" />Asesor responsable</span>}>
-                {canReassign && members.length > 0 ? (
-                  <select
-                    value={assignedTo}
-                    onChange={e => setAssignedTo(e.target.value)}
-                    className={cls}
-                    disabled={!canReassign}
-                  >
+                {loadingMembers ? (
+                  <div className="flex items-center gap-2 text-sm text-slate-400 py-2">
+                    <span className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-emerald-500 animate-spin inline-block" />
+                    Cargando asesores...
+                  </div>
+                ) : membersError ? (
+                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    No se pudo cargar la lista de asesores. Aplica el SQL de migración en Supabase.
+                  </p>
+                ) : (
+                  <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className={cls}>
                     <option value="">Sin asignar</option>
                     {members.map(m => (
                       <option key={m.user_id} value={m.user_id}>
-                        {m.nombre} ({m.role})
+                        {m.nombre}{m.user_id === currentUserId ? ' (yo)' : ''}
                       </option>
                     ))}
                   </select>
-                ) : (
-                  <p className="text-sm text-slate-500 py-2">
-                    {members.length === 0 ? 'Cargando miembros...' : 'Se asignará a ti automáticamente'}
-                  </p>
                 )}
               </Field>
             )}
-            {/* Para agentes: mostrar a quién está asignado (solo lectura) */}
+            {/* Para agentes: solo lectura — quién tiene el cliente */}
             {!canReassign && cliente?.assigned_to && (
               <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
                 <UserCircle2 className="w-4 h-4 text-slate-400" />
