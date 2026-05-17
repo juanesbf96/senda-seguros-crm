@@ -65,12 +65,12 @@ AS $$
     c.nombre           AS cliente_nombre,
     w.id               AS workspace_id,
     w.name             AS workspace_name,
-    wm.email           AS admin_email,
-    COALESCE(wm.nombre, split_part(wm.email,'@',1)) AS admin_nombre
+    au.email           AS admin_email,
+    COALESCE(au.raw_user_meta_data->>'nombre', split_part(au.email,'@',1)) AS admin_nombre
   FROM polizas p
-  JOIN clientes c   ON c.id = p.client_id
-  JOIN workspaces w ON w.id = p.workspace_id
-  JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = w.owner_id
+  JOIN clientes c    ON c.id = p.client_id
+  JOIN workspaces w  ON w.id = p.workspace_id
+  JOIN auth.users au ON au.id = w.owner_id
   WHERE
     p.eliminada = false
     AND p.estado = 'activa'
