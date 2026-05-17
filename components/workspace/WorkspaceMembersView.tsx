@@ -98,21 +98,15 @@ export default function WorkspaceMembersView() {
     setInviting(true)
     setInviteError('')
 
-    const { data: { user } } = await supabase.auth.getUser()
+    // Usamos RPC SECURITY DEFINER para evitar bloqueos de RLS en el INSERT
+    const { data, error } = await supabase.rpc('create_workspace_invitation', {
+      p_workspace_id: currentWorkspace.id,
+      p_email:        inviteEmail.trim().toLowerCase(),
+      p_role:         inviteRole,
+    })
 
-    const { data, error } = await supabase
-      .from('workspace_invitations')
-      .insert({
-        workspace_id: currentWorkspace.id,
-        email: inviteEmail.trim().toLowerCase(),
-        role: inviteRole,
-        created_by: user?.id,
-      })
-      .select('token')
-      .single()
-
-    if (error) {
-      setInviteError(error.message)
+    if (error || data?.error) {
+      setInviteError(error?.message || data?.error || 'Error al generar la invitación')
     } else {
       const link = `${window.location.origin}/invitacion?token=${data.token}`
       setInviteSuccessLink(link)
