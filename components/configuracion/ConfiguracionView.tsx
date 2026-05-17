@@ -1,10 +1,12 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users } from 'lucide-react'
+import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users, ShieldCheck, Lock } from 'lucide-react'
 import { ConfigItem } from '@/types'
 import WorkspaceMembersView from '@/components/workspace/WorkspaceMembersView'
+import PermisosRolesView from '@/components/configuracion/PermisosRolesView'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 const AGENCY_KEYS = ['nombre_agencia', 'nit', 'telefono', 'email', 'ciudad', 'departamento', 'direccion']
 const AGENCY_LABELS: Record<string, string> = {
@@ -356,10 +358,12 @@ function ModulosEditor({ config, onToggle }: {
 }
 
 /* ── Main Component ─────────────────────────────────── */
-type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'workspace'
+type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'workspace' | 'permisos'
 
 export default function ConfiguracionView() {
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, isAdmin } = useWorkspace()
+  const { can } = usePermissions()
+  const canEditAgencia = can('configuracion_editar_agencia')
   const [config, setConfig]   = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving]   = useState(false)
@@ -406,13 +410,15 @@ export default function ConfiguracionView() {
     set(key, val ? '1' : '0')
   }
 
-  const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  const ALL_TABS: { key: TabKey; label: string; icon: React.ElementType; adminOnly?: boolean }[] = [
     { key: 'agencia',    label: 'Datos de la agencia',    icon: Building2 },
     { key: 'listas',     label: 'Listados del sistema',   icon: List },
     { key: 'categorias', label: 'Categorías de clientes', icon: Tag },
     { key: 'modulos',    label: 'Módulos',                icon: ToggleRight },
+    { key: 'permisos',   label: 'Permisos de roles',      icon: ShieldCheck, adminOnly: true },
     { key: 'workspace',  label: 'Workspace & Miembros',   icon: Users },
   ]
+  const TABS = ALL_TABS.filter(t => !t.adminOnly || isAdmin)
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -423,19 +429,21 @@ export default function ConfiguracionView() {
           </h1>
           <p className="text-slate-500 text-sm mt-1">Personaliza tu agencia, listados y categorías de clientes</p>
         </div>
-        <button onClick={saveAll} disabled={saving}
-          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-            saved
-              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-              : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-          }`}>
-          {saved
-            ? <><CheckCircle className="w-4 h-4" /> Guardado</>
-            : saving
-            ? <><Save className="w-4 h-4 animate-pulse" /> Guardando...</>
-            : <><Save className="w-4 h-4" /> Guardar cambios</>
-          }
-        </button>
+        {(tab !== 'agencia' || canEditAgencia) && (
+          <button onClick={saveAll} disabled={saving}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              saved
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+            }`}>
+            {saved
+              ? <><CheckCircle className="w-4 h-4" /> Guardado</>
+              : saving
+              ? <><Save className="w-4 h-4 animate-pulse" /> Guardando...</>
+              : <><Save className="w-4 h-4" /> Guardar cambios</>
+            }
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -452,6 +460,13 @@ export default function ConfiguracionView() {
 
       {/* ── Agencia tab ── */}
       {tab === 'agencia' && (
+        <div className="space-y-4">
+        {!canEditAgencia && (
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+            <Lock className="w-4 h-4 flex-shrink-0" />
+            Solo lectura. No tienes permiso para editar los datos de la agencia.
+          </div>
+        )}
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="flex items-center gap-3 mb-6">
             <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
@@ -469,9 +484,10 @@ export default function ConfiguracionView() {
                 <label className="block text-xs font-medium text-slate-600 mb-1.5">{AGENCY_LABELS[key]}</label>
                 <input
                   type={key === 'email' ? 'email' : 'text'}
-                  value={config[key] || ''} onChange={e => set(key, e.target.value)}
+                  value={config[key] || ''} onChange={e => canEditAgencia && set(key, e.target.value)}
                   placeholder={AGENCY_LABELS[key]}
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                  readOnly={!canEditAgencia}
+                  className={`w-full border border-slate-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 ${canEditAgencia ? 'bg-white' : 'bg-slate-50 text-slate-500 cursor-not-allowed'}`}
                 />
               </div>
             ))}
@@ -497,6 +513,7 @@ export default function ConfiguracionView() {
               </div>
             </div>
           )}
+        </div>
         </div>
       )}
 
@@ -574,6 +591,11 @@ export default function ConfiguracionView() {
             <strong>Tip:</strong> Las categorías creadas aquí estarán disponibles en el formulario de clientes y en los filtros avanzados de la lista de clientes. Recuerda guardar los cambios con el botón superior.
           </div>
         </div>
+      )}
+
+      {/* ── Permisos tab ── */}
+      {tab === 'permisos' && isAdmin && (
+        <PermisosRolesView />
       )}
 
       {/* ── Workspace tab ── */}

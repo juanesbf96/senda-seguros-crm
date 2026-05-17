@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import {
   Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2,
   SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet, TrendingUp,
@@ -102,6 +103,7 @@ function downloadCSV(content: string, filename: string) {
 
 export default function ClientesList() {
   const { currentWorkspace } = useWorkspace()
+  const { can } = usePermissions()
   const [clientes,      setClientes]      = useState<Cliente[]>([])
   const [loading,       setLoading]       = useState(true)
   const [search,        setSearch]        = useState('')
@@ -266,10 +268,12 @@ export default function ClientesList() {
                 className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 <Download className="w-4 h-4" /> Exportar CSV
               </button>
-              <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                <Plus className="w-4 h-4" /> Nuevo cliente
-              </button>
+              {can('clientes_crear') && (
+                <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                  <Plus className="w-4 h-4" /> Nuevo cliente
+                </button>
+              )}
             </>
           )}
         </div>
@@ -491,10 +495,12 @@ export default function ClientesList() {
                           <Pencil className="w-4 h-4" />
                         </button>
                         {/* Eliminar */}
-                        <button onClick={() => deleteCliente(c.id)}
-                          className="text-slate-400 hover:text-red-600 transition-colors p-0.5">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {can('clientes_eliminar') && (
+                          <button onClick={() => deleteCliente(c.id)}
+                            className="text-slate-400 hover:text-red-600 transition-colors p-0.5">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                         {/* Más opciones */}
                         <div className="relative" ref={openMenuId === c.id ? menuRef : null}>
                           <button
@@ -591,24 +597,26 @@ export default function ClientesList() {
               </button>
 
               {/* Eliminar con confirm inline */}
-              {confirmingBulkDelete ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-red-300">¿Eliminar {selected.size} clientes?</span>
-                  <button onClick={bulkDelete}
-                    className="text-xs bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors">
-                    Sí, eliminar
+              {can('clientes_eliminar') && (
+                confirmingBulkDelete ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-red-300">¿Eliminar {selected.size} clientes?</span>
+                    <button onClick={bulkDelete}
+                      className="text-xs bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors">
+                      Sí, eliminar
+                    </button>
+                    <button onClick={() => setConfirmingBulkDelete(false)}
+                      className="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-lg transition-colors">
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingBulkDelete(true)}
+                    className="flex items-center gap-1.5 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                    <Trash2 className="w-3.5 h-3.5" /> Eliminar
                   </button>
-                  <button onClick={() => setConfirmingBulkDelete(false)}
-                    className="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-lg transition-colors">
-                    Cancelar
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setConfirmingBulkDelete(true)}
-                  className="flex items-center gap-1.5 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
-                  <Trash2 className="w-3.5 h-3.5" /> Eliminar
-                </button>
+                )
               )}
 
               {/* Deselect all */}

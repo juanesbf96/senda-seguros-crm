@@ -2,9 +2,10 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa } from '@/types'
-import { Plus, Phone, Mail, MapPin } from 'lucide-react'
+import { Plus, Phone, Mail, MapPin, Lock } from 'lucide-react'
 import Link from 'next/link'
 import ClienteModal from '@/components/clientes/ClienteModal'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 const ETAPAS: { id: Etapa; label: string; color: string; header: string }[] = [
   { id: 'nuevo', label: 'Nuevo', color: 'border-t-blue-500', header: 'bg-blue-50' },
@@ -21,6 +22,7 @@ const ETAPA_DOT: Record<Etapa, string> = {
 }
 
 export default function Pipeline() {
+  const { can } = usePermissions()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -56,6 +58,14 @@ export default function Pipeline() {
     </div>
   )
 
+  if (!can('pipeline_ver')) return (
+    <div className="flex flex-col items-center justify-center h-full gap-3 text-slate-400">
+      <Lock className="w-10 h-10 opacity-40" />
+      <p className="text-sm font-medium">Sin acceso al Pipeline</p>
+      <p className="text-xs">No tienes permiso para ver esta sección.</p>
+    </div>
+  )
+
   return (
     <div className="p-6 h-full flex flex-col">
       <div className="flex items-center justify-between mb-6">
@@ -63,13 +73,15 @@ export default function Pipeline() {
           <h1 className="text-2xl font-bold text-slate-900">Pipeline de Leads</h1>
           <p className="text-slate-500 text-sm mt-1">{clientes.length} contacto{clientes.length !== 1 ? 's' : ''} en total</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Nuevo contacto
-        </button>
+        {can('pipeline_ver') && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Nuevo contacto
+          </button>
+        )}
       </div>
 
       <div className="flex gap-4 overflow-x-auto flex-1 pb-4">

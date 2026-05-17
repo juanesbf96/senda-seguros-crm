@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Meta, TipoMeta } from '@/types'
 import { Plus, Pencil, Trash2, Target, TrendingUp, RefreshCw, CheckCircle2 } from 'lucide-react'
 import MetasModal from './MetasModal'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 const TIPO_LABELS: Record<TipoMeta, string> = {
   prima_total:     'Prima total',
@@ -75,6 +76,7 @@ function ProgressRing({ pct, color, size = 80 }: { pct: number; color: string; s
 }
 
 export default function MetasView() {
+  const { can } = usePermissions()
   const [metas, setMetas]       = useState<Meta[]>([])
   const [loading, setLoading]   = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -134,10 +136,12 @@ export default function MetasView() {
             {completadas} completadas · {enProgreso} en progreso · {totalMetas} total
           </p>
         </div>
-        <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus className="w-4 h-4" /> Nueva meta
-        </button>
+        {can('metas_crear_editar') && (
+          <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" /> Nueva meta
+          </button>
+        )}
       </div>
 
       {/* Summary cards */}
@@ -167,10 +171,12 @@ export default function MetasView() {
           <Target className="w-10 h-10 mx-auto mb-3 text-slate-300" />
           <p className="text-slate-500 font-medium">No hay metas definidas</p>
           <p className="text-slate-400 text-sm mt-1">Crea tu primera meta para comenzar a trackear el progreso</p>
-          <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-            className="mt-4 inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4" /> Nueva meta
-          </button>
+          {can('metas_crear_editar') && (
+            <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+              className="mt-4 inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Nueva meta
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -204,14 +210,18 @@ export default function MetasView() {
                           <RefreshCw className={`w-3.5 h-3.5 ${recalcId === m.id ? 'animate-spin' : ''}`} />
                         </button>
                       )}
-                      <button onClick={() => { setEditing(m); setShowModal(true) }}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
-                        <Pencil className="w-3.5 h-3.5" />
-                      </button>
-                      <button onClick={() => deleteMeta(m.id)}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {can('metas_crear_editar') && (
+                        <button onClick={() => { setEditing(m); setShowModal(true) }}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {can('metas_crear_editar') && (
+                        <button onClick={() => deleteMeta(m.id)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors">
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
 

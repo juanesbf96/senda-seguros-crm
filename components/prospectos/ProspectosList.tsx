@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Prospecto, EtapaProspecto, FuenteProspecto } from '@/types'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import { formatCOP } from '@/lib/utils'
 import {
   Plus, Search, Pencil, Trash2, LayoutGrid, List,
@@ -55,6 +56,7 @@ type ViewMode = 'kanban' | 'list'
 
 export default function ProspectosList() {
   const { currentWorkspace } = useWorkspace()
+  const { can } = usePermissions()
   const [prospectos, setProspectos] = useState<Prospecto[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -141,10 +143,12 @@ export default function ProspectosList() {
               <List className="w-4 h-4" />
             </button>
           </div>
-          <button onClick={() => { setEditing(undefined); setEtapaInicial('nuevo'); setShowModal(true) }}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4" /> Nuevo prospecto
-          </button>
+          {can('pipeline_ver') && (
+            <button onClick={() => { setEditing(undefined); setEtapaInicial('nuevo'); setShowModal(true) }}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Nuevo prospecto
+            </button>
+          )}
         </div>
       </div>
 
@@ -187,10 +191,12 @@ export default function ProspectosList() {
                             className="text-slate-300 hover:text-slate-600 transition-colors">
                             <Pencil className="w-3.5 h-3.5" />
                           </button>
-                          <button onClick={() => deleteProspecto(p.id)}
-                            className="text-slate-300 hover:text-red-500 transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {(can('pipeline_eliminar_todos') || can('pipeline_eliminar_propios')) && (
+                            <button onClick={() => deleteProspecto(p.id)}
+                              className="text-slate-300 hover:text-red-500 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       </div>
                       {p.ramo_interes && (
@@ -213,23 +219,27 @@ export default function ProspectosList() {
                         </p>
                       )}
                       {/* Quick move buttons */}
-                      <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
-                        {ETAPAS.filter(e => e !== etapa).slice(0, 2).map(nextEtapa => (
-                          <button key={nextEtapa}
-                            onClick={() => moveToEtapa(p.id, nextEtapa)}
-                            className="flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
-                            <ChevronRight className="w-3 h-3" />
-                            {ETAPA_LABELS[nextEtapa].replace(' ✓', '')}
-                          </button>
-                        ))}
-                      </div>
+                      {can('pipeline_mover_todos') && (
+                        <div className="flex gap-1 mt-2 pt-2 border-t border-slate-100">
+                          {ETAPAS.filter(e => e !== etapa).slice(0, 2).map(nextEtapa => (
+                            <button key={nextEtapa}
+                              onClick={() => moveToEtapa(p.id, nextEtapa)}
+                              className="flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-slate-600 transition-colors">
+                              <ChevronRight className="w-3 h-3" />
+                              {ETAPA_LABELS[nextEtapa].replace(' ✓', '')}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ))}
                   {/* Add card in column */}
-                  <button onClick={() => { setEditing(undefined); setEtapaInicial(etapa); setShowModal(true) }}
-                    className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg border border-dashed border-slate-300 transition-colors flex items-center justify-center gap-1">
-                    <Plus className="w-3 h-3" /> Agregar
-                  </button>
+                  {can('pipeline_ver') && (
+                    <button onClick={() => { setEditing(undefined); setEtapaInicial(etapa); setShowModal(true) }}
+                      className="w-full py-2 text-xs text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg border border-dashed border-slate-300 transition-colors flex items-center justify-center gap-1">
+                      <Plus className="w-3 h-3" /> Agregar
+                    </button>
+                  )}
                 </div>
               </div>
             )
@@ -285,7 +295,8 @@ export default function ProspectosList() {
                     <td className="px-4 py-3">
                       <select value={p.etapa}
                         onChange={e => moveToEtapa(p.id, e.target.value as EtapaProspecto)}
-                        className="text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                        disabled={!can('pipeline_mover_todos')}
+                        className={`text-xs border border-slate-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-emerald-400 ${!can('pipeline_mover_todos') ? 'opacity-50 cursor-not-allowed' : ''}`}>
                         {ETAPAS.map(e => (
                           <option key={e} value={e}>{ETAPA_LABELS[e]}</option>
                         ))}
@@ -301,10 +312,12 @@ export default function ProspectosList() {
                           className="text-slate-400 hover:text-slate-700 transition-colors">
                           <Pencil className="w-4 h-4" />
                         </button>
-                        <button onClick={() => deleteProspecto(p.id)}
-                          className="text-slate-400 hover:text-red-600 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {(can('pipeline_eliminar_todos') || can('pipeline_eliminar_propios')) && (
+                          <button onClick={() => deleteProspecto(p.id)}
+                            className="text-slate-400 hover:text-red-600 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

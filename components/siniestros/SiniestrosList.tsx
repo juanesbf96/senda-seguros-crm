@@ -6,6 +6,7 @@ import { formatCOP, formatDate } from '@/lib/utils'
 import { Plus, Search, Pencil, Trash2, AlertTriangle, ShieldAlert } from 'lucide-react'
 import Link from 'next/link'
 import SiniestroModal from './SiniestroModal'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 const ESTADO_LABELS: Record<EstadoSiniestro, string> = {
   reportado:  'Reportado',
@@ -25,6 +26,7 @@ const ESTADO_COLORS: Record<EstadoSiniestro, string> = {
 type Tab = EstadoSiniestro | 'todos'
 
 export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
+  const { can } = usePermissions()
   const [siniestros, setSiniestros] = useState<Siniestro[]>([])
   const [loading,    setLoading]    = useState(true)
   const [search,     setSearch]     = useState('')
@@ -84,10 +86,12 @@ export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
           <h1 className="text-2xl font-bold text-slate-900">Siniestros</h1>
           <p className="text-slate-500 text-sm mt-1">{siniestros.length} registros</p>
         </div>
-        <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus className="w-4 h-4" /> Nuevo siniestro
-        </button>
+        {can('siniestros_crear') && (
+          <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" /> Nuevo siniestro
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
@@ -159,14 +163,18 @@ export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => { setEditing(s); setShowModal(true) }}
-                      className="text-slate-400 hover:text-slate-700 transition-colors">
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => deleteSiniestro(s.id)}
-                      className="text-slate-400 hover:text-red-600 transition-colors">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {can('siniestros_editar_todos') && (
+                      <button onClick={() => { setEditing(s); setShowModal(true) }}
+                        className="text-slate-400 hover:text-slate-700 transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    )}
+                    {can('siniestros_editar_todos') && (
+                      <button onClick={() => deleteSiniestro(s.id)}
+                        className="text-slate-400 hover:text-red-600 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

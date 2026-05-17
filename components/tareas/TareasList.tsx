@@ -6,6 +6,7 @@ import { Plus, Search, Pencil, Trash2, CheckSquare, Square, AlertCircle, ArrowUp
 import Link from 'next/link'
 import TareaModal from './TareaModal'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 const PRIORIDAD_ICON: Record<PrioridadTarea, React.ElementType> = {
   normal: Minus, alta: ArrowUp, urgente: AlertCircle,
@@ -27,6 +28,7 @@ function formatFecha(s: string | null) {
 
 export default function TareasList({ clienteId }: { clienteId?: string }) {
   const { currentWorkspace } = useWorkspace()
+  const { can } = usePermissions()
   const [tareas, setTareas] = useState<Tarea[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -182,10 +184,12 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
               )}
             </div>
 
-            <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-              <Plus className="w-4 h-4" /> Nueva tarea
-            </button>
+            {can('tareas_crear') && (
+              <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <Plus className="w-4 h-4" /> Nueva tarea
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -208,7 +212,7 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
             )}
           </button>
         ))}
-        {clienteId && (
+        {clienteId && can('tareas_crear') && (
           <button onClick={() => { setEditing(undefined); setShowModal(true) }}
             className="ml-auto flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium pb-2">
             <Plus className="w-3.5 h-3.5" /> Agregar tarea
@@ -238,7 +242,7 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
               isOverdue ? 'border-red-200 bg-red-50/30' :
               isToday ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200',
             ].join(' ')}>
-              <button onClick={() => toggleComplete(t)} className="mt-0.5 flex-shrink-0 text-slate-300 hover:text-emerald-600 transition-colors">
+              <button onClick={() => toggleComplete(t)} disabled={!can('tareas_editar_todas') && !can('tareas_completar_propias')} className="mt-0.5 flex-shrink-0 text-slate-300 hover:text-emerald-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 {t.completada
                   ? <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                   : <Square className="w-5 h-5" />}
@@ -268,7 +272,7 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
                       {t.cliente.nombre}
                     </Link>
                   )}
-                  {t.asignado_a && (
+                  {t.asignado_a && can('tareas_asignar') && (
                     <span className="text-xs text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
                       → {t.asignado_a}
                     </span>
@@ -280,10 +284,12 @@ export default function TareasList({ clienteId }: { clienteId?: string }) {
                   className="text-slate-400 hover:text-slate-700 transition-colors p-1">
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
-                <button onClick={() => deleteTarea(t.id)}
-                  className="text-slate-400 hover:text-red-600 transition-colors p-1">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                {can('tareas_editar_todas') && (
+                  <button onClick={() => deleteTarea(t.id)}
+                    className="text-slate-400 hover:text-red-600 transition-colors p-1">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             </div>
           )

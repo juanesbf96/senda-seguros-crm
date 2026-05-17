@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import { Cliente, Poliza, Etapa } from '@/types'
 import { formatCOP, daysUntil } from '@/lib/utils'
 import Link from 'next/link'
@@ -24,6 +25,7 @@ const ETAPA_COLORS: Record<Etapa, string> = {
 
 export default function Dashboard() {
   const { currentWorkspace, loading: wsLoading } = useWorkspace()
+  const { can } = usePermissions()
   const [clientes,   setClientes]   = useState<Cliente[]>([])
   const [polizas,    setPolizas]    = useState<Poliza[]>([])
   const [todasPolizas, setTodasPolizas] = useState<{ estado: string }[]>([])
@@ -152,46 +154,50 @@ export default function Dashboard() {
       </div>
 
       {/* ── Fila 0: KPIs financieros ──────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <FinCard
-          icon={<DollarSign className="w-5 h-5 text-emerald-600"/>}
-          label="Prima neta activa"
-          value={formatCOP(primaTotal)}
-          sub={`${polizas.length} pólizas activas`}
-          bg="bg-emerald-50" href="/polizas" color="text-emerald-800"
-        />
-        <FinCard
-          icon={<Percent className="w-5 h-5 text-blue-600"/>}
-          label="Comisión agencia"
-          value={formatCOP(comisionTotal)}
-          sub="Total pólizas activas"
-          bg="bg-blue-50" href="/polizas" color="text-blue-800"
-        />
-        <FinCard
-          icon={<Banknote className="w-5 h-5 text-amber-600"/>}
-          label="Por cobrar"
-          value={formatCOP(cobrosPendiente)}
-          sub={cobrosVencido > 0 ? `⚠ ${formatCOP(cobrosVencido)} vencido` : 'Al día'}
-          bg={cobrosVencido > 0 ? 'bg-amber-50' : 'bg-slate-50'}
-          href="/cobros" color="text-amber-800"
-          urgent={cobrosVencido > 0}
-        />
-        <FinCard
-          icon={<BarChart3 className="w-5 h-5 text-violet-600"/>}
-          label="Comisiones pendientes"
-          value={formatCOP(liqPendiente)}
-          sub="A liquidar vendedores"
-          bg="bg-violet-50" href="/liquidaciones" color="text-violet-800"
-        />
-      </div>
+      {can('dashboard_ver_global') && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <FinCard
+            icon={<DollarSign className="w-5 h-5 text-emerald-600"/>}
+            label="Prima neta activa"
+            value={formatCOP(primaTotal)}
+            sub={`${polizas.length} pólizas activas`}
+            bg="bg-emerald-50" href="/polizas" color="text-emerald-800"
+          />
+          <FinCard
+            icon={<Percent className="w-5 h-5 text-blue-600"/>}
+            label="Comisión agencia"
+            value={formatCOP(comisionTotal)}
+            sub="Total pólizas activas"
+            bg="bg-blue-50" href="/polizas" color="text-blue-800"
+          />
+          <FinCard
+            icon={<Banknote className="w-5 h-5 text-amber-600"/>}
+            label="Por cobrar"
+            value={formatCOP(cobrosPendiente)}
+            sub={cobrosVencido > 0 ? `⚠ ${formatCOP(cobrosVencido)} vencido` : 'Al día'}
+            bg={cobrosVencido > 0 ? 'bg-amber-50' : 'bg-slate-50'}
+            href="/cobros" color="text-amber-800"
+            urgent={cobrosVencido > 0}
+          />
+          <FinCard
+            icon={<BarChart3 className="w-5 h-5 text-violet-600"/>}
+            label="Comisiones pendientes"
+            value={formatCOP(liqPendiente)}
+            sub="A liquidar vendedores"
+            bg="bg-violet-50" href="/liquidaciones" color="text-violet-800"
+          />
+        </div>
+      )}
 
       {/* ── Fila 1: 4 métricas estado pólizas ─────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <MetricCard icon={<RefreshCw className="w-5 h-5 text-purple-600"/>} label="Cotizaciones" value={porEtapa('cotizacion')} bg="bg-purple-50" href="/leads" color="text-purple-700"/>
-        <MetricCard icon={<Send className="w-5 h-5 text-blue-600"/>} label="En expedición" value={polizasPendientes} bg="bg-blue-50" href="/polizas" color="text-blue-700"/>
-        <MetricCard icon={<AlertTriangle className="w-5 h-5 text-amber-600"/>} label="Por renovar (30d)" value={renovaciones30.length} bg="bg-amber-50" href="/renovaciones" color="text-amber-700" urgent={renovaciones30.length > 0}/>
-        <MetricCard icon={<ShieldAlert className="w-5 h-5 text-red-500"/>} label="Pólizas vencidas" value={polizasVencidas} bg="bg-red-50" href="/polizas" color="text-red-700"/>
-      </div>
+      {can('dashboard_ver_global') && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <MetricCard icon={<RefreshCw className="w-5 h-5 text-purple-600"/>} label="Cotizaciones" value={porEtapa('cotizacion')} bg="bg-purple-50" href="/leads" color="text-purple-700"/>
+          <MetricCard icon={<Send className="w-5 h-5 text-blue-600"/>} label="En expedición" value={polizasPendientes} bg="bg-blue-50" href="/polizas" color="text-blue-700"/>
+          <MetricCard icon={<AlertTriangle className="w-5 h-5 text-amber-600"/>} label="Por renovar (30d)" value={renovaciones30.length} bg="bg-amber-50" href="/renovaciones" color="text-amber-700" urgent={renovaciones30.length > 0}/>
+          <MetricCard icon={<ShieldAlert className="w-5 h-5 text-red-500"/>} label="Pólizas vencidas" value={polizasVencidas} bg="bg-red-50" href="/polizas" color="text-red-700"/>
+        </div>
+      )}
 
       {/* ── Fila 2: Solicitudes + Clientes + Producción ───────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -394,28 +400,30 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-blue-500"/> Tareas
-            </h2>
-            <Link href="/tareas" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver <ChevronRight className="w-3 h-3"/>
-            </Link>
+        {can('dashboard_ver_propias') && (
+          <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-blue-500"/> Tareas
+              </h2>
+              <Link href="/tareas" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
+                Ver <ChevronRight className="w-3 h-3"/>
+              </Link>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: 'Vencidas', value: tareasVencidas, cls: tareasVencidas>0?'bg-red-50 border border-red-200 text-red-700':'bg-slate-50 border border-slate-200 text-slate-400' },
+                { label: 'Hoy',      value: tareasHoy,      cls: tareasHoy>0    ?'bg-amber-50 border border-amber-200 text-amber-700':'bg-slate-50 border border-slate-200 text-slate-400' },
+                { label: 'Mañana',   value: tareasMañana,   cls: 'bg-slate-50 border border-slate-200 text-slate-600' },
+              ].map(t => (
+                <div key={t.label} className={`${t.cls} rounded-lg p-2 text-center`}>
+                  <p className="text-2xl font-bold">{t.value}</p>
+                  <p className="text-xs font-medium mt-0.5">{t.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { label: 'Vencidas', value: tareasVencidas, cls: tareasVencidas>0?'bg-red-50 border border-red-200 text-red-700':'bg-slate-50 border border-slate-200 text-slate-400' },
-              { label: 'Hoy',      value: tareasHoy,      cls: tareasHoy>0    ?'bg-amber-50 border border-amber-200 text-amber-700':'bg-slate-50 border border-slate-200 text-slate-400' },
-              { label: 'Mañana',   value: tareasMañana,   cls: 'bg-slate-50 border border-slate-200 text-slate-600' },
-            ].map(t => (
-              <div key={t.label} className={`${t.cls} rounded-lg p-2 text-center`}>
-                <p className="text-2xl font-bold">{t.value}</p>
-                <p className="text-xs font-medium mt-0.5">{t.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ── Fila 5: Últimos clientes ───────────────────────────────────── */}

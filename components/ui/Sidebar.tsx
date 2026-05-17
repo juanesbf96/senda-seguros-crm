@@ -12,11 +12,12 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions, type PermissionKey } from '@/contexts/PermissionsContext'
 
 const STORAGE_KEY       = 'senda-sidebar-collapsed'
 const GROUPS_STORAGE_KEY = 'senda-sidebar-groups'
 
-type NavItem = { href: string; label: string; icon: React.ElementType }
+type NavItem = { href: string; label: string; icon: React.ElementType; perm?: PermissionKey | PermissionKey[] }
 type NavGroup = { id: string; label: string; items: NavItem[] }
 
 const NAV_GROUPS: NavGroup[] = [
@@ -26,27 +27,27 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/',           label: 'Dashboard',  icon: LayoutDashboard },
       { href: '/asistente',  label: 'Asistente',  icon: Bot },
-      { href: '/leads',      label: 'Pipeline',   icon: Kanban },
-      { href: '/clientes',   label: 'Clientes',   icon: Users },
+      { href: '/leads',      label: 'Pipeline',   icon: Kanban,  perm: 'pipeline_ver' },
+      { href: '/clientes',   label: 'Clientes',   icon: Users,   perm: 'clientes_ver_todos' },
     ],
   },
   {
     id: 'polizas',
     label: 'Pólizas',
     items: [
-      { href: '/polizas',      label: 'Pólizas',      icon: FileText },
-      { href: '/solicitudes',  label: 'Solicitudes',  icon: ClipboardList },
+      { href: '/polizas',      label: 'Pólizas',      icon: FileText,      perm: 'polizas_ver' },
+      { href: '/solicitudes',  label: 'Solicitudes',  icon: ClipboardList, perm: 'solicitudes_ver' },
       { href: '/remisiones',   label: 'Remisiones',   icon: Send },
-      { href: '/renovaciones', label: 'Renovaciones', icon: Bell },
+      { href: '/renovaciones', label: 'Renovaciones', icon: Bell,          perm: 'polizas_ver' },
     ],
   },
   {
     id: 'finanzas',
     label: 'Finanzas',
     items: [
-      { href: '/cobros',        label: 'Cobros',        icon: DollarSign },
-      { href: '/caja',          label: 'Caja',          icon: Receipt },
-      { href: '/liquidaciones', label: 'Liquidaciones', icon: Calculator },
+      { href: '/cobros',        label: 'Cobros',        icon: DollarSign,  perm: 'finanzas_cobros_ver' },
+      { href: '/caja',          label: 'Caja',          icon: Receipt,     perm: ['finanzas_caja_ver_propias', 'finanzas_caja_ver_todas'] },
+      { href: '/liquidaciones', label: 'Liquidaciones', icon: Calculator,  perm: 'finanzas_liquidaciones_ver' },
     ],
   },
   {
@@ -54,8 +55,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Gestión',
     items: [
       { href: '/agenda',     label: 'Agenda',     icon: CalendarDays },
-      { href: '/tareas',     label: 'Tareas',     icon: CheckSquare },
-      { href: '/metas',      label: 'Metas',      icon: Target },
+      { href: '/tareas',     label: 'Tareas',     icon: CheckSquare, perm: 'tareas_ver_todas' },
+      { href: '/metas',      label: 'Metas',      icon: Target,      perm: 'metas_ver' },
       { href: '/vendedores', label: 'Vendedores', icon: UserCog },
     ],
   },
@@ -63,14 +64,14 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'crm',
     label: 'CRM',
     items: [
-      { href: '/prospectos', label: 'Prospectos', icon: TrendingUp },
+      { href: '/prospectos', label: 'Prospectos', icon: TrendingUp, perm: 'pipeline_ver' },
     ],
   },
   {
     id: 'operaciones',
     label: 'Operaciones',
     items: [
-      { href: '/siniestros',  label: 'Siniestros',  icon: ShieldAlert },
+      { href: '/siniestros',  label: 'Siniestros',  icon: ShieldAlert,    perm: 'siniestros_ver' },
       { href: '/facturas',    label: 'Facturas',    icon: FileSpreadsheet },
       { href: '/diligencias', label: 'Diligencias', icon: ClipboardCheck },
     ],
@@ -89,6 +90,19 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router   = useRouter()
   const { workspaces, currentWorkspace, currentRole, setCurrentWorkspace } = useWorkspace()
+  const { can } = usePermissions()
+
+  // Filter nav items by permission
+  function visibleGroups(): NavGroup[] {
+    return NAV_GROUPS.map(group => ({
+      ...group,
+      items: group.items.filter(item => {
+        if (!item.perm) return true
+        if (Array.isArray(item.perm)) return item.perm.some(p => can(p))
+        return can(item.perm)
+      }),
+    })).filter(group => group.items.length > 0)
+  }
   const [collapsed, setCollapsed]   = useState(false)
   const [mounted, setMounted]       = useState(false)
   const [wsMenuOpen, setWsMenuOpen] = useState(false)
@@ -221,7 +235,7 @@ export default function Sidebar() {
 
       {/* ── Navigation ──────────────────────────────────────── */}
       <nav className="flex-1 overflow-y-auto py-2" aria-label="Navegación principal">
-        {NAV_GROUPS.map(group => {
+        {visibleGroups().map(group => {
           const isOpen = openGroups[group.id] ?? true
           const hasActive = group.items.some(item =>
             item.href === '/' ? pathname === '/' : pathname.startsWith(item.href)

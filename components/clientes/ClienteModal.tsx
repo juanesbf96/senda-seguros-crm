@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
 import { X, ChevronDown } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 
 interface Props {
   cliente?: Cliente
@@ -29,6 +30,9 @@ const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 
 export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   const { currentWorkspace } = useWorkspace()
+  const { can } = usePermissions()
+  const canEdit = can('clientes_editar_todos') || can('clientes_editar_propios')
+  const saveDisabled = !!cliente && !canEdit
   const [tipo, setTipo] = useState<TipoCliente>(cliente?.tipo_cliente || 'persona_natural')
   const [form, setForm] = useState({
     nombre:                   cliente?.nombre || '',
@@ -324,8 +328,11 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
             className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
             Cancelar
           </button>
-          <button onClick={save} disabled={saving}
-            className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+          <button
+            onClick={save}
+            disabled={saving || saveDisabled}
+            title={saveDisabled ? 'Sin permiso para editar clientes' : undefined}
+            className={`flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors ${saveDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
