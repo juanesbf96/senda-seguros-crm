@@ -104,17 +104,23 @@ export default function TopBar({ hq = 'seg' }: { hq?: 'seg' | 'mkt' }) {
     ])
 
     const items: Notif[] = []
-    ;(renovs || []).forEach((r: { id: string; aseguradora: string; ramo: string; fecha_fin: string; cliente?: { nombre?: string } }) => {
+    // Helper para nombre de cliente desde relación supabase (puede venir como objeto o array)
+    const clienteNombre = (c: unknown): string => {
+      if (!c) return ''
+      if (Array.isArray(c)) return c[0]?.nombre || ''
+      return (c as { nombre?: string }).nombre || ''
+    }
+    ;(renovs || []).forEach((r: { id: string; aseguradora: string; ramo: string; fecha_fin: string; cliente?: unknown }) => {
       const dias = Math.ceil((new Date(r.fecha_fin).getTime() - hoy.getTime()) / 86400000)
       items.push({ id: r.id, tipo: 'renovacion', urgente: dias <= 7,
         titulo: `${r.aseguradora} ${r.ramo}`,
-        subtitulo: `Vence en ${dias} día${dias !== 1 ? 's' : ''} · ${r.cliente?.nombre || ''}`,
+        subtitulo: `Vence en ${dias} día${dias !== 1 ? 's' : ''} · ${clienteNombre(r.cliente)}`,
         href: '/renovaciones' })
     })
-    ;(cobrosV || []).forEach((c: { id: string; concepto: string; valor: number; cliente?: { nombre?: string } }) => {
+    ;(cobrosV || []).forEach((c: { id: string; concepto: string; valor: number; cliente?: unknown }) => {
       const fmt = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(c.valor)
       items.push({ id: c.id, tipo: 'cobro', urgente: true,
-        titulo: c.concepto, subtitulo: `${c.cliente?.nombre || ''} · ${fmt}`, href: '/cobros' })
+        titulo: c.concepto, subtitulo: `${clienteNombre(c.cliente)} · ${fmt}`, href: '/cobros' })
     })
     ;(tareasU || []).forEach((t: { id: string; titulo: string; fecha_vencimiento?: string }) => {
       items.push({ id: t.id, tipo: 'tarea', urgente: true,

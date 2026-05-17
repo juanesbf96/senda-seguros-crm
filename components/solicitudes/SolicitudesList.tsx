@@ -118,7 +118,7 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
         <div>
           <h1 className="text-2xl font-bold text-ink-700">Solicitudes</h1>
           <p className="text-ink-400 text-sm mt-1">
-            {cotizaciones.length} cotizaciones · {expediciones.length} expediciones · {inactivas.length} inactivas
+            {activas.length} activas · {inactivas.length} inactivas
           </p>
         </div>
         <button

@@ -398,7 +398,7 @@ ${renovsStr}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                {m.role === 'bot' && (
+                {m.role === 'assistant' && (
                   <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
                     <Bot className="w-4 h-4 text-primary-500" />
                   </div>

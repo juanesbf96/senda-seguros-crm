@@ -68,8 +68,8 @@ export function TrendChart({
             padding: '8px 12px',
           }}
           labelStyle={{ color: '#1F1F26', fontWeight: 600, marginBottom: 4 }}
-          formatter={(value: number, name: string) => [
-            formatValue ? formatValue(value) : value,
+          formatter={(value, name) => [
+            formatValue ? formatValue(Number(value)) : value,
             name,
           ]}
         />

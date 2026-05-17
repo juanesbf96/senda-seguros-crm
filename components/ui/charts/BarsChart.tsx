@@ -61,8 +61,8 @@ export function BarsChart({
             padding: '8px 12px',
           }}
           labelStyle={{ color: '#1F1F26', fontWeight: 600, marginBottom: 4 }}
-          formatter={(value: number) => [
-            formatValue ? formatValue(value) : value,
+          formatter={(value) => [
+            formatValue ? formatValue(Number(value)) : value,
             valueLabel,
           ]}
         />
