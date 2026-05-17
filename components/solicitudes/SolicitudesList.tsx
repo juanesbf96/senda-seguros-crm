@@ -1,8 +1,13 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Solicitud, EstadoSolicitud } from '@/types'
-import { Plus, Search, Pencil, Trash2, ClipboardList, FileCheck, Archive } from 'lucide-react'
+import { Solicitud, EstadoSolicitud, TipoSolicitud } from '@/types'
+import {
+  Plus, Search, Pencil, Trash2,
+  ClipboardList, FileCheck, Archive, RefreshCw,
+  FilePen, XCircle, FileText, UserPlus, UserMinus,
+  AlertTriangle, LayoutGrid,
+} from 'lucide-react'
 import Link from 'next/link'
 import SolicitudModal from './SolicitudModal'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -19,19 +24,28 @@ const ESTADO_LABELS: Record<EstadoSolicitud, string> = {
   cancelada: 'Cancelada', inactiva: 'Inactiva',
 }
 
-type Tab = 'cotizaciones' | 'expediciones' | 'inactivas'
+type Tab = 'todas' | TipoSolicitud | 'inactivas'
 
-function formatDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+const TIPO_LABELS: Record<TipoSolicitud, string> = {
+  cotizacion:  'Cotizaciones',
+  expedicion:  'Expediciones',
+  renovacion:  'Renovaciones',
+  endoso:      'Endosos',
+  cancelacion: 'Cancelaciones',
+  certificado: 'Certificados',
+  siniestro:   'Siniestros',
+  inclusion:   'Inclusiones',
+  exclusion:   'Exclusiones',
+  otro:        'Otros',
 }
+
 
 export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   const { currentWorkspace } = useWorkspace()
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
-  const [activeTab, setActiveTab]     = useState<Tab>('cotizaciones')
+  const [activeTab, setActiveTab]     = useState<Tab>('todas')
   const [showModal, setShowModal]     = useState(false)
   const [editing, setEditing]         = useState<Solicitud | undefined>()
 
@@ -57,14 +71,17 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   }
 
   // Tab filtering
-  const cotizaciones  = solicitudes.filter(s => s.tipo === 'cotizacion'  && s.estado !== 'inactiva')
-  const expediciones  = solicitudes.filter(s => s.tipo === 'expedicion'  && s.estado !== 'inactiva')
-  const inactivas     = solicitudes.filter(s => s.estado === 'inactiva')
+  const activas   = solicitudes.filter(s => s.estado !== 'inactiva')
+  const inactivas = solicitudes.filter(s => s.estado === 'inactiva')
 
-  const tabData: Record<Tab, Solicitud[]> = { cotizaciones, expediciones, inactivas }
+  function getTabData(tab: Tab): Solicitud[] {
+    if (tab === 'todas')    return activas
+    if (tab === 'inactivas') return inactivas
+    return activas.filter(s => s.tipo === tab)
+  }
 
   const q = search.toLowerCase()
-  const filtered = tabData[activeTab].filter(s =>
+  const filtered = getTabData(activeTab).filter(s =>
     !search ||
     s.cliente?.nombre?.toLowerCase().includes(q) ||
     s.descripcion?.toLowerCase().includes(q) ||
@@ -74,9 +91,18 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   )
 
   const TABS: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: 'cotizaciones', label: 'Cotizaciones', icon: ClipboardList, count: cotizaciones.length },
-    { key: 'expediciones', label: 'Expediciones', icon: FileCheck,     count: expediciones.length },
-    { key: 'inactivas',    label: 'Inactivas',    icon: Archive,       count: inactivas.length    },
+    { key: 'todas',        label: 'Todas',         icon: LayoutGrid,   count: activas.length },
+    { key: 'cotizacion',   label: 'Cotizaciones',  icon: ClipboardList, count: activas.filter(s => s.tipo === 'cotizacion').length },
+    { key: 'expedicion',   label: 'Expediciones',  icon: FileCheck,     count: activas.filter(s => s.tipo === 'expedicion').length },
+    { key: 'renovacion',   label: 'Renovaciones',  icon: RefreshCw,     count: activas.filter(s => s.tipo === 'renovacion').length },
+    { key: 'endoso',       label: 'Endosos',       icon: FilePen,       count: activas.filter(s => s.tipo === 'endoso').length },
+    { key: 'cancelacion',  label: 'Cancelaciones', icon: XCircle,       count: activas.filter(s => s.tipo === 'cancelacion').length },
+    { key: 'certificado',  label: 'Certificados',  icon: FileText,      count: activas.filter(s => s.tipo === 'certificado').length },
+    { key: 'siniestro',    label: 'Siniestros',    icon: AlertTriangle, count: activas.filter(s => s.tipo === 'siniestro').length },
+    { key: 'inclusion',    label: 'Inclusiones',   icon: UserPlus,      count: activas.filter(s => s.tipo === 'inclusion').length },
+    { key: 'exclusion',    label: 'Exclusiones',   icon: UserMinus,     count: activas.filter(s => s.tipo === 'exclusion').length },
+    { key: 'otro',         label: 'Otros',         icon: ClipboardList, count: activas.filter(s => s.tipo === 'otro').length },
+    { key: 'inactivas',    label: 'Inactivas',     icon: Archive,       count: inactivas.length },
   ]
 
   if (loading) return (
@@ -92,7 +118,7 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Solicitudes</h1>
           <p className="text-slate-500 text-sm mt-1">
-            {cotizaciones.length} cotizaciones · {expediciones.length} expediciones · {inactivas.length} inactivas
+            {activas.length} activas · {inactivas.length} inactivas · {solicitudes.length} total
           </p>
         </div>
         <button
@@ -104,23 +130,27 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
         </button>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200">
-        {TABS.map(({ key, label, icon: Icon, count }) => (
-          <button key={key} onClick={() => setActiveTab(key)}
-            className={[
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-              activeTab === key
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700',
-            ].join(' ')}>
-            <Icon className="w-4 h-4" />
-            {label}
-            <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-              {count}
-            </span>
-          </button>
-        ))}
+      {/* Tabs — scrollable horizontally on small screens */}
+      <div className="mb-5 border-b border-slate-200 overflow-x-auto">
+        <div className="flex gap-0.5 min-w-max">
+          {TABS.map(({ key, label, icon: Icon, count }) => (
+            <button key={key} onClick={() => setActiveTab(key)}
+              className={[
+                'flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors whitespace-nowrap',
+                activeTab === key
+                  ? 'border-emerald-600 text-emerald-600'
+                  : 'border-transparent text-slate-500 hover:text-slate-700',
+              ].join(' ')}>
+              <Icon className="w-3.5 h-3.5" />
+              {label}
+              {count > 0 && (
+                <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Search */}
@@ -141,13 +171,11 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
               <th className="px-4 py-3 font-medium w-20">N°</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium">Estado</th>
-              {activeTab === 'inactivas' && (
-                <>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Tipo</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
-                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Riesgo</th>
-                </>
+              {(activeTab === 'todas' || activeTab === 'inactivas') && (
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Tipo</th>
               )}
+              <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
+              <th className="px-4 py-3 font-medium hidden lg:table-cell">Riesgo</th>
               <th className="px-4 py-3 font-medium hidden md:table-cell">Observaciones</th>
               <th className="px-4 py-3 font-medium hidden lg:table-cell">Asignado a</th>
               <th className="px-4 py-3 font-medium text-right">Acciones</th>
@@ -169,15 +197,17 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
                     {ESTADO_LABELS[s.estado]}
                   </span>
                 </td>
-                {activeTab === 'inactivas' && (
-                  <>
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs capitalize">{s.tipo}</td>
-                    <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{s.ramo || '—'}</td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs max-w-[150px]">
-                      <span className="line-clamp-2">{s.riesgo || '—'}</span>
-                    </td>
-                  </>
+                {(activeTab === 'todas' || activeTab === 'inactivas') && (
+                  <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">
+                    <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 font-medium capitalize">
+                      {TIPO_LABELS[s.tipo] ?? s.tipo}
+                    </span>
+                  </td>
                 )}
+                <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs">{s.ramo || '—'}</td>
+                <td className="px-4 py-3 hidden lg:table-cell text-slate-500 text-xs max-w-[150px]">
+                  <span className="line-clamp-2">{s.riesgo || '—'}</span>
+                </td>
                 <td className="px-4 py-3 hidden md:table-cell text-slate-500 text-xs max-w-[200px]">
                   <span className="line-clamp-2">{s.descripcion || s.notas || '—'}</span>
                 </td>

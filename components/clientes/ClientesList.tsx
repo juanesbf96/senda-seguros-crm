@@ -200,6 +200,14 @@ export default function ClientesList() {
 
   const activeFilterCount = countActiveFilters(filters)
 
+  /* ── Pagination ── */
+  const PAGE_SIZE = 50
+  const [page, setPage] = useState(1)
+  // Reset page when filters/search change
+  useEffect(() => { setPage(1) }, [search, filters])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   /* ── Selection helpers ── */
   function toggleSelect(id: string) {
     setSelected(prev => {
@@ -266,7 +274,7 @@ export default function ClientesList() {
           <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
           <p className="text-slate-500 text-sm mt-1">
             {activeTab === 'clientes'
-              ? `${filtered.length} de ${clientes.length} registros`
+              ? `${filtered.length} de ${clientes.length} registros${totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ''}`
               : activeTab === 'contactos'
               ? `${contactCount} contactos vinculados`
               : 'Pipeline comercial y oportunidades'}
@@ -455,7 +463,7 @@ export default function ClientesList() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(c => (
+                {paginated.map(c => (
                   <tr key={c.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selected.has(c.id) ? 'bg-emerald-50' : ''}`}>
                     <td className="px-4 py-3">
                       <input
@@ -608,6 +616,36 @@ export default function ClientesList() {
               </div>
             )}
           </div>
+
+          {/* ── Pagination ── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+              <p>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} clientes</p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(1)} disabled={page === 1}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">«</button>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">‹</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 2)
+                  .reduce<(number | '...')[]>((acc, n, i, arr) => {
+                    if (i > 0 && (n as number) - (arr[i - 1] as number) > 1) acc.push('...')
+                    acc.push(n)
+                    return acc
+                  }, [])
+                  .map((n, i) => n === '...'
+                    ? <span key={`dots-${i}`} className="px-2">…</span>
+                    : <button key={n} onClick={() => setPage(n as number)}
+                        className={`px-3 py-1 rounded font-medium transition-colors ${page === n ? 'bg-emerald-600 text-white' : 'hover:bg-slate-100'}`}>{n}</button>
+                  )
+                }
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">›</button>
+                <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">»</button>
+              </div>
+            </div>
+          )}
 
           {/* ── Floating bulk action bar ── */}
           {selected.size > 0 && (

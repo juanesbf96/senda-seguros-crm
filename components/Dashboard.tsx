@@ -24,8 +24,9 @@ const ETAPA_COLORS: Record<Etapa, string> = {
 }
 
 export default function Dashboard() {
-  const { currentWorkspace, loading: wsLoading } = useWorkspace()
+  const { currentWorkspace, currentUserId, isAdmin, isSupervisor, loading: wsLoading } = useWorkspace()
   const { can } = usePermissions()
+  const isGlobal = isAdmin || isSupervisor  // Can see all-workspace metrics
   const [clientes,   setClientes]   = useState<Cliente[]>([])
   const [polizas,    setPolizas]    = useState<Poliza[]>([])
   const [todasPolizas, setTodasPolizas] = useState<{ estado: string }[]>([])
@@ -49,9 +50,32 @@ export default function Dashboard() {
     setLoading(true)
     async function load() {
       const wsId     = currentWorkspace!.id
+      const uid      = currentUserId
       const today    = new Date().toISOString().split('T')[0]
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
       const in7days  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+
+      // Base queries — global vs per-agent
+      let qClientes = supabase.from('clientes').select('*').eq('workspace_id', wsId).order('created_at', { ascending: false })
+      let qPolizas  = supabase.from('polizas').select('*, cliente:clientes(nombre)').eq('workspace_id', wsId).eq('estado', 'activa').eq('eliminada', false)
+      let qAllP     = supabase.from('polizas').select('estado').eq('workspace_id', wsId).eq('eliminada', false)
+      let qSin      = supabase.from('siniestros').select('id').eq('workspace_id', wsId).not('estado', 'in', '("cerrado","rechazado")')
+      let qTV       = supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).lt('fecha_vencimiento', today)
+      let qTH       = supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', today)
+      let qTM       = supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', tomorrow)
+      let qCobros   = supabase.from('cobros').select('valor, estado, tipo').eq('workspace_id', wsId).neq('estado', 'anulado')
+      let qLiqs     = supabase.from('liquidaciones').select('total_comision, estado').eq('workspace_id', wsId).eq('estado', 'pendiente')
+      let qSols     = supabase.from('solicitudes').select('id, estado, prioridad, fecha_limite').eq('workspace_id', wsId)
+
+      if (!isGlobal && uid) {
+        qClientes = qClientes.eq('assigned_to', uid)
+        qPolizas  = qPolizas.eq('vendedor_id', uid)
+        qAllP     = qAllP.eq('vendedor_id', uid)
+        qTV       = qTV.eq('asignado_a', uid)
+        qTH       = qTH.eq('asignado_a', uid)
+        qTM       = qTM.eq('asignado_a', uid)
+        qSols     = qSols.eq('asignado_a', uid)
+      }
 
       const [
         { data: c },
@@ -65,20 +89,14 @@ export default function Dashboard() {
         { data: liqs },
         { data: sols },
       ] = await Promise.all([
-        supabase.from('clientes').select('*').eq('workspace_id', wsId).order('created_at', { ascending: false }),
-        supabase.from('polizas')
-          .select('*, cliente:clientes(nombre)')
-          .eq('workspace_id', wsId)
-          .eq('estado', 'activa')
-          .eq('eliminada', false),
-        supabase.from('polizas').select('estado').eq('workspace_id', wsId).eq('eliminada', false),
-        supabase.from('siniestros').select('id').eq('workspace_id', wsId).not('estado', 'in', '("cerrado","rechazado")'),
-        supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).lt('fecha_vencimiento', today),
-        supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', today),
-        supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', tomorrow),
-        supabase.from('cobros').select('valor, estado, tipo').eq('workspace_id', wsId).neq('estado', 'anulado'),
-        supabase.from('liquidaciones').select('total_comision, estado').eq('workspace_id', wsId).eq('estado', 'pendiente'),
-        supabase.from('solicitudes').select('id, estado, prioridad, fecha_limite').eq('workspace_id', wsId),
+        qClientes,
+        qPolizas,
+        qAllP,
+        qSin,
+        qTV, qTH, qTM,
+        qCobros,
+        qLiqs,
+        qSols,
       ])
 
       setClientes(c || [])
@@ -150,11 +168,16 @@ export default function Dashboard() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500 text-sm mt-1">Resumen de Senda Seguros</p>
+        <p className="text-slate-500 text-sm mt-1">
+          {isGlobal ? 'Resumen de Senda Seguros' : 'Tus métricas personales'}
+          {!isGlobal && (
+            <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">Vista de agente</span>
+          )}
+        </p>
       </div>
 
       {/* ── Fila 0: KPIs financieros ──────────────────────────────────── */}
-      {can('dashboard_ver_global') && (
+      {isGlobal && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <FinCard
             icon={<DollarSign className="w-5 h-5 text-emerald-600"/>}
@@ -190,7 +213,7 @@ export default function Dashboard() {
       )}
 
       {/* ── Fila 1: 4 métricas estado pólizas ─────────────────────────── */}
-      {can('dashboard_ver_global') && (
+      {isGlobal && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard icon={<RefreshCw className="w-5 h-5 text-purple-600"/>} label="Cotizaciones" value={porEtapa('cotizacion')} bg="bg-purple-50" href="/leads" color="text-purple-700"/>
           <MetricCard icon={<Send className="w-5 h-5 text-blue-600"/>} label="En expedición" value={polizasPendientes} bg="bg-blue-50" href="/polizas" color="text-blue-700"/>

@@ -82,6 +82,13 @@ export default function CobrosList() {
 
   const totalPendiente = filtered.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0)
 
+  /* ── Pagination ── */
+  const PAGE_SIZE = 50
+  const [page, setPage] = useState(1)
+  useEffect(() => { setPage(1) }, [search, filterEstado, activeTab])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
   const isComisionTab = activeTab === 'comision_por_cobrar' || activeTab === 'comision_recibida'
   const isAseguradoraTab = activeTab === 'por_pagar' || isComisionTab
 
@@ -183,7 +190,7 @@ export default function CobrosList() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map(c => {
+            {paginated.map(c => {
               const days = c.fecha_vencimiento ? daysUntil(c.fecha_vencimiento) : null
               const overdue = days !== null && days < 0 && c.estado === 'pendiente'
               return (
@@ -248,6 +255,36 @@ export default function CobrosList() {
           </div>
         )}
       </div>
+
+      {/* ── Pagination ── */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+          <p>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} cobros</p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(1)} disabled={page === 1}
+              className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">«</button>
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">‹</button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 2)
+              .reduce<(number | '...')[]>((acc, n, i, arr) => {
+                if (i > 0 && (n as number) - (arr[i - 1] as number) > 1) acc.push('...')
+                acc.push(n)
+                return acc
+              }, [])
+              .map((n, i) => n === '...'
+                ? <span key={`dots-${i}`} className="px-2">…</span>
+                : <button key={n} onClick={() => setPage(n as number)}
+                    className={`px-3 py-1 rounded font-medium transition-colors ${page === n ? 'bg-emerald-600 text-white' : 'hover:bg-slate-100'}`}>{n}</button>
+              )
+            }
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">›</button>
+            <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+              className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed">»</button>
+          </div>
+        </div>
+      )}
 
       {showModal && (
         <CobrosModal cobro={editing} activeTab={activeTab}
