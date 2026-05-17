@@ -670,6 +670,7 @@ export default function ClientesList() {
       {showModal && (
         <ClienteModal
           cliente={editing}
+          members={members}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load() }}
         />

@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
-import { X, ChevronDown, UserCircle2 } from 'lucide-react'
+import { X, UserCircle2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
 
@@ -10,6 +10,7 @@ interface Member { user_id: string; nombre: string; email: string; role: string 
 
 interface Props {
   cliente?: Cliente
+  members?: Member[]   // pasados desde el padre (ya cargados)
   onClose: () => void
   onSaved: () => void
 }
@@ -30,7 +31,7 @@ const TIPO_LABELS: Record<TipoCliente, string> = {
 
 const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 
-export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
+export default function ClienteModal({ cliente, members = [], onClose, onSaved }: Props) {
   const { currentWorkspace, currentUserId, isSupervisor, isAdmin } = useWorkspace()
   const { can } = usePermissions()
 
@@ -46,9 +47,6 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
 
   const [tipo, setTipo] = useState<TipoCliente>(cliente?.tipo_cliente || 'persona_natural')
   const [assignedTo, setAssignedTo] = useState<string>(cliente?.assigned_to || '')
-  const [members, setMembers] = useState<Member[]>([])
-  const [loadingMembers, setLoadingMembers] = useState(false)
-  const [membersError, setMembersError] = useState(false)
   const [form, setForm] = useState({
     nombre:                   cliente?.nombre || '',
     email:                    cliente?.email || '',
@@ -84,20 +82,6 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
       setAssignedTo(currentUserId)
     }
   }, [currentUserId])
-
-  // Cargar miembros solo si el usuario puede reasignar
-  // Usamos get_workspace_members (RPC ya probado) en lugar de get_assignable_members
-  useEffect(() => {
-    if (!currentWorkspace || !canReassign) return
-    setLoadingMembers(true)
-    setMembersError(false)
-    supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
-      .then(({ data, error }) => {
-        if (error || !data) { setMembersError(true) }
-        else { setMembers(data as Member[]) }
-        setLoadingMembers(false)
-      })
-  }, [currentWorkspace?.id, canReassign])
 
   function set(field: string, val: string | boolean) {
     setForm(f => ({ ...f, [field]: val }))
@@ -342,24 +326,18 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
             {/* Asignación — solo admin/supervisor pueden ver y cambiar */}
             {canReassign && (
               <Field label={<span className="flex items-center gap-1.5"><UserCircle2 className="w-3.5 h-3.5" />Asesor responsable</span>}>
-                {loadingMembers ? (
-                  <div className="flex items-center gap-2 text-sm text-slate-400 py-2">
-                    <span className="w-4 h-4 rounded-full border-2 border-slate-300 border-t-emerald-500 animate-spin inline-block" />
-                    Cargando asesores...
-                  </div>
-                ) : membersError ? (
-                  <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    No se pudo cargar la lista de asesores. Aplica el SQL de migración en Supabase.
+                <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className={cls}>
+                  <option value="">Sin asignar</option>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.nombre}{m.user_id === currentUserId ? ' (yo)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {members.length === 0 && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Se asignará a ti automáticamente al guardar.
                   </p>
-                ) : (
-                  <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className={cls}>
-                    <option value="">Sin asignar</option>
-                    {members.map(m => (
-                      <option key={m.user_id} value={m.user_id}>
-                        {m.nombre}{m.user_id === currentUserId ? ' (yo)' : ''}
-                      </option>
-                    ))}
-                  </select>
                 )}
               </Field>
             )}
