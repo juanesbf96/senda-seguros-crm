@@ -7,6 +7,7 @@ import { Plus, Search, Pencil, Trash2, AlertTriangle, ShieldAlert } from 'lucide
 import Link from 'next/link'
 import SiniestroModal from './SiniestroModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_LABELS: Record<EstadoSiniestro, string> = {
   reportado:  'Reportado',
@@ -27,6 +28,7 @@ type Tab = EstadoSiniestro | 'todos'
 
 export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
   const { can } = usePermissions()
+  const { currentWorkspace } = useWorkspace()
   const [siniestros, setSiniestros] = useState<Siniestro[]>([])
   const [loading,    setLoading]    = useState(true)
   const [search,     setSearch]     = useState('')
@@ -35,9 +37,11 @@ export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
   const [editing,    setEditing]    = useState<Siniestro | undefined>()
 
   async function load() {
+    if (!currentWorkspace) return
     let q = supabase
       .from('siniestros')
       .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora,ramo), amparos:siniestro_amparos(*)')
+      .eq('workspace_id', currentWorkspace.id)
       .order('created_at', { ascending: false })
     if (clienteId) q = q.eq('client_id', clienteId)
     const { data } = await q
@@ -45,7 +49,7 @@ export default function SiniestrosList({ clienteId }: { clienteId?: string }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [clienteId])
+  useEffect(() => { load() }, [clienteId, currentWorkspace])
 
   async function deleteSiniestro(id: string) {
     if (!confirm('¿Eliminar este siniestro?')) return

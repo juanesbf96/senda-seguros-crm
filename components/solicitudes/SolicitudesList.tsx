@@ -5,6 +5,7 @@ import { Solicitud, EstadoSolicitud } from '@/types'
 import { Plus, Search, Pencil, Trash2, ClipboardList, FileCheck, Archive } from 'lucide-react'
 import Link from 'next/link'
 import SolicitudModal from './SolicitudModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoSolicitud, string> = {
   nueva:      'bg-blue-100 text-blue-700',
@@ -26,6 +27,7 @@ function formatDate(d: string | null) {
 }
 
 export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
+  const { currentWorkspace } = useWorkspace()
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
@@ -34,9 +36,11 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   const [editing, setEditing]         = useState<Solicitud | undefined>()
 
   async function load() {
+    if (!currentWorkspace) return
     let q = supabase
       .from('solicitudes')
       .select('*, cliente:clientes(id, nombre), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .eq('workspace_id', currentWorkspace.id)
       .order('numero_solicitud', { ascending: false })
     if (clienteId) q = q.eq('client_id', clienteId)
     const { data } = await q
@@ -44,7 +48,7 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [clienteId])
+  useEffect(() => { load() }, [clienteId, currentWorkspace])
 
   async function deleteSolicitud(id: string) {
     if (!confirm('¿Eliminar esta solicitud?')) return

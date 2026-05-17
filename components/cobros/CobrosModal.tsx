@@ -57,9 +57,9 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
   const isAseguradoraTab = form.tipo === 'por_pagar' || form.tipo === 'comision_por_cobrar' || form.tipo === 'comision_recibida'
 
   useEffect(() => {
-    if (!clienteId)
-      supabase.from('clientes').select('id, nombre').order('nombre').then(({ data }) => setClientes(data || []))
-  }, [clienteId])
+    if (!clienteId && currentWorkspace)
+      supabase.from('clientes').select('id, nombre').eq('workspace_id', currentWorkspace.id).order('nombre').then(({ data }) => setClientes(data || []))
+  }, [clienteId, currentWorkspace])
 
   useEffect(() => {
     const cid = form.client_id

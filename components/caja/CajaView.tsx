@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import ReciboModal from './ReciboModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const FORMA_LABELS: Record<FormaPago, string> = {
   efectivo: 'Efectivo', transferencia: 'Transferencia', cheque: 'Cheque',
@@ -49,6 +50,7 @@ function groupByDate(recibos: Recibo[]) {
 }
 
 export default function CajaView() {
+  const { currentWorkspace } = useWorkspace()
   const [recibos, setRecibos] = useState<Recibo[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch]   = useState('')
@@ -60,15 +62,17 @@ export default function CajaView() {
   const [dateTo, setDateTo]       = useState('')
 
   async function load() {
+    if (!currentWorkspace) return
     const { data } = await supabase
       .from('recibos')
       .select('*, cliente:clientes(id, nombre), cobro:cobros(id, concepto, valor), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .eq('workspace_id', currentWorkspace.id)
       .order('fecha_pago', { ascending: false })
     setRecibos((data || []) as Recibo[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace])
 
   async function deleteRecibo(id: string) {
     if (!confirm('¿Eliminar este recibo?')) return

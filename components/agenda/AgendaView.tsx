@@ -5,6 +5,7 @@ import { format, parse, startOfWeek, getDay, startOfMonth, endOfMonth, addMonths
 import { es } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import { supabase } from '@/lib/supabase/client'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { AgendaEvento } from '@/types'
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalIcon } from 'lucide-react'
 import AgendaEventoModal from './AgendaEventoModal'
@@ -43,6 +44,7 @@ const VIEWS: { key: View; label: string }[] = [
 ]
 
 export default function AgendaView() {
+  const { currentWorkspace } = useWorkspace()
   const [events,    setEvents]    = useState<CalEvent[]>([])
   const [loading,   setLoading]   = useState(true)
   const [view,      setView]      = useState<View>('month')
@@ -51,17 +53,21 @@ export default function AgendaView() {
 
   // ── Carga todos los eventos (propios + CRM) ──────────────────────
   const load = useCallback(async () => {
+    if (!currentWorkspace) return
+    const wid = currentWorkspace.id
     const rangeStart = subMonths(startOfMonth(date), 1)
     const rangeEnd   = addMonths(endOfMonth(date), 1)
 
     const [propiosRes, tareasRes, polizasRes, cobrosRes, prospectosRes] = await Promise.all([
       supabase.from('agenda_eventos')
         .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora), prospecto:prospectos(id,nombre)')
+        .eq('workspace_id', wid)
         .gte('fecha_inicio', rangeStart.toISOString())
         .lte('fecha_fin',    rangeEnd.toISOString()),
 
       supabase.from('tareas')
         .select('id, titulo, fecha_vencimiento, completada, prioridad')
+        .eq('workspace_id', wid)
         .eq('completada', false)
         .not('fecha_vencimiento', 'is', null)
         .gte('fecha_vencimiento', rangeStart.toISOString().slice(0,10))
@@ -69,6 +75,7 @@ export default function AgendaView() {
 
       supabase.from('polizas')
         .select('id, numero_poliza, aseguradora, ramo, fecha_fin')
+        .eq('workspace_id', wid)
         .eq('eliminada', false)
         .not('fecha_fin', 'is', null)
         .gte('fecha_fin', rangeStart.toISOString().slice(0,10))
@@ -76,6 +83,7 @@ export default function AgendaView() {
 
       supabase.from('cobros')
         .select('id, concepto, valor, fecha_vencimiento, estado')
+        .eq('workspace_id', wid)
         .eq('estado', 'pendiente')
         .not('fecha_vencimiento', 'is', null)
         .gte('fecha_vencimiento', rangeStart.toISOString().slice(0,10))
@@ -83,6 +91,7 @@ export default function AgendaView() {
 
       supabase.from('prospecto_actividades')
         .select('id, descripcion, tipo, fecha, prospecto:prospectos(id,nombre)')
+        .eq('workspace_id', wid)
         .gte('fecha', rangeStart.toISOString())
         .lte('fecha', rangeEnd.toISOString()),
     ])
@@ -147,7 +156,7 @@ export default function AgendaView() {
 
     setEvents(calEvents)
     setLoading(false)
-  }, [date])
+  }, [date, currentWorkspace])
 
   useEffect(() => { load() }, [load])
 

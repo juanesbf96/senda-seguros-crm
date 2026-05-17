@@ -4,8 +4,10 @@ import { supabase } from '@/lib/supabase/client'
 import { Vendedor } from '@/types'
 import { Plus, Pencil, Trash2, UserCheck, UserX, Search } from 'lucide-react'
 import VendedorModal from './VendedorModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 export default function VendedoresList() {
+  const { currentWorkspace } = useWorkspace()
   const [vendedores, setVendedores] = useState<Vendedor[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -14,15 +16,17 @@ export default function VendedoresList() {
   const [filtroActivo, setFiltroActivo] = useState<'todos' | 'activos' | 'inactivos'>('activos')
 
   async function load() {
+    if (!currentWorkspace) return
     const { data } = await supabase
       .from('vendedores')
       .select('*')
+      .eq('workspace_id', currentWorkspace.id)
       .order('nombre')
     setVendedores((data || []) as Vendedor[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace])
 
   async function deleteVendedor(id: string) {
     if (!confirm('¿Eliminar este vendedor? Se perderá su información.')) return

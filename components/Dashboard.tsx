@@ -72,7 +72,7 @@ export default function Dashboard() {
           .eq('estado', 'activa')
           .eq('eliminada', false),
         supabase.from('polizas').select('estado').eq('workspace_id', wsId).eq('eliminada', false),
-        supabase.from('siniestros').select('id').eq('workspace_id', wsId).eq('finalizado', false),
+        supabase.from('siniestros').select('id').eq('workspace_id', wsId).not('estado', 'in', '("cerrado","rechazado")'),
         supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).lt('fecha_vencimiento', today),
         supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', today),
         supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', tomorrow),

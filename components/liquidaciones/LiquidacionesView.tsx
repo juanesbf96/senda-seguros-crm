@@ -5,6 +5,7 @@ import { Liquidacion, Vendedor, EstadoLiquidacion } from '@/types'
 import { formatCOP, formatDate } from '@/lib/utils'
 import { Plus, Pencil, Trash2, DollarSign, Search } from 'lucide-react'
 import LiquidacionModal from './LiquidacionModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoLiquidacion, string> = {
   pendiente: 'bg-amber-100 text-amber-700',
@@ -18,6 +19,7 @@ const ESTADO_LABELS: Record<EstadoLiquidacion, string> = {
 }
 
 export default function LiquidacionesView() {
+  const { currentWorkspace } = useWorkspace()
   const [liquidaciones, setLiquidaciones] = useState<Liquidacion[]>([])
   const [vendedores, setVendedores]       = useState<Pick<Vendedor, 'id' | 'nombre'>[]>([])
   const [loading, setLoading]             = useState(true)
@@ -28,18 +30,21 @@ export default function LiquidacionesView() {
   const [editing, setEditing]             = useState<Liquidacion | undefined>()
 
   async function load() {
+    if (!currentWorkspace) return
+    const wid = currentWorkspace.id
     const [liqRes, vendRes] = await Promise.all([
       supabase.from('liquidaciones')
         .select('*, vendedor:vendedores(id, nombre, porcentaje_comision)')
+        .eq('workspace_id', wid)
         .order('periodo', { ascending: false }),
-      supabase.from('vendedores').select('id, nombre').eq('activo', true).order('nombre'),
+      supabase.from('vendedores').select('id, nombre').eq('workspace_id', wid).eq('activo', true).order('nombre'),
     ])
     setLiquidaciones((liqRes.data || []) as Liquidacion[])
     setVendedores(vendRes.data || [])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace])
 
   async function deleteLiquidacion(id: string) {
     if (!confirm('¿Eliminar esta liquidación?')) return

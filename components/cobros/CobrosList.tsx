@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import CobrosModal from './CobrosModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoCobro, string> = {
   pendiente: 'bg-amber-100 text-amber-700',
@@ -30,6 +31,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType; desc: string }[]
 ]
 
 export default function CobrosList() {
+  const { currentWorkspace } = useWorkspace()
   const [cobros, setCobros]         = useState<Cobro[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -39,15 +41,17 @@ export default function CobrosList() {
   const [editing, setEditing]       = useState<Cobro | undefined>()
 
   async function load() {
+    if (!currentWorkspace) return
     const { data } = await supabase
       .from('cobros')
       .select('*, cliente:clientes(id, nombre), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .eq('workspace_id', currentWorkspace.id)
       .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
     setCobros((data || []) as Cobro[])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace])
 
   async function deleteCobro(id: string) {
     if (!confirm('¿Eliminar este cobro?')) return
