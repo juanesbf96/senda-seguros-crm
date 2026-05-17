@@ -18,16 +18,16 @@ const ETAPA_LABELS: Record<Etapa, string> = {
   nuevo: 'Nuevo', contactado: 'Contactado', cotizacion: 'Cotización', cerrado: 'Cerrado',
 }
 const ETAPA_COLORS: Record<Etapa, string> = {
-  nuevo: 'bg-blue-100 text-blue-700',
-  contactado: 'bg-amber-100 text-amber-700',
+  nuevo: 'bg-info/20 text-info',
+  contactado: 'bg-warning-soft text-ink-700',
   cotizacion: 'bg-purple-100 text-purple-700',
-  cerrado: 'bg-emerald-100 text-emerald-700',
+  cerrado: 'bg-primary-100 text-primary-700',
 }
 const TIPO_LABELS: Record<TipoCliente, string> = {
   persona_natural: 'Persona Natural', empresa: 'Empresa', consorcio: 'Consorcio',
 }
 const TIPO_COLORS: Record<TipoCliente, string> = {
-  persona_natural: 'bg-slate-100 text-slate-600',
+  persona_natural: 'bg-cream-200 text-ink-500',
   empresa:  'bg-indigo-100 text-indigo-700',
   consorcio:'bg-teal-100 text-teal-700',
 }
@@ -237,7 +237,7 @@ export default function ClientesList() {
 
   if (loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -248,8 +248,8 @@ export default function ClientesList() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Clientes</h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-ink-700">Clientes</h1>
+          <p className="text-ink-400 text-sm mt-1">
             {activeTab === 'clientes'
               ? `${filtered.length} de ${clientes.length} registros`
               : activeTab === 'contactos'
@@ -261,16 +261,16 @@ export default function ClientesList() {
           {activeTab === 'clientes' && (
             <>
               <button onClick={() => setShowImport(true)}
-                className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                className="flex items-center gap-2 bg-white border border-ink-200 hover:bg-cream-100 text-ink-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 <Upload className="w-4 h-4" /> Importar CSV
               </button>
               <button onClick={exportCSV}
-                className="flex items-center gap-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                className="flex items-center gap-2 bg-white border border-ink-200 hover:bg-cream-100 text-ink-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 <Download className="w-4 h-4" /> Exportar CSV
               </button>
               {can('clientes_crear') && (
                 <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                  className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                   <Plus className="w-4 h-4" /> Nuevo cliente
                 </button>
               )}
@@ -280,33 +280,33 @@ export default function ClientesList() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200">
+      <div className="flex gap-1 mb-5 border-b border-ink-200">
         <button onClick={() => setActiveTab('clientes')}
           className={[
             'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-            activeTab === 'clientes' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+            activeTab === 'clientes' ? 'border-primary-500 text-primary-500' : 'border-transparent text-ink-400 hover:text-ink-600',
           ].join(' ')}>
           <Users className="w-4 h-4" />
           Clientes
-          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'clientes' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'clientes' ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
             {clientes.length}
           </span>
         </button>
         <button onClick={() => setActiveTab('contactos')}
           className={[
             'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-            activeTab === 'contactos' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+            activeTab === 'contactos' ? 'border-primary-500 text-primary-500' : 'border-transparent text-ink-400 hover:text-ink-600',
           ].join(' ')}>
           <UserSquare2 className="w-4 h-4" />
           Contactos
-          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'contactos' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+          <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'contactos' ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
             {contactCount}
           </span>
         </button>
         <button onClick={() => setActiveTab('crm')}
           className={[
             'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
-            activeTab === 'crm' ? 'border-emerald-600 text-emerald-600' : 'border-transparent text-slate-500 hover:text-slate-700',
+            activeTab === 'crm' ? 'border-primary-500 text-primary-500' : 'border-transparent text-ink-400 hover:text-ink-600',
           ].join(' ')}>
           <TrendingUp className="w-4 h-4" />
           CRM Comercial
@@ -322,10 +322,10 @@ export default function ClientesList() {
           {/* ── Toolbar ── */}
           <div className="flex gap-3 mb-3 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400" />
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar por nombre, teléfono, cédula, NIT..."
-                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400" />
+                className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
             </div>
 
             {/* Filtros rápidos inline */}
@@ -351,13 +351,13 @@ export default function ClientesList() {
               className={[
                 'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border transition-colors',
                 showFilters || activeFilterCount > 2
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50',
+                  ? 'bg-primary-50 border-primary-300 text-primary-700'
+                  : 'bg-white border-ink-200 text-ink-500 hover:bg-cream-100',
               ].join(' ')}>
               <SlidersHorizontal className="w-4 h-4" />
               Filtros
               {activeFilterCount > 0 && (
-                <span className="bg-emerald-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                <span className="bg-primary-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -365,7 +365,7 @@ export default function ClientesList() {
 
             {(activeFilterCount > 0 || search) && (
               <button onClick={clearFilters}
-                className="flex items-center gap-1 text-xs text-slate-400 hover:text-red-500 transition-colors px-2">
+                className="flex items-center gap-1 text-xs text-ink-400 hover:text-error transition-colors px-2">
                 <X className="w-3.5 h-3.5" /> Limpiar
               </button>
             )}
@@ -373,7 +373,7 @@ export default function ClientesList() {
 
           {/* ── Panel de filtros avanzados ── */}
           {showFilters && (
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="bg-cream-100 border border-ink-200 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               <FilterSelect label="Categoría" value={filters.categoria} onChange={v => setF('categoria', v)}>
                 <option value="">Todas</option>
                 {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
@@ -406,16 +406,16 @@ export default function ClientesList() {
           )}
 
           {/* ── Tabla ── */}
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-200">
-                <tr className="text-left text-xs text-slate-500">
+              <thead className="bg-cream-100 border-b border-ink-200">
+                <tr className="text-left text-xs text-ink-400">
                   <th className="px-4 py-3 font-medium w-8">
                     <input
                       type="checkbox"
                       checked={allFilteredSelected}
                       onChange={toggleAll}
-                      className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                      className="rounded border-ink-300 text-primary-500 focus:ring-primary-400"
                     />
                   </th>
                   <th className="px-4 py-3 font-medium">Nombre</th>
@@ -430,44 +430,44 @@ export default function ClientesList() {
               </thead>
               <tbody>
                 {filtered.map(c => (
-                  <tr key={c.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selected.has(c.id) ? 'bg-emerald-50' : ''}`}>
+                  <tr key={c.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${selected.has(c.id) ? 'bg-primary-50' : ''}`}>
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={selected.has(c.id)}
                         onChange={() => toggleSelect(c.id)}
-                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-400"
+                        className="rounded border-ink-300 text-primary-500 focus:ring-primary-400"
                       />
                     </td>
                     <td className="px-4 py-3">
-                      <Link href={`/clientes/${c.id}`} className="font-medium text-slate-800 hover:text-emerald-600 transition-colors">
+                      <Link href={`/clientes/${c.id}`} className="font-medium text-ink-700 hover:text-primary-500 transition-colors">
                         {c.nombre}
                       </Link>
-                      {c.sobrenombre && <div className="text-xs text-slate-400">{c.sobrenombre}</div>}
+                      {c.sobrenombre && <div className="text-xs text-ink-400">{c.sobrenombre}</div>}
                     </td>
                     <td className="px-4 py-3 hidden sm:table-cell">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${TIPO_COLORS[c.tipo_cliente]}`}>
                         {TIPO_LABELS[c.tipo_cliente]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-500 hidden md:table-cell">
+                    <td className="px-4 py-3 text-ink-400 hidden md:table-cell">
                       {c.tipo_cliente === 'persona_natural' ? (c.cedula || '—') : (c.nit || '—')}
                     </td>
                     <td className="px-4 py-3">
                       <div className="space-y-0.5">
                         {c.telefono && (
-                          <div className="flex items-center gap-1 text-slate-500">
+                          <div className="flex items-center gap-1 text-ink-400">
                             <Phone className="w-3 h-3" />{c.telefono}
                           </div>
                         )}
                         {c.email && (
-                          <div className="text-slate-400 text-xs truncate max-w-[160px]">{c.email}</div>
+                          <div className="text-ink-400 text-xs truncate max-w-[160px]">{c.email}</div>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3 hidden lg:table-cell">
                       {c.ciudad && (
-                        <div className="flex items-center gap-1 text-slate-500">
+                        <div className="flex items-center gap-1 text-ink-400">
                           <MapPin className="w-3 h-3" />{c.ciudad}
                         </div>
                       )}
@@ -479,25 +479,25 @@ export default function ClientesList() {
                     </td>
                     <td className="px-4 py-3 hidden xl:table-cell">
                       {c.categoria
-                        ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">{c.categoria}</span>
-                        : <span className="text-slate-300 text-xs">—</span>}
+                        ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cream-200 text-ink-500">{c.categoria}</span>
+                        : <span className="text-ink-300 text-xs">—</span>}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         {/* Ver */}
                         <Link href={`/clientes/${c.id}`}
-                          className="text-slate-400 hover:text-emerald-600 transition-colors p-0.5">
+                          className="text-ink-400 hover:text-primary-500 transition-colors p-0.5">
                           <Eye className="w-4 h-4" />
                         </Link>
                         {/* Editar */}
                         <button onClick={() => { setEditing(c); setShowModal(true) }}
-                          className="text-slate-400 hover:text-slate-700 transition-colors p-0.5">
+                          className="text-ink-400 hover:text-ink-600 transition-colors p-0.5">
                           <Pencil className="w-4 h-4" />
                         </button>
                         {/* Eliminar */}
                         {can('clientes_eliminar') && (
                           <button onClick={() => deleteCliente(c.id)}
-                            className="text-slate-400 hover:text-red-600 transition-colors p-0.5">
+                            className="text-ink-400 hover:text-error transition-colors p-0.5">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         )}
@@ -505,19 +505,19 @@ export default function ClientesList() {
                         <div className="relative" ref={openMenuId === c.id ? menuRef : null}>
                           <button
                             onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
-                            className="text-slate-400 hover:text-slate-700 transition-colors p-0.5">
+                            className="text-ink-400 hover:text-ink-600 transition-colors p-0.5">
                             <MoreHorizontal className="w-4 h-4" />
                           </button>
                           {openMenuId === c.id && (
-                            <div className="absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-30 min-w-[170px] py-1 text-sm">
+                            <div className="absolute right-0 top-full mt-1 bg-white border border-ink-200 rounded-xl shadow-lg z-30 min-w-[170px] py-1 text-sm">
                               {c.telefono && (
                                 <a
                                   href={`https://wa.me/57${c.telefono.replace(/\D/g, '')}`}
                                   target="_blank"
                                   rel="noreferrer"
                                   onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
-                                  <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-cream-100 text-ink-600">
+                                  <Wallet className="w-3.5 h-3.5 text-primary-500" />
                                   WhatsApp
                                 </a>
                               )}
@@ -525,8 +525,8 @@ export default function ClientesList() {
                                 <a
                                   href={`tel:${c.telefono}`}
                                   onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
-                                  <Phone className="w-3.5 h-3.5 text-blue-500" />
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-cream-100 text-ink-600">
+                                  <Phone className="w-3.5 h-3.5 text-info" />
                                   Llamar
                                 </a>
                               )}
@@ -534,18 +534,18 @@ export default function ClientesList() {
                                 <a
                                   href={`mailto:${c.email}`}
                                   onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700">
+                                  className="flex items-center gap-2 px-3 py-2 hover:bg-cream-100 text-ink-600">
                                   <MapPin className="w-3.5 h-3.5 text-purple-500" />
                                   Enviar email
                                 </a>
                               )}
                               {(c.telefono || c.email) && (
-                                <div className="border-t border-slate-100 my-1" />
+                                <div className="border-t border-cream-200 my-1" />
                               )}
                               <button
                                 onClick={() => { exportOne(c); setOpenMenuId(null) }}
-                                className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 text-slate-700 w-full text-left">
-                                <Download className="w-3.5 h-3.5 text-slate-400" />
+                                className="flex items-center gap-2 px-3 py-2 hover:bg-cream-100 text-ink-600 w-full text-left">
+                                <Download className="w-3.5 h-3.5 text-ink-400" />
                                 Exportar este cliente
                               </button>
                             </div>
@@ -558,11 +558,11 @@ export default function ClientesList() {
               </tbody>
             </table>
             {filtered.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
+              <div className="text-center py-12 text-ink-400">
                 <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
                 <p className="text-sm">No se encontraron clientes</p>
                 {(activeFilterCount > 0 || search) && (
-                  <button onClick={clearFilters} className="mt-2 text-xs text-emerald-600 hover:underline">
+                  <button onClick={clearFilters} className="mt-2 text-xs text-primary-500 hover:underline">
                     Limpiar filtros
                   </button>
                 )}
@@ -572,16 +572,16 @@ export default function ClientesList() {
 
           {/* ── Floating bulk action bar ── */}
           {selected.size > 0 && (
-            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-ink-700 text-white px-5 py-3 rounded-2xl shadow-2xl">
               <span className="text-sm font-medium whitespace-nowrap">{selected.size} seleccionados</span>
 
-              <div className="w-px h-5 bg-slate-600" />
+              <div className="w-px h-5 bg-ink-500" />
 
               {/* Cambiar etapa */}
               <select
                 onChange={e => { if (e.target.value) bulkChangeEtapa(e.target.value as Etapa) }}
                 defaultValue=""
-                className="bg-slate-800 text-white text-xs rounded-lg px-2 py-1.5 border border-slate-700 focus:outline-none focus:ring-2 focus:ring-emerald-400">
+                className="bg-ink-700 text-white text-xs rounded-lg px-2 py-1.5 border border-ink-600 focus:outline-none focus:ring-2 focus:ring-primary-400">
                 <option value="" disabled>Cambiar etapa...</option>
                 <option value="nuevo">Nuevo</option>
                 <option value="contactado">Contactado</option>
@@ -592,7 +592,7 @@ export default function ClientesList() {
               {/* Exportar selección */}
               <button
                 onClick={exportSelected}
-                className="flex items-center gap-1.5 text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                className="flex items-center gap-1.5 text-xs bg-ink-600 hover:bg-ink-500 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
                 <Download className="w-3.5 h-3.5" /> Exportar selección
               </button>
 
@@ -600,20 +600,20 @@ export default function ClientesList() {
               {can('clientes_eliminar') && (
                 confirmingBulkDelete ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-red-300">¿Eliminar {selected.size} clientes?</span>
+                    <span className="text-xs text-error/70">¿Eliminar {selected.size} clientes?</span>
                     <button onClick={bulkDelete}
-                      className="text-xs bg-red-600 hover:bg-red-500 px-2.5 py-1.5 rounded-lg transition-colors">
+                      className="text-xs bg-error hover:bg-error px-2.5 py-1.5 rounded-lg transition-colors">
                       Sí, eliminar
                     </button>
                     <button onClick={() => setConfirmingBulkDelete(false)}
-                      className="text-xs bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded-lg transition-colors">
+                      className="text-xs bg-ink-600 hover:bg-ink-500 px-2.5 py-1.5 rounded-lg transition-colors">
                       Cancelar
                     </button>
                   </div>
                 ) : (
                   <button
                     onClick={() => setConfirmingBulkDelete(true)}
-                    className="flex items-center gap-1.5 text-xs bg-red-700 hover:bg-red-600 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
+                    className="flex items-center gap-1.5 text-xs bg-error hover:bg-error px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap">
                     <Trash2 className="w-3.5 h-3.5" /> Eliminar
                   </button>
                 )
@@ -621,7 +621,7 @@ export default function ClientesList() {
 
               {/* Deselect all */}
               <button onClick={() => { setSelected(new Set()); setConfirmingBulkDelete(false) }}
-                className="text-slate-400 hover:text-white transition-colors ml-1">
+                className="text-ink-400 hover:text-white transition-colors ml-1">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -649,8 +649,8 @@ export default function ClientesList() {
 /* ── helpers ── */
 function selCls(active: boolean) {
   return [
-    'px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 transition-colors',
-    active ? 'border-emerald-400 bg-emerald-50 text-emerald-800' : 'border-slate-200 bg-white text-slate-600',
+    'px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors',
+    active ? 'border-primary-400 bg-primary-50 text-primary-800' : 'border-ink-200 bg-white text-ink-500',
   ].join(' ')
 }
 
@@ -659,9 +659,9 @@ function FilterSelect({ label, value, onChange, children }: {
 }) {
   return (
     <div>
-      <label className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400 mb-1">{label}</label>
+      <label className="block text-[10px] font-semibold uppercase tracking-wide text-ink-400 mb-1">{label}</label>
       <select value={value} onChange={e => onChange(e.target.value)}
-        className="w-full px-2 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+        className="w-full px-2 py-1.5 text-xs border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white">
         {children}
       </select>
     </div>

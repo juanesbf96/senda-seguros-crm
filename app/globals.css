@@ -1,34 +1,179 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+/**
+ * Design System — Senda Seguros CRM
+ *
+ * Este archivo es la fuente de verdad para tokens visuales en Tailwind v4.
+ * Para usar en JS/TS importa desde `@/lib/design-tokens`.
+ *
+ * Tokens disponibles:
+ *   - Colores:     primary-{50..900}, cream-{50..400}, ink-{50..900}
+ *   - Semánticos:  success, warning, warning-soft, error, error-soft, info
+ *   - Surface:     surface, background, foreground, muted, border
+ *   - Radios:      rounded-{xs|sm|md|lg|xl|2xl|pill}
+ *   - Sombras:     shadow-{soft|card|lifted|glass}
+ *   - Tipografía:  font-{sans|display}
+ *
+ * Para cambiar la identidad visual del CRM, modifica los valores aquí
+ * y replícalos en `lib/design-tokens.ts`. Todos los componentes heredan.
+ */
+@theme {
+  /* ── Color tokens ───────────────────────────────────────────── */
+  /* Primary — verde derivado de #6FCF97 */
+  --color-primary-50:  #E8F7EF;
+  --color-primary-100: #C8EBD6;
+  --color-primary-200: #A5DDBC;
+  --color-primary-300: #8AD4AA;
+  --color-primary-400: #7DD0A0;
+  --color-primary-500: #6FCF97;
+  --color-primary-600: #56B87E;
+  --color-primary-700: #3D9F65;
+  --color-primary-800: #2A7F4D;
+  --color-primary-900: #1B5F37;
+
+  /* Semánticos */
+  --color-success: #6FCF97;
+  --color-warning: #F2C94C;
+  --color-warning-soft: #FCE9A8;
+  --color-error: #EB5757;
+  --color-error-soft: #FBC8C8;
+  --color-info: #56A8E0;
+
+  /* Neutrales — luminosos, casi blancos con calidez sutil */
+  --color-cream-50:  #FEFDFB;
+  --color-cream-100: #FBF9F5;
+  --color-cream-200: #F4F1EA;
+  --color-cream-300: #E8E2D4;
+  --color-cream-400: #C9BC9F;
+
+  --color-ink-50:   #F7F7F8;
+  --color-ink-100:  #ECECEF;
+  --color-ink-200:  #D8D8DE;
+  --color-ink-300:  #B0B0BA;
+  --color-ink-400:  #7C7C8A;
+  --color-ink-500:  #4F4F5A;
+  --color-ink-600:  #2F2F38;
+  --color-ink-700:  #1F1F26;
+  --color-ink-800:  #131318;
+  --color-ink-900:  #0A0A0E;
+
+  /* Surface aliases para consistencia */
+  --color-surface:     #FFFFFF;
+  --color-background:  #FBF9F5;
+  --color-foreground:  #1F1F26;
+  --color-muted:       #7C7C8A;
+  --color-border:      #ECECEF;
+
+  /* ── Typography ─────────────────────────────────────────────── */
+  --font-sans: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ── Radius scale (Crextio usa pills + cards muy redondeadas) ── */
+  --radius-xs:  6px;
+  --radius-sm:  10px;
+  --radius-md:  14px;
+  --radius-lg:  20px;
+  --radius-xl:  28px;
+  --radius-2xl: 36px;
+  --radius-pill: 999px;
+
+  /* ── Shadows (Crextio: elevaciones suaves y difusas) ──────── */
+  --shadow-soft:    0 1px 2px rgba(20, 20, 30, 0.04), 0 2px 6px rgba(20, 20, 30, 0.04);
+  --shadow-card:    0 2px 6px rgba(20, 20, 30, 0.04), 0 8px 24px rgba(20, 20, 30, 0.06);
+  --shadow-lifted:  0 10px 30px rgba(20, 20, 30, 0.10), 0 20px 60px rgba(20, 20, 30, 0.08);
+  --shadow-glass:   0 8px 32px rgba(20, 20, 30, 0.12);
 }
 
-body {
+/* ── Glass effect (Crextio uses subtle blurs on overlay cards) ── */
+.glass {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-glass);
+}
+
+.glass-dark {
+  background: rgba(20, 20, 30, 0.55);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--shadow-glass);
+}
+
+/* ── Base layer ────────────────────────────────────────────────── */
+:root {
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
   background: var(--background);
   color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #f8fafc;
-    --foreground: #0f172a;
-  }
+/* ── Override browser autofill (Chrome/Safari pinta azul) ────── */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: var(--color-ink-700) !important;
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  caret-color: var(--color-ink-700);
+  transition: background-color 5000s ease-in-out 0s;
 }
 
+/* ── Scrollbar styling ──────────────────────────────────────────── */
 .scrollbar-thin::-webkit-scrollbar {
   width: 4px;
+  height: 4px;
 }
 .scrollbar-thin::-webkit-scrollbar-track {
   background: transparent;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
-  border-radius: 2px;
+  background-color: var(--color-ink-200);
+  border-radius: 999px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-300);
 }
 
-* {
-  box-sizing: border-box;
+/* ── Crextio diagonal stripe pattern ───────────────────────────── */
+.stripe-pattern {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-cream-200) 0,
+    var(--color-cream-200) 6px,
+    var(--color-cream-100) 6px,
+    var(--color-cream-100) 12px
+  );
+}
+
+.stripe-pattern-dark {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--color-ink-700) 0,
+    var(--color-ink-700) 6px,
+    var(--color-ink-800) 6px,
+    var(--color-ink-800) 12px
+  );
+}
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 200ms ease-out;
 }

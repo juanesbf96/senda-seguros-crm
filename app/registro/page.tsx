@@ -69,24 +69,24 @@ function RegistroContent() {
 
   if (verificationSent) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-sm p-8 text-center">
-          <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <MailCheck className="w-8 h-8 text-emerald-600" />
+      <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl border border-ink-200 shadow-sm w-full max-w-sm p-8 text-center">
+          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <MailCheck className="w-8 h-8 text-primary-500" />
           </div>
-          <h1 className="text-xl font-bold text-slate-900 mb-2">Revisa tu correo</h1>
-          <p className="text-sm text-slate-500 mb-2">
+          <h1 className="text-xl font-bold text-ink-700 mb-2">Revisa tu correo</h1>
+          <p className="text-sm text-ink-400 mb-2">
             Te enviamos un enlace de verificación a
           </p>
-          <p className="text-sm font-medium text-slate-800 mb-6">{email}</p>
-          <p className="text-xs text-slate-400 mb-6">
+          <p className="text-sm font-medium text-ink-700 mb-6">{email}</p>
+          <p className="text-xs text-ink-400 mb-6">
             Haz clic en el enlace del correo para activar tu cuenta
             {inviteToken ? ' y aceptar tu invitación.' : ' y acceder al CRM.'}
             {' '}Revisa también tu carpeta de spam.
           </p>
           <Link
             href="/login"
-            className="inline-block w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="inline-block w-full bg-primary-500 hover:bg-primary-700 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
             Ir al inicio de sesión
           </Link>
@@ -96,26 +96,26 @@ function RegistroContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-sm p-8">
+    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl border border-ink-200 shadow-sm w-full max-w-sm p-8">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center">
             <Shield className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="font-bold text-slate-900 leading-tight">Senda Seguros</p>
-            <p className="text-xs text-slate-500">CRM</p>
+            <p className="font-bold text-ink-700 leading-tight">Senda Seguros</p>
+            <p className="text-xs text-ink-400">CRM</p>
           </div>
         </div>
 
-        <h1 className="text-xl font-bold text-slate-900 mb-1">Crear cuenta</h1>
-        <p className="text-sm text-slate-500 mb-6">
+        <h1 className="text-xl font-bold text-ink-700 mb-1">Crear cuenta</h1>
+        <p className="text-sm text-ink-400 mb-6">
           {inviteToken ? 'Crea tu cuenta para aceptar la invitación' : 'Configura tu acceso al CRM'}
         </p>
 
         <form onSubmit={handleRegistro} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-ink-600 mb-1.5">
               Nombre completo
             </label>
             <input
@@ -125,12 +125,12 @@ function RegistroContent() {
               required
               autoComplete="name"
               placeholder="Tu nombre"
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="w-full px-3 py-2.5 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-ink-600 mb-1.5">
               Correo electrónico
             </label>
             <input
@@ -140,12 +140,12 @@ function RegistroContent() {
               required
               autoComplete="email"
               placeholder="tu@correo.com"
-              className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+              className="w-full px-3 py-2.5 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label className="block text-sm font-medium text-ink-600 mb-1.5">
               Contraseña
             </label>
             <div className="relative">
@@ -156,13 +156,13 @@ function RegistroContent() {
                 required
                 autoComplete="new-password"
                 placeholder="Mínimo 6 caracteres"
-                className="w-full px-3 py-2.5 pr-10 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                className="w-full px-3 py-2.5 pr-10 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(p => !p)}
                 aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-500 transition-colors"
               >
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
@@ -170,7 +170,7 @@ function RegistroContent() {
           </div>
 
           {error && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+            <p className="text-sm text-error bg-error-soft border border-error/20 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -178,17 +178,17 @@ function RegistroContent() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+            className="w-full bg-primary-500 hover:bg-primary-700 disabled:bg-primary-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
           >
             {loading ? 'Creando cuenta...' : 'Crear cuenta'}
           </button>
         </form>
 
-        <p className="text-center text-xs text-slate-400 mt-6">
+        <p className="text-center text-xs text-ink-400 mt-6">
           ¿Ya tienes cuenta?{' '}
           <Link
             href={inviteToken ? `/login?invite=${inviteToken}` : '/login'}
-            className="text-emerald-600 hover:underline font-medium"
+            className="text-primary-500 hover:underline font-medium"
           >
             Iniciar sesión
           </Link>
@@ -201,8 +201,8 @@ function RegistroContent() {
 export default function RegistroPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-emerald-600 animate-spin" />
+      <div className="min-h-screen bg-cream-100 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
       </div>
     }>
       <RegistroContent />

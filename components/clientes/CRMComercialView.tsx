@@ -55,12 +55,12 @@ const ETAPA_LABELS: Record<string, string> = {
 }
 
 const ETAPA_COLORS: Record<string, string> = {
-  nuevo: 'bg-blue-100 text-blue-700',
-  contactado: 'bg-sky-100 text-sky-700',
+  nuevo: 'bg-info/20 text-info',
+  contactado: 'bg-sky-100 text-info',
   calificado: 'bg-violet-100 text-violet-700',
-  propuesta: 'bg-amber-100 text-amber-700',
-  cerrado_ganado: 'bg-emerald-100 text-emerald-700',
-  cerrado_perdido: 'bg-red-100 text-red-700',
+  propuesta: 'bg-warning-soft text-ink-700',
+  cerrado_ganado: 'bg-primary-100 text-primary-700',
+  cerrado_perdido: 'bg-error-soft text-error',
 }
 
 const FUENTE_LABELS: Record<string, string> = {
@@ -115,7 +115,7 @@ function ProspectosTab() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -124,17 +124,17 @@ function ProspectosTab() {
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { icon: <Briefcase className="w-4 h-4 text-blue-600"/>, label: 'Total negocios', value: prospectos.length, sub: 'en pipeline', bg: 'bg-blue-50' },
-          { icon: <DollarSign className="w-4 h-4 text-emerald-600"/>, label: 'Valor pipeline', value: formatCOP(totalValor), sub: 'estimado total', bg: 'bg-emerald-50' },
+          { icon: <Briefcase className="w-4 h-4 text-info"/>, label: 'Total negocios', value: prospectos.length, sub: 'en pipeline', bg: 'bg-info/10' },
+          { icon: <DollarSign className="w-4 h-4 text-primary-500"/>, label: 'Valor pipeline', value: formatCOP(totalValor), sub: 'estimado total', bg: 'bg-primary-50' },
           { icon: <Target className="w-4 h-4 text-violet-600"/>, label: 'Ganados', value: ganados.length, sub: `${formatCOP(valorGanado)} ganado`, bg: 'bg-violet-50' },
-          { icon: <TrendingUp className="w-4 h-4 text-amber-600"/>, label: 'Tasa cierre', value: `${tasa}%`, sub: 'de conversión', bg: 'bg-amber-50' },
+          { icon: <TrendingUp className="w-4 h-4 text-ink-700"/>, label: 'Tasa cierre', value: `${tasa}%`, sub: 'de conversión', bg: 'bg-warning-soft' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4 flex items-start gap-3`}>
             <div className="mt-0.5">{s.icon}</div>
             <div>
-              <p className="text-xs text-slate-500 font-medium">{s.label}</p>
-              <p className="text-xl font-bold text-slate-800 leading-tight">{s.value}</p>
-              <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
+              <p className="text-xs text-ink-400 font-medium">{s.label}</p>
+              <p className="text-xl font-bold text-ink-700 leading-tight">{s.value}</p>
+              <p className="text-xs text-ink-400 mt-0.5">{s.sub}</p>
             </div>
           </div>
         ))}
@@ -143,29 +143,29 @@ function ProspectosTab() {
       {/* Toolbar */}
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[180px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"/>
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-400"/>
           <input value={search} onChange={e => setSearch(e.target.value)}
             placeholder="Buscar negocio, cliente, vendedor..."
-            className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"/>
+            className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"/>
         </div>
         <select value={filterEtapa} onChange={e => setFilterEtapa(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-400">
+          className="text-sm border border-ink-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-primary-400">
           <option value="all">Todas las etapas</option>
           {Object.entries(ETAPA_LABELS).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
         <button onClick={() => { setEditing(null); setShowModal(true) }}
-          className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4"/> Nuevo negocio
         </button>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-left text-xs text-slate-500">
+          <thead className="bg-cream-100 border-b border-ink-200">
+            <tr className="text-left text-xs text-ink-400">
               <th className="px-4 py-3 font-medium w-12">N°</th>
               <th className="px-4 py-3 font-medium">Nombre negocio</th>
               <th className="px-4 py-3 font-medium hidden md:table-cell">Cliente / Empresa</th>
@@ -179,34 +179,34 @@ function ProspectosTab() {
           </thead>
           <tbody>
             {filtered.map((p, idx) => (
-              <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 text-slate-400 font-mono text-xs">#{idx + 1}</td>
+              <tr key={p.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
+                <td className="px-4 py-3 text-ink-400 font-mono text-xs">#{idx + 1}</td>
                 <td className="px-4 py-3">
-                  <span className="font-medium text-slate-800">{p.nombre}</span>
-                  {p.notas && <p className="text-xs text-slate-400 truncate max-w-[180px]">{p.notas}</p>}
+                  <span className="font-medium text-ink-700">{p.nombre}</span>
+                  {p.notas && <p className="text-xs text-ink-400 truncate max-w-[180px]">{p.notas}</p>}
                 </td>
-                <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{p.empresa || '—'}</td>
-                <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{p.asignado_a || '—'}</td>
-                <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{p.ramo_interes || '—'}</td>
-                <td className="px-4 py-3 text-slate-700 font-medium hidden lg:table-cell">
+                <td className="px-4 py-3 text-ink-500 hidden md:table-cell">{p.empresa || '—'}</td>
+                <td className="px-4 py-3 text-ink-500 hidden lg:table-cell">{p.asignado_a || '—'}</td>
+                <td className="px-4 py-3 text-ink-500 hidden md:table-cell">{p.ramo_interes || '—'}</td>
+                <td className="px-4 py-3 text-ink-600 font-medium hidden lg:table-cell">
                   {p.valor_estimado ? formatCOP(p.valor_estimado) : '—'}
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ETAPA_COLORS[p.etapa] || 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ETAPA_COLORS[p.etapa] || 'bg-cream-200 text-ink-500'}`}>
                     {ETAPA_LABELS[p.etapa] || p.etapa}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-slate-500 text-xs hidden xl:table-cell">
+                <td className="px-4 py-3 text-ink-400 text-xs hidden xl:table-cell">
                   {p.fuente ? FUENTE_LABELS[p.fuente] || p.fuente : '—'}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-1">
                     <button onClick={() => { setEditing(p); setShowModal(true) }}
-                      className="text-slate-400 hover:text-slate-700 transition-colors p-0.5">
+                      className="text-ink-400 hover:text-ink-600 transition-colors p-0.5">
                       <Pencil className="w-4 h-4"/>
                     </button>
                     <button onClick={() => deleteProspecto(p.id)}
-                      className="text-slate-400 hover:text-red-600 transition-colors p-0.5">
+                      className="text-ink-400 hover:text-error transition-colors p-0.5">
                       <Trash2 className="w-4 h-4"/>
                     </button>
                   </div>
@@ -216,11 +216,11 @@ function ProspectosTab() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-ink-400">
             <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-30"/>
             <p className="text-sm">No hay negocios registrados</p>
             <button onClick={() => { setEditing(null); setShowModal(true) }}
-              className="mt-2 text-xs text-emerald-600 hover:underline">
+              className="mt-2 text-xs text-primary-500 hover:underline">
               Crear primer negocio
             </button>
           </div>
@@ -288,38 +288,38 @@ function ProspectoModal({ prospecto, onClose, onSaved }: {
     onSaved()
   }
 
-  const inp = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400'
+  const inp = 'w-full border border-ink-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-800">{prospecto ? 'Editar negocio' : 'Nuevo negocio'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5"/></button>
+        <div className="flex items-center justify-between p-5 border-b border-cream-200">
+          <h2 className="font-semibold text-ink-700">{prospecto ? 'Editar negocio' : 'Nuevo negocio'}</h2>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500"><X className="w-5 h-5"/></button>
         </div>
         <div className="p-5 grid grid-cols-2 gap-4">
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Nombre del negocio *</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Nombre del negocio *</label>
             <input value={form.nombre} onChange={e => set('nombre', e.target.value)} className={inp} placeholder="Ej: Renovación SOAT Flota XYZ"/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Empresa / Cliente</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Empresa / Cliente</label>
             <input value={form.empresa} onChange={e => set('empresa', e.target.value)} className={inp} placeholder="Nombre empresa"/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Asignado a (vendedor)</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Asignado a (vendedor)</label>
             <input value={form.asignado_a} onChange={e => set('asignado_a', e.target.value)} className={inp} placeholder="Nombre vendedor"/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ramo / Riesgo</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Ramo / Riesgo</label>
             <input value={form.ramo_interes} onChange={e => set('ramo_interes', e.target.value)} className={inp} placeholder="Ej: SOAT, Vida, ARL"/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Monto estimado (COP)</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Monto estimado (COP)</label>
             <input type="number" value={form.valor_estimado} onChange={e => set('valor_estimado', e.target.value)} className={inp} placeholder="0"/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Etapa</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Etapa</label>
             <select value={form.etapa} onChange={e => set('etapa', e.target.value)} className={inp}>
               {Object.entries(ETAPA_LABELS).map(([k, v]) => (
                 <option key={k} value={k}>{v}</option>
@@ -327,7 +327,7 @@ function ProspectoModal({ prospecto, onClose, onSaved }: {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Fuente</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Fuente</label>
             <select value={form.fuente} onChange={e => set('fuente', e.target.value)} className={inp}>
               <option value="">— Seleccionar —</option>
               {Object.entries(FUENTE_LABELS).map(([k, v]) => (
@@ -336,28 +336,28 @@ function ProspectoModal({ prospecto, onClose, onSaved }: {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Teléfono</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Teléfono</label>
             <input value={form.telefono} onChange={e => set('telefono', e.target.value)} className={inp} placeholder="+57..."/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Email</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Email</label>
             <input type="email" value={form.email} onChange={e => set('email', e.target.value)} className={inp} placeholder="correo@..."/>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Ciudad</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Ciudad</label>
             <input value={form.ciudad} onChange={e => set('ciudad', e.target.value)} className={inp} placeholder="Bogotá"/>
           </div>
           <div className="col-span-2">
-            <label className="block text-xs font-medium text-slate-600 mb-1">Notas</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Notas</label>
             <textarea value={form.notas} onChange={e => set('notas', e.target.value)} rows={3} className={inp} placeholder="Observaciones..."/>
           </div>
         </div>
         <div className="flex justify-end gap-3 px-5 pb-5">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 rounded-lg border border-slate-200 transition-colors">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-ink-500 hover:bg-cream-100 rounded-lg border border-ink-200 transition-colors">
             Cancelar
           </button>
           <button onClick={save} disabled={saving || !form.nombre.trim()}
-            className="px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
+            className="px-4 py-2 text-sm bg-primary-500 hover:bg-primary-700 disabled:opacity-50 text-white rounded-lg font-medium transition-colors">
             {saving ? 'Guardando...' : prospecto ? 'Guardar cambios' : 'Crear negocio'}
           </button>
         </div>
@@ -378,7 +378,7 @@ function GestionTab() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"/>
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"/>
     </div>
   )
 
@@ -446,7 +446,7 @@ function GestionTab() {
   const promedioDias = avgDias.length ? Math.round(avgDias.reduce((a, b) => a + b, 0) / avgDias.length) : 0
 
   if (prospectos.length === 0) return (
-    <div className="text-center py-16 text-slate-400">
+    <div className="text-center py-16 text-ink-400">
       <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-20"/>
       <p className="font-medium">Sin datos de gestión</p>
       <p className="text-sm mt-1">Crea negocios en la pestaña Prospectos para ver métricas</p>
@@ -458,13 +458,13 @@ function GestionTab() {
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[
-          { label: 'Total negocios', value: prospectos.length, color: 'text-slate-800', bg: 'bg-slate-50' },
-          { label: 'Tasa conversión', value: `${tasaConversion}%`, color: tasaConversion >= 20 ? 'text-emerald-700' : 'text-amber-700', bg: 'bg-amber-50' },
-          { label: 'Promedio días gestión', value: promedioDias ? `${promedioDias}d` : '—', color: 'text-blue-700', bg: 'bg-blue-50' },
+          { label: 'Total negocios', value: prospectos.length, color: 'text-ink-700', bg: 'bg-cream-100' },
+          { label: 'Tasa conversión', value: `${tasaConversion}%`, color: tasaConversion >= 20 ? 'text-primary-700' : 'text-ink-700', bg: 'bg-warning-soft' },
+          { label: 'Promedio días gestión', value: promedioDias ? `${promedioDias}d` : '—', color: 'text-info', bg: 'bg-info/10' },
           { label: 'Negocios cerrados', value: totalCerrados, color: 'text-violet-700', bg: 'bg-violet-50' },
         ].map(s => (
           <div key={s.label} className={`${s.bg} rounded-xl p-4`}>
-            <p className="text-xs text-slate-500 font-medium mb-1">{s.label}</p>
+            <p className="text-xs text-ink-400 font-medium mb-1">{s.label}</p>
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -473,10 +473,10 @@ function GestionTab() {
       {/* Charts row 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Negocios por período */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Negocios vendidos por período</h3>
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <h3 className="text-sm font-semibold text-ink-600 mb-4">Negocios vendidos por período</h3>
           {periodData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-slate-300 text-sm">Sin datos de período</div>
+            <div className="flex items-center justify-center h-40 text-ink-300 text-sm">Sin datos de período</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={periodData} barSize={18} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -492,16 +492,16 @@ function GestionTab() {
             </ResponsiveContainer>
           )}
           <div className="flex gap-4 mt-2">
-            <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-sm bg-slate-300 inline-block"/>Total creados</span>
-            <span className="flex items-center gap-1.5 text-xs text-slate-500"><span className="w-3 h-3 rounded-sm bg-emerald-500 inline-block"/>Ganados</span>
+            <span className="flex items-center gap-1.5 text-xs text-ink-400"><span className="w-3 h-3 rounded-sm bg-ink-300 inline-block"/>Total creados</span>
+            <span className="flex items-center gap-1.5 text-xs text-ink-400"><span className="w-3 h-3 rounded-sm bg-primary-500 inline-block"/>Ganados</span>
           </div>
         </div>
 
         {/* Promedio días gestión */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Promedio días gestión comercial</h3>
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <h3 className="text-sm font-semibold text-ink-600 mb-4">Promedio días gestión comercial</h3>
           {diasData.length === 0 ? (
-            <div className="flex items-center justify-center h-40 text-slate-300 text-sm">Sin negocios cerrados aún</div>
+            <div className="flex items-center justify-center h-40 text-ink-300 text-sm">Sin negocios cerrados aún</div>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={diasData} barSize={22} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
@@ -521,10 +521,10 @@ function GestionTab() {
       {/* Charts row 2 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Negocios por estado */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Negocios por estado</h3>
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <h3 className="text-sm font-semibold text-ink-600 mb-4">Negocios por estado</h3>
           {byEtapa.length === 0 ? (
-            <div className="flex items-center justify-center h-48 text-slate-300 text-sm">Sin datos</div>
+            <div className="flex items-center justify-center h-48 text-ink-300 text-sm">Sin datos</div>
           ) : (
             <div className="flex items-center gap-4">
               <ResponsiveContainer width="60%" height={200}>
@@ -542,8 +542,8 @@ function GestionTab() {
                 {byEtapa.map((d, i) => (
                   <div key={d.name} className="flex items-center gap-2 text-xs">
                     <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}/>
-                    <span className="text-slate-600 truncate flex-1">{d.name}</span>
-                    <span className="font-semibold text-slate-800">{d.value}</span>
+                    <span className="text-ink-500 truncate flex-1">{d.name}</span>
+                    <span className="font-semibold text-ink-700">{d.value}</span>
                   </div>
                 ))}
               </div>
@@ -552,19 +552,19 @@ function GestionTab() {
         </div>
 
         {/* Embudo de conversión */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="text-sm font-semibold text-slate-700 mb-4">Embudo de conversión</h3>
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <h3 className="text-sm font-semibold text-ink-600 mb-4">Embudo de conversión</h3>
           <div className="space-y-2.5">
             {embudo.map((e, i) => {
               const pct = maxEmbudo > 0 ? Math.round((e.value / maxEmbudo) * 100) : 0
-              const colors = ['bg-blue-500', 'bg-sky-500', 'bg-violet-500', 'bg-amber-500', 'bg-emerald-500']
+              const colors = ['bg-info/100', 'bg-info', 'bg-violet-500', 'bg-warning', 'bg-primary-500']
               return (
                 <div key={e.name}>
                   <div className="flex justify-between text-xs mb-1">
-                    <span className="text-slate-600 font-medium">{e.name}</span>
-                    <span className="text-slate-500">{e.value} <span className="text-slate-300">({pct}%)</span></span>
+                    <span className="text-ink-500 font-medium">{e.name}</span>
+                    <span className="text-ink-400">{e.value} <span className="text-ink-300">({pct}%)</span></span>
                   </div>
-                  <div className="h-6 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-6 bg-cream-200 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${colors[i]}`}
                       style={{ width: `${pct}%` }}
@@ -579,11 +579,11 @@ function GestionTab() {
             })}
           </div>
           {prospectos.filter(p => p.etapa === 'cerrado_perdido').length > 0 && (
-            <div className="mt-3 pt-3 border-t border-slate-100">
-              <div className="flex items-center gap-2 text-xs text-slate-500">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-400 flex-shrink-0"/>
+            <div className="mt-3 pt-3 border-t border-cream-200">
+              <div className="flex items-center gap-2 text-xs text-ink-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-error flex-shrink-0"/>
                 <span>Perdidos:</span>
-                <span className="font-semibold text-slate-700">{prospectos.filter(p => p.etapa === 'cerrado_perdido').length}</span>
+                <span className="font-semibold text-ink-600">{prospectos.filter(p => p.etapa === 'cerrado_perdido').length}</span>
               </div>
             </div>
           )}
@@ -631,7 +631,7 @@ function SOATTab() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"/>
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"/>
     </div>
   )
 
@@ -640,10 +640,10 @@ function SOATTab() {
       {/* Header + filter */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
-          <Car className="w-5 h-5 text-blue-600"/>
+          <Car className="w-5 h-5 text-info"/>
           <div>
-            <h3 className="font-semibold text-slate-800">Oportunidades SOAT</h3>
-            <p className="text-xs text-slate-500">Pólizas SOAT próximas a vencer — contactar para renovar</p>
+            <h3 className="font-semibold text-ink-700">Oportunidades SOAT</h3>
+            <p className="text-xs text-ink-400">Pólizas SOAT próximas a vencer — contactar para renovar</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -653,8 +653,8 @@ function SOATTab() {
               className={[
                 'px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors',
                 filterDias === d
-                  ? 'bg-blue-600 text-white border-blue-600'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50',
+                  ? 'bg-info text-white border-blue-600'
+                  : 'bg-white text-ink-500 border-ink-200 hover:bg-cream-100',
               ].join(' ')}>
               {d}d
             </button>
@@ -664,25 +664,25 @@ function SOATTab() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-red-50 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-red-700">{urgentes}</p>
-          <p className="text-xs text-red-600 mt-0.5">Urgentes (≤15d)</p>
+        <div className="bg-error-soft rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-error">{urgentes}</p>
+          <p className="text-xs text-error mt-0.5">Urgentes (≤15d)</p>
         </div>
-        <div className="bg-amber-50 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-amber-700">{proximos}</p>
-          <p className="text-xs text-amber-600 mt-0.5">Próximas (16–30d)</p>
+        <div className="bg-warning-soft rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-ink-700">{proximos}</p>
+          <p className="text-xs text-ink-700 mt-0.5">Próximas (16–30d)</p>
         </div>
-        <div className="bg-blue-50 rounded-xl p-3 text-center">
-          <p className="text-2xl font-bold text-blue-700">{filtered.length}</p>
-          <p className="text-xs text-blue-600 mt-0.5">Total ({filterDias}d)</p>
+        <div className="bg-info/10 rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold text-info">{filtered.length}</p>
+          <p className="text-xs text-info mt-0.5">Total ({filterDias}d)</p>
         </div>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr className="text-left text-xs text-slate-500">
+          <thead className="bg-cream-100 border-b border-ink-200">
+            <tr className="text-left text-xs text-ink-400">
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium hidden md:table-cell">Placa / Riesgo</th>
               <th className="px-4 py-3 font-medium hidden lg:table-cell">Aseguradora</th>
@@ -695,22 +695,22 @@ function SOATTab() {
             {filtered.map(p => {
               const days = p.fecha_fin ? daysUntilFin(p.fecha_fin) : 999
               const urgency = days <= 15
-                ? 'bg-red-100 text-red-700'
+                ? 'bg-error-soft text-error'
                 : days <= 30
-                  ? 'bg-amber-100 text-amber-700'
-                  : 'bg-blue-100 text-blue-700'
+                  ? 'bg-warning-soft text-ink-700'
+                  : 'bg-info/20 text-info'
               return (
-                <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <tr key={p.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
                   <td className="px-4 py-3">
-                    <span className="font-medium text-slate-800">{(p.cliente as any)?.nombre || 'Sin cliente'}</span>
-                    {p.numero_poliza && <p className="text-xs text-slate-400">Póliza: {p.numero_poliza}</p>}
+                    <span className="font-medium text-ink-700">{(p.cliente as any)?.nombre || 'Sin cliente'}</span>
+                    {p.numero_poliza && <p className="text-xs text-ink-400">Póliza: {p.numero_poliza}</p>}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 hidden md:table-cell">{p.riesgo || '—'}</td>
-                  <td className="px-4 py-3 text-slate-600 hidden lg:table-cell">{p.aseguradora}</td>
-                  <td className="px-4 py-3 text-slate-700 font-medium hidden md:table-cell">
+                  <td className="px-4 py-3 text-ink-500 hidden md:table-cell">{p.riesgo || '—'}</td>
+                  <td className="px-4 py-3 text-ink-500 hidden lg:table-cell">{p.aseguradora}</td>
+                  <td className="px-4 py-3 text-ink-600 font-medium hidden md:table-cell">
                     {p.prima_neta ? formatCOP(p.prima_neta) : '—'}
                   </td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">
+                  <td className="px-4 py-3 text-ink-500 text-xs">
                     {p.fecha_fin
                       ? new Date(p.fecha_fin + 'T12:00:00').toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
                       : '—'}
@@ -726,7 +726,7 @@ function SOATTab() {
           </tbody>
         </table>
         {filtered.length === 0 && (
-          <div className="text-center py-12 text-slate-400">
+          <div className="text-center py-12 text-ink-400">
             <Car className="w-8 h-8 mx-auto mb-2 opacity-30"/>
             <p className="text-sm">No hay pólizas SOAT por vencer en los próximos {filterDias} días</p>
           </div>
@@ -749,14 +749,14 @@ export default function CRMComercialView() {
   return (
     <div>
       {/* Sub-tabs */}
-      <div className="flex gap-1 mb-5 border-b border-slate-200">
+      <div className="flex gap-1 mb-5 border-b border-ink-200">
         {tabs.map(t => (
           <button key={t.key} onClick={() => setSubTab(t.key)}
             className={[
               'flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors',
               subTab === t.key
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700',
+                ? 'border-primary-500 text-primary-500'
+                : 'border-transparent text-ink-400 hover:text-ink-600',
             ].join(' ')}>
             {t.icon}
             {t.label}

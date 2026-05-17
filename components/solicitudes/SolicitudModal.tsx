@@ -102,13 +102,13 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <h2 className="font-semibold text-ink-700">
             {solicitud
               ? `Editar solicitud #${solicitud.numero_solicitud || ''}`
               : 'Nueva solicitud'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -116,10 +116,10 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
         <div className="p-5 space-y-4">
           {/* Número (read-only en edición) */}
           {solicitud?.numero_solicitud && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200">
-              <span className="text-xs text-slate-500">N° solicitud</span>
-              <span className="font-mono font-semibold text-slate-700">#{solicitud.numero_solicitud}</span>
-              <span className="ml-auto text-xs text-slate-400">(auto-generado)</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-cream-100 rounded-lg border border-ink-200">
+              <span className="text-xs text-ink-400">N° solicitud</span>
+              <span className="font-mono font-semibold text-ink-600">#{solicitud.numero_solicitud}</span>
+              <span className="ml-auto text-xs text-ink-400">(auto-generado)</span>
             </div>
           )}
 
@@ -181,9 +181,9 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
                     'flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-colors',
                     form.prioridad === p
                       ? p === 'urgente'
-                        ? 'bg-red-600 border-red-600 text-white'
-                        : 'bg-emerald-600 border-emerald-600 text-white'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400',
+                        ? 'bg-error border-error text-white'
+                        : 'bg-primary-500 border-primary-500 text-white'
+                      : 'bg-white border-ink-200 text-ink-500 hover:border-ink-400',
                   ].join(' ')}>
                   {p === 'urgente' ? '⚠ Urgente' : 'Normal'}
                 </button>
@@ -215,16 +215,16 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
               placeholder="Notas para el equipo..." rows={2} className={inputCls} />
           </Field>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
-        <div className="flex gap-3 p-5 border-t border-slate-200">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
           <button onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">
             Cancelar
           </button>
           <button onClick={save} disabled={saving}
-            className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 transition-colors">
             {saving ? 'Guardando...' : 'Guardar solicitud'}
           </button>
         </div>
@@ -234,6 +234,6 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>{children}</div>
 }
-const inputCls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const inputCls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

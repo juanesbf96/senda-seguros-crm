@@ -98,9 +98,9 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800">{vendedor ? 'Editar vendedor' : 'Nuevo vendedor'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <h2 className="font-semibold text-ink-700">{vendedor ? 'Editar vendedor' : 'Nuevo vendedor'}</h2>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-5">
@@ -132,8 +132,8 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
                     className={[
                       'flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors',
                       form.activo === opt.val
-                        ? opt.val ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-500 border-slate-500 text-white'
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400',
+                        ? opt.val ? 'bg-primary-500 border-primary-500 text-white' : 'bg-ink-400 border-ink-400 text-white'
+                        : 'bg-white border-ink-200 text-ink-500 hover:border-ink-400',
                     ].join(' ')}>
                     {opt.label}
                   </button>
@@ -149,7 +149,7 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
                 <div key={idx} className="flex items-center gap-3">
                   <div className="flex-1 grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">Año</label>
+                      <label className="block text-[10px] text-ink-400 mb-1">Año</label>
                       <input
                         type="number" min="1" max="30"
                         value={c.anio}
@@ -158,7 +158,7 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-slate-400 mb-1">% Comisión</label>
+                      <label className="block text-[10px] text-ink-400 mb-1">% Comisión</label>
                       <div className="relative">
                         <input
                           type="number" min="0" max="100" step="0.01"
@@ -166,13 +166,13 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
                           onChange={e => updateComision(idx, 'porcentaje', e.target.value)}
                           className={cls + ' pr-7'}
                         />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
                       </div>
                     </div>
                   </div>
                   {comisiones.length > 1 && (
                     <button type="button" onClick={() => removeComision(idx)}
-                      className="mt-4 text-slate-400 hover:text-red-500 transition-colors">
+                      className="mt-4 text-ink-400 hover:text-error transition-colors">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
@@ -180,10 +180,10 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
               ))}
             </div>
             <button type="button" onClick={addComision}
-              className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium mt-1">
+              className="flex items-center gap-1.5 text-xs text-primary-500 hover:text-primary-700 font-medium mt-1">
               <Plus className="w-3.5 h-3.5" /> Agregar año
             </button>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
+            <p className="text-[11px] text-ink-400 leading-relaxed">
               El % se aplica sobre la <strong>comisión de agencia</strong>, no sobre la prima neta.
             </p>
           </Section>
@@ -217,12 +217,12 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
               placeholder="Observaciones..." rows={2} className={cls} />
           </Section>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
-        <div className="flex gap-3 p-5 border-t border-slate-200">
-          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">Cancelar</button>
-          <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">Cancelar</button>
+          <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 transition-colors">
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -234,14 +234,14 @@ export default function VendedorModal({ vendedor, onClose, onSaved }: Props) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">{title}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mb-3">{title}</p>
       <div className="space-y-3">{children}</div>
     </div>
   )
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>{children}</div>
 }
 
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

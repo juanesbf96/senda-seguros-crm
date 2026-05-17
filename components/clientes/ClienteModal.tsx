@@ -116,11 +116,11 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800">
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <h2 className="font-semibold text-ink-700">
             {cliente ? 'Editar cliente' : 'Nuevo cliente'}
           </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -135,8 +135,8 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
                   className={[
                     'py-2 px-3 rounded-lg text-xs font-medium border transition-colors',
                     tipo === t
-                      ? 'bg-emerald-600 border-emerald-600 text-white'
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400',
+                      ? 'bg-primary-500 border-primary-500 text-white'
+                      : 'bg-white border-ink-200 text-ink-500 hover:border-primary-400',
                   ].join(' ')}>
                   {TIPO_LABELS[t]}
                 </button>
@@ -320,19 +320,19 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
             </Field>
           </Section>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
-        <div className="flex gap-3 p-5 border-t border-slate-200">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
           <button onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">
             Cancelar
           </button>
           <button
             onClick={save}
             disabled={saving || saveDisabled}
             title={saveDisabled ? 'Sin permiso para editar clientes' : undefined}
-            className={`flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors ${saveDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
+            className={`flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 transition-colors ${saveDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}>
             {saving ? 'Guardando...' : 'Guardar'}
           </button>
         </div>
@@ -346,7 +346,7 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">{title}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mb-3">{title}</p>
       <div className="space-y-3">{children}</div>
     </div>
   )
@@ -355,7 +355,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>
       {children}
     </div>
   )
@@ -371,13 +371,13 @@ function Toggle({ value, onChange, yesLabel = 'Sí', noLabel = 'No' }: {
     <div className="flex gap-2">
       <button type="button" onClick={() => onChange(true)}
         className={['flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-colors',
-          value ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400',
+          value ? 'bg-primary-500 border-primary-500 text-white' : 'bg-white border-ink-200 text-ink-500 hover:border-primary-400',
         ].join(' ')}>
         {yesLabel}
       </button>
       <button type="button" onClick={() => onChange(false)}
         className={['flex-1 py-2 px-3 rounded-lg text-xs font-medium border transition-colors',
-          !value ? 'bg-slate-500 border-slate-500 text-white' : 'bg-white border-slate-200 text-slate-600 hover:border-slate-400',
+          !value ? 'bg-ink-400 border-ink-400 text-white' : 'bg-white border-ink-200 text-ink-500 hover:border-ink-400',
         ].join(' ')}>
         {noLabel}
       </button>
@@ -385,4 +385,4 @@ function Toggle({ value, onChange, yesLabel = 'Sí', noLabel = 'No' }: {
   )
 }
 
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

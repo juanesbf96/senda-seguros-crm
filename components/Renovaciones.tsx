@@ -20,16 +20,16 @@ type MainTab = 'activas' | 'cerradas' | 'polizas'
 
 /* ── Gestión config ─────────────────────────────────────────── */
 const GESTION_CFG: Record<EstadoGestion, { label: string; cls: string }> = {
-  pendiente:      { label: 'Pendiente',      cls: 'bg-slate-100 text-slate-600' },
-  contactado:     { label: 'Contactado',     cls: 'bg-blue-100 text-blue-700' },
+  pendiente:      { label: 'Pendiente',      cls: 'bg-cream-200 text-ink-500' },
+  contactado:     { label: 'Contactado',     cls: 'bg-info/20 text-info' },
   en_negociacion: { label: 'En negociación', cls: 'bg-purple-100 text-purple-700' },
-  renovado:       { label: 'Renovado ✓',    cls: 'bg-emerald-100 text-emerald-700' },
-  no_renueva:     { label: 'No renueva',     cls: 'bg-red-100 text-red-600' },
+  renovado:       { label: 'Renovado ✓',    cls: 'bg-primary-100 text-primary-700' },
+  no_renueva:     { label: 'No renueva',     cls: 'bg-error-soft text-error' },
 }
 const ESTADO_ORDER: EstadoGestion[] = ['pendiente', 'contactado', 'en_negociacion', 'renovado', 'no_renueva']
 
 /* ── Shared helpers ─────────────────────────────────────────── */
-const iCls = 'w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white'
+const iCls = 'w-full border border-ink-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white'
 
 async function loadGestiones(polizaIds: string[]): Promise<Record<string, GestionRenovacion>> {
   if (!polizaIds.length) return {}
@@ -65,30 +65,30 @@ function PolicyRow({
 
   return (
     <div className={`bg-white rounded-xl border transition-colors ${
-      isUrgent ? 'border-red-300' : isWarn ? 'border-amber-300' : 'border-slate-200'
+      isUrgent ? 'border-error/50' : isWarn ? 'border-warning/40' : 'border-ink-200'
     }`}>
       <div className="p-4 flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-            isUrgent ? 'bg-red-100' : isWarn ? 'bg-amber-100' : 'bg-blue-100'
+            isUrgent ? 'bg-error-soft' : isWarn ? 'bg-warning-soft' : 'bg-info/20'
           }`}>
             <span className={`text-sm font-bold ${
-              isUrgent ? 'text-red-700' : isWarn ? 'text-amber-700' : 'text-blue-700'
+              isUrgent ? 'text-error' : isWarn ? 'text-ink-700' : 'text-info'
             }`}>{days}d</span>
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {p.cliente
-                ? <Link href={`/clientes/${p.cliente.id}`} className="font-semibold text-slate-800 hover:text-emerald-600">{p.cliente.nombre}</Link>
-                : <span className="font-semibold text-slate-800">—</span>}
-              <span className="text-slate-400 text-sm">·</span>
-              <span className="text-sm text-slate-600">{p.aseguradora}</span>
-              <span className="text-sm text-slate-400">{p.ramo}</span>
+                ? <Link href={`/clientes/${p.cliente.id}`} className="font-semibold text-ink-700 hover:text-primary-500">{p.cliente.nombre}</Link>
+                : <span className="font-semibold text-ink-700">—</span>}
+              <span className="text-ink-400 text-sm">·</span>
+              <span className="text-sm text-ink-500">{p.aseguradora}</span>
+              <span className="text-sm text-ink-400">{p.ramo}</span>
             </div>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-              <span className="text-xs text-slate-400">Vence: {formatDate(p.fecha_fin)}</span>
-              {p.prima_neta && <span className="text-xs text-slate-500">Prima neta: {formatCOP(p.prima_neta)}</span>}
-              {p.numero_poliza && <span className="text-xs text-slate-400">N°: {p.numero_poliza}</span>}
+              <span className="text-xs text-ink-400">Vence: {formatDate(p.fecha_fin)}</span>
+              {p.prima_neta && <span className="text-xs text-ink-400">Prima neta: {formatCOP(p.prima_neta)}</span>}
+              {p.numero_poliza && <span className="text-xs text-ink-400">N°: {p.numero_poliza}</span>}
             </div>
           </div>
         </div>
@@ -99,20 +99,20 @@ function PolicyRow({
           </span>
           {p.cliente?.telefono && (
             <a href={`tel:${p.cliente.telefono}`}
-              className="flex items-center gap-1 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors">
+              className="flex items-center gap-1 text-xs text-primary-700 bg-primary-50 border border-primary-200 px-2.5 py-1.5 rounded-lg hover:bg-primary-100 transition-colors">
               <Phone className="w-3.5 h-3.5" /> {p.cliente.telefono}
             </a>
           )}
           <button onClick={() => setExpanded(e => !e)}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100">
+            className="text-ink-400 hover:text-ink-600 p-1.5 rounded-lg hover:bg-cream-200">
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
       </div>
 
       {expanded && (
-        <div className="border-t border-slate-100 p-4 bg-slate-50/50 rounded-b-xl">
-          <p className="text-xs font-medium text-slate-500 mb-3">Actualizar gestión</p>
+        <div className="border-t border-cream-200 p-4 bg-cream-100/50 rounded-b-xl">
+          <p className="text-xs font-medium text-ink-400 mb-3">Actualizar gestión</p>
           <div className="flex gap-2 flex-wrap mb-3">
             {ESTADO_ORDER.map(estado => (
               <button key={estado}
@@ -122,7 +122,7 @@ function PolicyRow({
                   'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
                   estadoActual === estado
                     ? `${GESTION_CFG[estado].cls} border-transparent cursor-default`
-                    : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-700',
+                    : 'bg-white border-ink-200 text-ink-500 hover:border-primary-400 hover:text-primary-700',
                 ].join(' ')}>
                 {estadoActual === estado && <Check className="w-3 h-3" />}
                 {GESTION_CFG[estado].label}
@@ -130,16 +130,16 @@ function PolicyRow({
             ))}
           </div>
           <div className="relative">
-            <MessageSquare className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+            <MessageSquare className="absolute left-3 top-2.5 w-3.5 h-3.5 text-ink-400" />
             <input
               value={notaDraft}
               onChange={e => onChangeNota(p.id, e.target.value)}
               placeholder="Nota sobre la gestión (opcional)..."
-              className="w-full pl-8 pr-3 py-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+              className="w-full pl-8 pr-3 py-2 text-xs border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
             />
           </div>
           {gestion?.notas && (
-            <p className="text-xs text-slate-400 mt-2 italic">Última nota: {gestion.notas}</p>
+            <p className="text-xs text-ink-400 mt-2 italic">Última nota: {gestion.notas}</p>
           )}
         </div>
       )}
@@ -199,31 +199,31 @@ function CampanaModal({ editing, onSave, onClose }: {
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg">
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-cream-200">
           <div>
-            <h2 className="font-bold text-slate-900">{editing ? 'Editar campaña' : 'Nueva campaña'}</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Define el período de vencimiento que cubre esta campaña</p>
+            <h2 className="font-bold text-ink-700">{editing ? 'Editar campaña' : 'Nueva campaña'}</h2>
+            <p className="text-xs text-ink-400 mt-0.5">Define el período de vencimiento que cubre esta campaña</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100">
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500 p-1.5 rounded-lg hover:bg-cream-200">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Nombre de la campaña *</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1.5">Nombre de la campaña *</label>
             <input value={form.nombre} onChange={e => set('nombre', e.target.value)}
               className={iCls} placeholder="Ej: Renovaciones Q2 2025, Vida - Junio..." autoFocus />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Inicio del período *</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1.5">Inicio del período *</label>
               <input type="date" value={form.fecha_inicio_periodo}
                 onChange={e => set('fecha_inicio_periodo', e.target.value)} className={iCls} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Fin del período *</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1.5">Fin del período *</label>
               <input type="date" value={form.fecha_fin_periodo}
                 onChange={e => set('fecha_fin_periodo', e.target.value)} className={iCls} />
             </div>
@@ -231,25 +231,25 @@ function CampanaModal({ editing, onSave, onClose }: {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Aseguradora (filtro opcional)</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1.5">Aseguradora (filtro opcional)</label>
               <input value={form.aseguradora} onChange={e => set('aseguradora', e.target.value)}
                 className={iCls} placeholder="Todas" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1.5">Ramo (filtro opcional)</label>
+              <label className="block text-xs font-medium text-ink-500 mb-1.5">Ramo (filtro opcional)</label>
               <input value={form.ramo} onChange={e => set('ramo', e.target.value)}
                 className={iCls} placeholder="Todos" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Descripción</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1.5">Descripción</label>
             <input value={form.descripcion} onChange={e => set('descripcion', e.target.value)}
               className={iCls} placeholder="Descripción opcional de la campaña..." />
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1.5">Notas internas</label>
+            <label className="block text-xs font-medium text-ink-500 mb-1.5">Notas internas</label>
             <textarea value={form.notas} onChange={e => set('notas', e.target.value)} rows={2}
               className={iCls + ' resize-none'} placeholder="Notas de seguimiento o instrucciones para el equipo..." />
           </div>
@@ -257,11 +257,11 @@ function CampanaModal({ editing, onSave, onClose }: {
 
         <div className="flex gap-2 justify-end px-6 pb-5">
           <button onClick={onClose}
-            className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+            className="px-4 py-2 text-sm text-ink-500 border border-ink-200 rounded-lg hover:bg-cream-100">
             Cancelar
           </button>
           <button onClick={submit} disabled={!valid || saving}
-            className="flex items-center gap-2 px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg disabled:opacity-50 font-medium">
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-primary-500 hover:bg-primary-700 text-white rounded-lg disabled:opacity-50 font-medium">
             {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
             {editing ? 'Guardar cambios' : 'Crear campaña'}
           </button>
@@ -338,7 +338,7 @@ function CampanaCard({
 
   return (
     <div className={`bg-white rounded-xl border-2 overflow-hidden transition-all ${
-      isActiva ? 'border-emerald-200' : 'border-slate-200 opacity-80'
+      isActiva ? 'border-primary-200' : 'border-ink-200 opacity-80'
     }`}>
       {/* Header */}
       <div className="p-5">
@@ -347,60 +347,60 @@ function CampanaCard({
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${
                 isActiva
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-slate-100 text-slate-500 border-slate-200'
+                  ? 'bg-primary-50 text-primary-700 border-primary-200'
+                  : 'bg-cream-200 text-ink-400 border-ink-200'
               }`}>
                 {isActiva ? 'Activa' : 'Cerrada'}
               </span>
-              <h3 className="font-bold text-slate-900">{campana.nombre}</h3>
+              <h3 className="font-bold text-ink-700">{campana.nombre}</h3>
             </div>
 
             <div className="flex items-center gap-4 mt-2 flex-wrap">
-              <span className="flex items-center gap-1.5 text-xs text-slate-500">
+              <span className="flex items-center gap-1.5 text-xs text-ink-400">
                 <Calendar className="w-3.5 h-3.5" />
                 {formatDate(campana.fecha_inicio_periodo)} → {formatDate(campana.fecha_fin_periodo)}
               </span>
               {campana.aseguradora && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                <span className="text-xs text-ink-400 bg-cream-200 px-2 py-0.5 rounded">
                   {campana.aseguradora}
                 </span>
               )}
               {campana.ramo && (
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                <span className="text-xs text-ink-400 bg-cream-200 px-2 py-0.5 rounded">
                   {campana.ramo}
                 </span>
               )}
               {isActiva && diasLeft >= 0 && (
-                <span className={`text-xs font-medium ${diasLeft <= 10 ? 'text-red-600' : 'text-slate-400'}`}>
+                <span className={`text-xs font-medium ${diasLeft <= 10 ? 'text-error' : 'text-ink-400'}`}>
                   {diasLeft === 0 ? 'Vence hoy' : `Período cierra en ${diasLeft}d`}
                 </span>
               )}
             </div>
 
             {campana.descripcion && (
-              <p className="text-xs text-slate-400 mt-1.5">{campana.descripcion}</p>
+              <p className="text-xs text-ink-400 mt-1.5">{campana.descripcion}</p>
             )}
           </div>
 
           <div className="flex items-center gap-1 flex-shrink-0">
             <button onClick={() => onEdit(campana)}
-              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg">
+              className="p-1.5 text-ink-400 hover:text-ink-600 hover:bg-cream-200 rounded-lg">
               <Pencil className="w-4 h-4" />
             </button>
             {isActiva
               ? <button onClick={() => onCerrar(campana.id)}
                   title="Cerrar campaña"
-                  className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg">
+                  className="p-1.5 text-ink-400 hover:text-ink-700 hover:bg-warning-soft rounded-lg">
                   <ArchiveX className="w-4 h-4" />
                 </button>
               : <button onClick={() => onReactivar(campana.id)}
                   title="Reactivar campaña"
-                  className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg">
+                  className="p-1.5 text-ink-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg">
                   <RefreshCw className="w-4 h-4" />
                 </button>
             }
             <button onClick={() => onDelete(campana.id)}
-              className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg">
+              className="p-1.5 text-ink-400 hover:text-error hover:bg-error-soft rounded-lg">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -409,28 +409,28 @@ function CampanaCard({
         {/* Stats row (only when loaded) */}
         {loaded && !loadingP && (
           <div className="mt-4 grid grid-cols-4 gap-3">
-            <div className="bg-slate-50 rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-slate-800">{total}</p>
-              <p className="text-xs text-slate-500">Pólizas</p>
+            <div className="bg-cream-100 rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-ink-700">{total}</p>
+              <p className="text-xs text-ink-400">Pólizas</p>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-emerald-700">{renovadas}</p>
-              <p className="text-xs text-slate-500">Renovadas</p>
+            <div className="bg-cream-100 rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-primary-700">{renovadas}</p>
+              <p className="text-xs text-ink-400">Renovadas</p>
             </div>
-            <div className="bg-slate-50 rounded-lg p-2.5 text-center">
-              <p className="text-lg font-bold text-red-600">{noRen}</p>
-              <p className="text-xs text-slate-500">No renuevan</p>
+            <div className="bg-cream-100 rounded-lg p-2.5 text-center">
+              <p className="text-lg font-bold text-error">{noRen}</p>
+              <p className="text-xs text-ink-400">No renuevan</p>
             </div>
             {urgente > 0 && (
-              <div className="bg-red-50 rounded-lg p-2.5 text-center">
-                <p className="text-lg font-bold text-red-700">{urgente}</p>
-                <p className="text-xs text-red-500">≤15 días</p>
+              <div className="bg-error-soft rounded-lg p-2.5 text-center">
+                <p className="text-lg font-bold text-error">{urgente}</p>
+                <p className="text-xs text-error">≤15 días</p>
               </div>
             )}
             {urgente === 0 && (
-              <div className="bg-slate-50 rounded-lg p-2.5 text-center">
-                <p className="text-xs font-bold text-slate-700">{formatCOP(prima)}</p>
-                <p className="text-xs text-slate-500">Prima neta</p>
+              <div className="bg-cream-100 rounded-lg p-2.5 text-center">
+                <p className="text-xs font-bold text-ink-600">{formatCOP(prima)}</p>
+                <p className="text-xs text-ink-400">Prima neta</p>
               </div>
             )}
           </div>
@@ -439,12 +439,12 @@ function CampanaCard({
         {/* Progress bar */}
         {loaded && !loadingP && total > 0 && (
           <div className="mt-3">
-            <div className="flex justify-between text-xs text-slate-500 mb-1">
+            <div className="flex justify-between text-xs text-ink-400 mb-1">
               <span>{pct}% renovadas</span>
               <span>{formatCOP(prima)} prima total</span>
             </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+            <div className="h-2 bg-cream-200 rounded-full overflow-hidden">
+              <div className="h-full bg-primary-500 rounded-full transition-all duration-500"
                 style={{ width: `${pct}%` }} />
             </div>
           </div>
@@ -452,9 +452,9 @@ function CampanaCard({
       </div>
 
       {/* Toggle policies */}
-      <div className="border-t border-slate-100">
+      <div className="border-t border-cream-200">
         <button onClick={toggleExpand}
-          className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-medium text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition-colors">
+          className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-medium text-ink-400 hover:text-primary-500 hover:bg-primary-50 transition-colors">
           {loadingP
             ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Cargando pólizas...</>
             : expanded
@@ -465,13 +465,13 @@ function CampanaCard({
       </div>
 
       {expanded && !loadingP && (
-        <div className="border-t border-slate-100 bg-slate-50/50 p-4">
+        <div className="border-t border-cream-200 bg-cream-100/50 p-4">
           {polizas.length === 0 ? (
             <div className="text-center py-8">
-              <Target className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <p className="text-sm text-slate-400">No hay pólizas activas que venzan en este período</p>
+              <Target className="w-8 h-8 text-ink-300 mx-auto mb-2" />
+              <p className="text-sm text-ink-400">No hay pólizas activas que venzan en este período</p>
               {(campana.aseguradora || campana.ramo) && (
-                <p className="text-xs text-slate-400 mt-1">Filtros aplicados: {[campana.aseguradora, campana.ramo].filter(Boolean).join(' · ')}</p>
+                <p className="text-xs text-ink-400 mt-1">Filtros aplicados: {[campana.aseguradora, campana.ramo].filter(Boolean).join(' · ')}</p>
               )}
             </div>
           ) : (
@@ -545,7 +545,7 @@ function Polizas60View() {
 
   if (loading) return (
     <div className="flex items-center justify-center py-20">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
     </div>
   )
 
@@ -553,39 +553,39 @@ function Polizas60View() {
     <div>
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-red-50 border border-red-200 rounded-xl p-4 text-center">
-          <AlertTriangle className="w-6 h-6 text-red-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold text-red-700">{urgente}</p>
-          <p className="text-xs text-red-600">0 – 15 días</p>
+        <div className="bg-error-soft border border-error/30 rounded-xl p-4 text-center">
+          <AlertTriangle className="w-6 h-6 text-error mx-auto mb-1" />
+          <p className="text-2xl font-bold text-error">{urgente}</p>
+          <p className="text-xs text-error">0 – 15 días</p>
         </div>
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-center">
-          <Clock className="w-6 h-6 text-amber-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold text-amber-700">{prox30}</p>
-          <p className="text-xs text-amber-600">16 – 30 días</p>
+        <div className="bg-warning-soft border border-warning/30 rounded-xl p-4 text-center">
+          <Clock className="w-6 h-6 text-warning mx-auto mb-1" />
+          <p className="text-2xl font-bold text-ink-700">{prox30}</p>
+          <p className="text-xs text-ink-700">16 – 30 días</p>
         </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-          <CheckCircle className="w-6 h-6 text-blue-500 mx-auto mb-1" />
-          <p className="text-2xl font-bold text-blue-700">{prox60}</p>
-          <p className="text-xs text-blue-600">31 – 60 días</p>
+        <div className="bg-info/10 border border-info/30 rounded-xl p-4 text-center">
+          <CheckCircle className="w-6 h-6 text-info mx-auto mb-1" />
+          <p className="text-2xl font-bold text-info">{prox60}</p>
+          <p className="text-xs text-info">31 – 60 días</p>
         </div>
       </div>
 
       {/* Filter */}
       <div className="flex items-center gap-2 mb-4">
-        <Filter className="w-4 h-4 text-slate-400" />
+        <Filter className="w-4 h-4 text-ink-400" />
         <select value={filterEstado} onChange={e => setFilter(e.target.value as EstadoGestion | 'all')}
-          className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white">
+          className="px-3 py-1.5 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white">
           <option value="all">Todos los estados</option>
           {ESTADO_ORDER.map(e => <option key={e} value={e}>{GESTION_CFG[e].label}</option>)}
         </select>
-        <span className="text-xs text-slate-400 ml-1">{filtered.length} de {polizas.length}</span>
+        <span className="text-xs text-ink-400 ml-1">{filtered.length} de {polizas.length}</span>
       </div>
 
       {filtered.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
-          <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-          <p className="font-medium text-slate-600">No hay renovaciones próximas</p>
-          <p className="text-sm text-slate-400 mt-1">Todas las pólizas activas vencen después de 60 días</p>
+        <div className="text-center py-16 bg-white rounded-xl border border-dashed border-ink-300">
+          <CheckCircle className="w-12 h-12 text-primary-400 mx-auto mb-3" />
+          <p className="font-medium text-ink-500">No hay renovaciones próximas</p>
+          <p className="text-sm text-ink-400 mt-1">Todas las pólizas activas vencen después de 60 días</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -677,33 +677,33 @@ export default function Renovaciones() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-emerald-600" /> Renovaciones
+          <h1 className="text-2xl font-bold text-ink-700 flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-primary-500" /> Renovaciones
           </h1>
-          <p className="text-slate-500 text-sm mt-1">
+          <p className="text-ink-400 text-sm mt-1">
             Gestión de campañas y seguimiento de pólizas próximas a vencer
           </p>
         </div>
         <button
           onClick={() => { setEditingC(null); setShowModal(true) }}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors">
+          className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-700 text-white rounded-lg text-sm font-medium transition-colors">
           <Plus className="w-4 h-4" /> Nueva campaña
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-slate-200">
+      <div className="flex gap-1 mb-6 border-b border-ink-200">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
               tab === t.key
-                ? 'border-emerald-600 text-emerald-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
+                ? 'border-primary-500 text-primary-500'
+                : 'border-transparent text-ink-400 hover:text-ink-600'
             }`}>
             {t.label}
             {t.count !== null && (
               <span className={`px-1.5 py-0.5 rounded-full text-xs font-semibold ${
-                tab === t.key ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                tab === t.key ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'
               }`}>{t.count}</span>
             )}
           </button>
@@ -713,26 +713,26 @@ export default function Renovaciones() {
       {/* Content */}
       {loading && tab !== 'polizas' ? (
         <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
         </div>
       ) : tab === 'polizas' ? (
         <Polizas60View />
       ) : (
         <>
           {(tab === 'activas' ? activas : cerradas).length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
-              <Target className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="font-medium text-slate-600">
+            <div className="text-center py-20 bg-white rounded-xl border border-dashed border-ink-300">
+              <Target className="w-12 h-12 text-ink-300 mx-auto mb-3" />
+              <p className="font-medium text-ink-500">
                 {tab === 'activas' ? 'No hay campañas activas' : 'No hay campañas cerradas'}
               </p>
               {tab === 'activas' && (
-                <p className="text-sm text-slate-400 mt-1">
+                <p className="text-sm text-ink-400 mt-1">
                   Crea una campaña para organizar y hacer seguimiento de las renovaciones por período
                 </p>
               )}
               {tab === 'activas' && (
                 <button onClick={() => { setEditingC(null); setShowModal(true) }}
-                  className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium">
+                  className="mt-4 flex items-center gap-2 mx-auto px-4 py-2 bg-primary-500 hover:bg-primary-700 text-white rounded-lg text-sm font-medium">
                   <Plus className="w-4 h-4" /> Nueva campaña
                 </button>
               )}

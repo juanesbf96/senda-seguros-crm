@@ -277,9 +277,9 @@ export default function AsistenteView() {
     siniestro:  <FileText className="w-4 h-4" />,
   }
   const TIPO_COLOR: Record<Alerta['tipo'], string> = {
-    renovacion: 'text-amber-600 bg-amber-50',
-    cobro:      'text-red-600 bg-red-50',
-    tarea:      'text-blue-600 bg-blue-50',
+    renovacion: 'text-ink-700 bg-warning-soft',
+    cobro:      'text-error bg-error-soft',
+    tarea:      'text-info bg-info/10',
     diligencia: 'text-orange-600 bg-orange-50',
     siniestro:  'text-purple-600 bg-purple-50',
   }
@@ -288,13 +288,13 @@ export default function AsistenteView() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <Bot className="w-6 h-6 text-emerald-600" /> Asistente virtual
+          <h1 className="text-2xl font-bold text-ink-700 flex items-center gap-2">
+            <Bot className="w-6 h-6 text-primary-500" /> Asistente virtual
           </h1>
-          <p className="text-slate-500 text-sm mt-1">Centro de operaciones y consultas inteligentes</p>
+          <p className="text-ink-400 text-sm mt-1">Centro de operaciones y consultas inteligentes</p>
         </div>
         <button onClick={loadResumen} disabled={loadingData}
-          className="flex items-center gap-2 text-slate-500 hover:text-slate-700 px-3 py-2 rounded-lg border border-slate-200 hover:border-slate-300 text-sm transition-colors">
+          className="flex items-center gap-2 text-ink-400 hover:text-ink-600 px-3 py-2 rounded-lg border border-ink-200 hover:border-ink-300 text-sm transition-colors">
           <RefreshCw className={`w-4 h-4 ${loadingData ? 'animate-spin' : ''}`} /> Actualizar
         </button>
       </div>
@@ -305,32 +305,32 @@ export default function AsistenteView() {
         <div className="lg:col-span-1 space-y-4">
 
           {/* Resumen rápido */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-emerald-500" /> Resumen rápido
+          <div className="bg-white rounded-xl border border-ink-200 p-4">
+            <h2 className="text-sm font-semibold text-ink-600 mb-3 flex items-center gap-2">
+              <Zap className="w-4 h-4 text-primary-500" /> Resumen rápido
             </h2>
             {loadingData ? (
               <div className="space-y-2">
-                {[...Array(6)].map((_, i) => <div key={i} className="h-8 bg-slate-100 rounded animate-pulse" />)}
+                {[...Array(6)].map((_, i) => <div key={i} className="h-8 bg-cream-200 rounded animate-pulse" />)}
               </div>
             ) : resumen && (
               <div className="space-y-2">
                 {[
-                  { icon: Users,      label: 'Clientes',          val: resumen.clientes.toLocaleString(),        color: 'text-blue-600 bg-blue-50' },
-                  { icon: FileText,   label: 'Pólizas activas',   val: resumen.polizasActivas.toLocaleString(),  color: 'text-emerald-600 bg-emerald-50' },
+                  { icon: Users,      label: 'Clientes',          val: resumen.clientes.toLocaleString(),        color: 'text-info bg-info/10' },
+                  { icon: FileText,   label: 'Pólizas activas',   val: resumen.polizasActivas.toLocaleString(),  color: 'text-primary-500 bg-primary-50' },
                   { icon: TrendingUp, label: 'Prima activa',       val: fmtCOP(resumen.primaTotalActiva),         color: 'text-violet-600 bg-violet-50' },
-                  { icon: Bell,       label: 'Renovar en 30d',    val: resumen.renovacionesMes.toLocaleString(), color: 'text-amber-600 bg-amber-50' },
-                  { icon: DollarSign, label: 'Cobros pendientes', val: resumen.cobrosPendientes.toLocaleString(),color: 'text-red-600 bg-red-50' },
-                  { icon: CheckSquare,label: 'Tareas pendientes', val: resumen.tareasPendientes.toLocaleString(),color: 'text-slate-600 bg-slate-50' },
+                  { icon: Bell,       label: 'Renovar en 30d',    val: resumen.renovacionesMes.toLocaleString(), color: 'text-ink-700 bg-warning-soft' },
+                  { icon: DollarSign, label: 'Cobros pendientes', val: resumen.cobrosPendientes.toLocaleString(),color: 'text-error bg-error-soft' },
+                  { icon: CheckSquare,label: 'Tareas pendientes', val: resumen.tareasPendientes.toLocaleString(),color: 'text-ink-500 bg-cream-100' },
                 ].map(({ icon: Icon, label, val, color }) => (
-                  <div key={label} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-slate-50">
+                  <div key={label} className="flex items-center justify-between py-1.5 px-2 rounded-lg hover:bg-cream-100">
                     <div className="flex items-center gap-2">
                       <div className={`w-6 h-6 rounded flex items-center justify-center ${color}`}>
                         <Icon className="w-3.5 h-3.5" />
                       </div>
-                      <span className="text-xs text-slate-600">{label}</span>
+                      <span className="text-xs text-ink-500">{label}</span>
                     </div>
-                    <span className="text-sm font-semibold text-slate-900">{val}</span>
+                    <span className="text-sm font-semibold text-ink-700">{val}</span>
                   </div>
                 ))}
               </div>
@@ -338,39 +338,39 @@ export default function AsistenteView() {
           </div>
 
           {/* Alertas */}
-          <div className="bg-white rounded-xl border border-slate-200 p-4">
-            <h2 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-500" /> Alertas pendientes
+          <div className="bg-white rounded-xl border border-ink-200 p-4">
+            <h2 className="text-sm font-semibold text-ink-600 mb-3 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-error" /> Alertas pendientes
               {alertas.length > 0 && (
-                <span className="ml-auto bg-red-100 text-red-700 text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                <span className="ml-auto bg-error-soft text-error text-xs font-semibold px-1.5 py-0.5 rounded-full">
                   {alertas.length}
                 </span>
               )}
             </h2>
             {loadingData ? (
               <div className="space-y-2">
-                {[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-slate-100 rounded animate-pulse" />)}
+                {[...Array(3)].map((_, i) => <div key={i} className="h-14 bg-cream-200 rounded animate-pulse" />)}
               </div>
             ) : alertas.length === 0 ? (
               <div className="text-center py-6">
-                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-2">
-                  <CheckSquare className="w-5 h-5 text-emerald-600" />
+                <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-2">
+                  <CheckSquare className="w-5 h-5 text-primary-500" />
                 </div>
-                <p className="text-sm text-slate-500">¡Sin alertas! Todo al día.</p>
+                <p className="text-sm text-ink-400">¡Sin alertas! Todo al día.</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {alertas.map(a => (
                   <a key={a.id} href={a.href}
-                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-colors hover:shadow-sm ${a.urgente ? 'border-red-100 bg-red-50/50' : 'border-slate-100 bg-slate-50/50'}`}>
+                    className={`flex items-start gap-2.5 p-2.5 rounded-lg border transition-colors hover:shadow-sm ${a.urgente ? 'border-error/20 bg-error-soft/50' : 'border-cream-200 bg-cream-100/50'}`}>
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${TIPO_COLOR[a.tipo]}`}>
                       {TIPO_ICON[a.tipo]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-800 truncate">{a.titulo}</p>
-                      <p className="text-xs text-slate-500 truncate">{a.subtitulo}</p>
+                      <p className="text-xs font-medium text-ink-700 truncate">{a.titulo}</p>
+                      <p className="text-xs text-ink-400 truncate">{a.subtitulo}</p>
                     </div>
-                    {a.urgente && <span className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0 mt-1" />}
+                    {a.urgente && <span className="w-2 h-2 bg-error rounded-full flex-shrink-0 mt-1" />}
                   </a>
                 ))}
               </div>
@@ -379,15 +379,15 @@ export default function AsistenteView() {
         </div>
 
         {/* RIGHT: Chat */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 flex flex-col" style={{ minHeight: '500px', maxHeight: '70vh' }}>
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <Bot className="w-5 h-5 text-emerald-600" />
+        <div className="lg:col-span-2 bg-white rounded-xl border border-ink-200 flex flex-col" style={{ minHeight: '500px', maxHeight: '70vh' }}>
+          <div className="px-5 py-4 border-b border-cream-200 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+              <Bot className="w-5 h-5 text-primary-500" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-900">Asistente CRM</p>
-              <p className="text-xs text-emerald-600 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" /> En línea · responde con datos reales
+              <p className="text-sm font-semibold text-ink-700">Asistente CRM</p>
+              <p className="text-xs text-primary-500 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-500 inline-block" /> En línea · responde con datos reales
               </p>
             </div>
           </div>
@@ -397,14 +397,14 @@ export default function AsistenteView() {
             {msgs.map((m, i) => (
               <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 {m.role === 'bot' && (
-                  <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
-                    <Bot className="w-4 h-4 text-emerald-600" />
+                  <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0 mr-2 mt-0.5">
+                    <Bot className="w-4 h-4 text-primary-500" />
                   </div>
                 )}
                 <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                   m.role === 'user'
-                    ? 'bg-emerald-600 text-white rounded-tr-sm'
-                    : 'bg-slate-100 text-slate-800 rounded-tl-sm'
+                    ? 'bg-primary-500 text-white rounded-tr-sm'
+                    : 'bg-cream-200 text-ink-700 rounded-tl-sm'
                 }`}>
                   <MsgText text={m.text} />
                 </div>
@@ -412,11 +412,11 @@ export default function AsistenteView() {
             ))}
             {thinking && (
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <Bot className="w-4 h-4 text-emerald-600" />
+                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                  <Bot className="w-4 h-4 text-primary-500" />
                 </div>
-                <div className="bg-slate-100 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1.5">
-                  {[0,1,2].map(j => <span key={j} className="w-2 h-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: `${j*150}ms` }} />)}
+                <div className="bg-cream-200 rounded-2xl rounded-tl-sm px-4 py-3 flex gap-1.5">
+                  {[0,1,2].map(j => <span key={j} className="w-2 h-2 bg-ink-400 rounded-full animate-bounce" style={{ animationDelay: `${j*150}ms` }} />)}
                 </div>
               </div>
             )}
@@ -424,11 +424,11 @@ export default function AsistenteView() {
           </div>
 
           {/* Sugerencias */}
-          <div className="px-4 py-2 border-t border-slate-100">
+          <div className="px-4 py-2 border-t border-cream-200">
             <div className="flex gap-2 flex-wrap">
               {SUGERENCIAS.slice(0, 3).map(s => (
                 <button key={s} onClick={() => send(s)}
-                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-emerald-600 border border-slate-200 hover:border-emerald-300 px-2.5 py-1 rounded-full transition-colors">
+                  className="flex items-center gap-1 text-xs text-ink-400 hover:text-primary-500 border border-ink-200 hover:border-primary-300 px-2.5 py-1 rounded-full transition-colors">
                   <Clock className="w-3 h-3" /> {s}
                 </button>
               ))}
@@ -442,10 +442,10 @@ export default function AsistenteView() {
                 value={input} onChange={e => setInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
                 placeholder="Pregúntame algo del CRM..."
-                className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 resize-none"
+                className="flex-1 border border-ink-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
               />
               <button onClick={() => send()} disabled={!input.trim() || thinking}
-                className="w-10 h-10 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 text-white rounded-xl flex items-center justify-center transition-colors flex-shrink-0">
+                className="w-10 h-10 bg-primary-500 hover:bg-primary-700 disabled:bg-ink-200 text-white rounded-xl flex items-center justify-center transition-colors flex-shrink-0">
                 <Send className="w-4 h-4" />
               </button>
             </div>

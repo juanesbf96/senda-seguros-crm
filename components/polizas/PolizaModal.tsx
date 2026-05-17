@@ -221,9 +221,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
 
         {/* header */}
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
-          <h2 className="font-semibold text-slate-800">{poliza ? 'Editar póliza' : 'Nueva póliza'}</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
+          <h2 className="font-semibold text-ink-700">{poliza ? 'Editar póliza' : 'Nueva póliza'}</h2>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -248,8 +248,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                   <button key={t} type="button" onClick={() => set('tipo_modalidad', t)}
                     className={['py-2 px-3 rounded-lg text-xs font-medium border capitalize transition-colors',
                       form.tipo_modalidad === t
-                        ? 'bg-emerald-600 border-emerald-600 text-white'
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400',
+                        ? 'bg-primary-500 border-primary-500 text-white'
+                        : 'bg-white border-ink-200 text-ink-500 hover:border-primary-400',
                     ].join(' ')}>
                     {t}
                   </button>
@@ -385,7 +385,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 <div className="relative">
                   <input value={form.porcentaje_iva} onChange={e => set('porcentaje_iva', e.target.value)}
                     type="number" min="0" max="100" step="0.01" className={cls + ' pr-7'} />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
                 </div>
               </Field>
             </div>
@@ -398,23 +398,23 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 <div className="relative">
                   <input value={form.porcentaje_comision_agencia} onChange={e => set('porcentaje_comision_agencia', e.target.value)}
                     type="number" min="0" max="100" step="0.01" placeholder="Ej: 12.5" className={cls + ' pr-7'} />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
                 </div>
               </Field>
             </div>
 
             {/* auto-calc summary */}
             {primaNeta > 0 && (
-              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-sm">
-                <div className="flex justify-between text-slate-600">
+              <div className="bg-cream-100 border border-ink-200 rounded-lg p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between text-ink-500">
                   <span>IVA ({pctIva}%)</span>
                   <span className="font-medium">$ {fmt(iva)}</span>
                 </div>
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between text-ink-500">
                   <span>Comisión agencia ({pctAgencia}%)</span>
-                  <span className="font-medium text-emerald-700">$ {fmt(comisionAgencia)}</span>
+                  <span className="font-medium text-primary-700">$ {fmt(comisionAgencia)}</span>
                 </div>
-                <div className="flex justify-between text-slate-800 font-semibold border-t border-slate-200 pt-1.5 mt-1">
+                <div className="flex justify-between text-ink-700 font-semibold border-t border-ink-200 pt-1.5 mt-1">
                   <span>Total prima</span>
                   <span>$ {fmt(totalPrima)}</span>
                 </div>
@@ -450,29 +450,29 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                   <div className="relative">
                     <input value={form.porcentaje_comision_vendedor} onChange={e => set('porcentaje_comision_vendedor', e.target.value)}
                       type="number" min="0" max="100" step="0.01" placeholder="Ej: 45" className={cls + ' pr-7'} />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
                   </div>
                 </Field>
                 <Field label="% Retención en la fuente">
                   <div className="relative">
                     <input value={form.retencion_vendedor} onChange={e => set('retencion_vendedor', e.target.value)}
                       type="number" min="0" max="100" step="0.01" className={cls + ' pr-7'} />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
                   </div>
                 </Field>
               </div>
             )}
             {form.vendedor_id && comisionAgencia > 0 && pctVendedor > 0 && (
-              <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm">
-                <div className="flex justify-between text-blue-700">
+              <div className="bg-info/10 border border-blue-100 rounded-lg p-3 text-sm">
+                <div className="flex justify-between text-info">
                   <span>Comisión vendedor ({pctVendedor}% de $ {fmt(comisionAgencia)})</span>
                   <span className="font-semibold">$ {fmt(comisionVendedor)}</span>
                 </div>
-                <div className="flex justify-between text-blue-600 mt-1">
+                <div className="flex justify-between text-info mt-1">
                   <span>Retención ({form.retencion_vendedor}%)</span>
                   <span>- $ {fmt(comisionVendedor * n(form.retencion_vendedor) / 100)}</span>
                 </div>
-                <div className="flex justify-between text-blue-800 font-semibold border-t border-blue-200 pt-1.5 mt-1">
+                <div className="flex justify-between text-info font-semibold border-t border-info/30 pt-1.5 mt-1">
                   <span>Neto a pagar</span>
                   <span>$ {fmt(comisionVendedor - comisionVendedor * n(form.retencion_vendedor) / 100)}</span>
                 </div>
@@ -518,16 +518,16 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
               placeholder="Coberturas adicionales, observaciones..." rows={2} className={cls} />
           </Section>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
-        <div className="flex gap-3 p-5 border-t border-slate-200">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
           <button onClick={onClose}
-            className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">
             Cancelar
           </button>
           <button onClick={save} disabled={saving}
-            className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+            className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 transition-colors">
             {saving ? 'Guardando...' : 'Guardar póliza'}
           </button>
         </div>
@@ -541,7 +541,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-3">{title}</p>
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-ink-400 mb-3">{title}</p>
       <div className="space-y-3">{children}</div>
     </div>
   )
@@ -550,7 +550,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
+      <label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>
       {children}
     </div>
   )
@@ -566,12 +566,12 @@ function CheckToggle({ checked, onChange, label }: {
       className={[
         'flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium border transition-colors',
         checked
-          ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300',
+          ? 'bg-primary-50 border-primary-300 text-primary-700'
+          : 'bg-white border-ink-200 text-ink-400 hover:border-ink-300',
       ].join(' ')}>
       <span className={[
         'w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0',
-        checked ? 'bg-emerald-600 border-emerald-600' : 'border-slate-300',
+        checked ? 'bg-primary-500 border-primary-500' : 'border-ink-300',
       ].join(' ')}>
         {checked && <span className="text-white text-[10px] font-bold">✓</span>}
       </span>
@@ -580,4 +580,4 @@ function CheckToggle({ checked, onChange, label }: {
   )
 }
 
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

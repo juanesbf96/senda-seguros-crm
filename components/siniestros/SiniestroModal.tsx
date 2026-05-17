@@ -22,11 +22,11 @@ const ESTADO_LABELS: Record<EstadoSiniestro, string> = {
   rechazado:  'Rechazado',
 }
 const ESTADO_COLORS: Record<EstadoSiniestro, string> = {
-  reportado:  'bg-slate-500',
-  en_estudio: 'bg-amber-500',
-  en_pago:    'bg-blue-500',
-  cerrado:    'bg-emerald-600',
-  rechazado:  'bg-red-600',
+  reportado:  'bg-ink-400',
+  en_estudio: 'bg-warning',
+  en_pago:    'bg-info/100',
+  cerrado:    'bg-primary-500',
+  rechazado:  'bg-error',
 }
 
 const ASEGURADORAS = ['Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria','La Equidad','Mapfre','Positiva','Previsora','Seguros del Estado','Otro']
@@ -139,19 +139,19 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
+        <div className="flex items-center justify-between p-5 border-b border-ink-200">
           <div>
-            <h2 className="font-semibold text-slate-800">{siniestro ? `Siniestro #${siniestro.numero_siniestro}` : 'Nuevo siniestro'}</h2>
-            {siniestro && <p className="text-xs text-slate-400 mt-0.5">Editando registro</p>}
+            <h2 className="font-semibold text-ink-700">{siniestro ? `Siniestro #${siniestro.numero_siniestro}` : 'Nuevo siniestro'}</h2>
+            {siniestro && <p className="text-xs text-ink-400 mt-0.5">Editando registro</p>}
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-500"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-5 space-y-5">
 
           {/* Stepper */}
           <div>
-            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Estado del siniestro</p>
+            <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider mb-3">Estado del siniestro</p>
             <div className="flex items-center gap-0">
               {ESTADOS.map((estado, i) => {
                 const isDone    = i < currentIdx
@@ -168,18 +168,18 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
                       ].join(' ')}
                     >
                       <div className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                        estado === 'rechazado' ? 'bg-red-500' :
-                        isDone ? 'bg-emerald-500' :
-                        isCurrent ? ESTADO_COLORS[estado] : 'bg-slate-200'
+                        estado === 'rechazado' ? 'bg-error' :
+                        isDone ? 'bg-primary-500' :
+                        isCurrent ? ESTADO_COLORS[estado] : 'bg-ink-200'
                       }`}>
                         {isDone ? <CheckCircle className="w-4 h-4" /> : estado === 'rechazado' ? <XCircle className="w-4 h-4" /> : i + 1}
                       </div>
-                      <span className={`text-[10px] font-medium text-center leading-tight ${isCurrent ? 'text-slate-800' : 'text-slate-400'}`}>
+                      <span className={`text-[10px] font-medium text-center leading-tight ${isCurrent ? 'text-ink-700' : 'text-ink-400'}`}>
                         {ESTADO_LABELS[estado]}
                       </span>
                     </button>
                     {!isLast && (
-                      <div className={`h-0.5 w-3 flex-shrink-0 ${i < currentIdx ? 'bg-emerald-400' : 'bg-slate-200'}`} />
+                      <div className={`h-0.5 w-3 flex-shrink-0 ${i < currentIdx ? 'bg-primary-400' : 'bg-ink-200'}`} />
                     )}
                   </div>
                 )
@@ -248,13 +248,13 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
           {/* Amparos */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Amparos / Coberturas</p>
-              <button onClick={addAmparo} className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+              <p className="text-xs font-semibold text-ink-400 uppercase tracking-wider">Amparos / Coberturas</p>
+              <button onClick={addAmparo} className="flex items-center gap-1 text-xs text-primary-500 hover:text-primary-700 font-medium">
                 <Plus className="w-3 h-3" /> Agregar
               </button>
             </div>
             {amparos.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-3 border border-dashed border-slate-200 rounded-lg">
+              <p className="text-xs text-ink-400 text-center py-3 border border-dashed border-ink-200 rounded-lg">
                 Sin amparos registrados
               </p>
             ) : (
@@ -270,7 +270,7 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
                       <option value="aprobado">Aprobado</option>
                       <option value="rechazado">Rechazado</option>
                     </select>
-                    <button onClick={() => removeAmparo(i)} className="col-span-1 text-slate-300 hover:text-red-500 transition-colors flex justify-center">
+                    <button onClick={() => removeAmparo(i)} className="col-span-1 text-ink-300 hover:text-error transition-colors flex justify-center">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
@@ -284,12 +284,12 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
               placeholder="Observaciones adicionales..." rows={2} className={cls} />
           </Field>
 
-          {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>}
+          {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>
 
-        <div className="flex gap-3 p-5 border-t border-slate-200">
-          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50">Cancelar</button>
-          <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60">
+        <div className="flex gap-3 p-5 border-t border-ink-200">
+          <button onClick={onClose} className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100">Cancelar</button>
+          <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60">
             {saving ? 'Guardando...' : 'Guardar siniestro'}
           </button>
         </div>
@@ -299,6 +299,6 @@ export default function SiniestroModal({ siniestro, clienteId, onClose, onSaved 
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>{children}</div>
+  return <div><label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>{children}</div>
 }
-const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent bg-white"
+const cls = "w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent bg-white"

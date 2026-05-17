@@ -1,31 +1,75 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
 import { Cliente, Poliza, Etapa } from '@/types'
-import { formatCOP, daysUntil } from '@/lib/utils'
+import { formatCOP, daysUntil, cn } from '@/lib/utils'
 import Link from 'next/link'
 import {
-  Users, AlertTriangle, TrendingUp, ChevronRight,
-  Clock, Cake, ShieldAlert, CheckSquare, RefreshCw, Send,
-  ClipboardList, Activity, DollarSign, BarChart3,
-  Banknote, Percent,
+  ArrowUpRight, Cake, ShieldAlert, CheckSquare,
+  RefreshCw, FileText, Banknote, Percent, Loader2, TrendingUp,
+  ClipboardList, Users, Target,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/Badge'
+import { Avatar } from '@/components/ui/Avatar'
+import {
+  Sparkline, Donut, DonutLegend, TrendChart, BarsChart,
+  type DonutSlice, type TrendDatum, type BarsDatum,
+} from '@/components/ui/charts'
 
 const ETAPA_LABELS: Record<Etapa, string> = {
   nuevo: 'Nuevo', contactado: 'Contactado', cotizacion: 'Cotización', cerrado: 'Cerrado',
 }
-const ETAPA_COLORS: Record<Etapa, string> = {
-  nuevo: 'bg-blue-100 text-blue-700',
-  contactado: 'bg-amber-100 text-amber-700',
-  cotizacion: 'bg-purple-100 text-purple-700',
-  cerrado: 'bg-emerald-100 text-emerald-700',
+
+const ETAPA_COLORS: Record<Etapa, 'primary' | 'warning' | 'neutral' | 'outline'> = {
+  nuevo: 'neutral', contactado: 'warning', cotizacion: 'outline', cerrado: 'primary',
+}
+
+const MONTH_LABELS_ES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+
+/** Paleta para slices de donut */
+const RAMO_COLORS = [
+  'var(--color-primary-500)',
+  'var(--color-primary-300)',
+  'var(--color-warning)',
+  'var(--color-info)',
+  'var(--color-ink-400)',
+  'var(--color-primary-700)',
+  'var(--color-cream-400)',
+]
+
+const ASEG_COLORS = [
+  'var(--color-info)',
+  'var(--color-primary-500)',
+  'var(--color-warning)',
+  'var(--color-primary-300)',
+  'var(--color-ink-500)',
+  'var(--color-error)',
+  'var(--color-cream-400)',
+]
+
+/** Estados de póliza para distribución dentro de "Pólizas activas" */
+const ESTADO_COLOR: Record<string, string> = {
+  activa:     'bg-primary-500',
+  pendiente:  'bg-info',
+  vencida:    'bg-error',
+  cancelada:  'bg-ink-300',
+}
+
+const ESTADO_LABEL: Record<string, string> = {
+  activa:    'Activas',
+  pendiente: 'En expedición',
+  vencida:   'Vencidas',
+  cancelada: 'Canceladas',
 }
 
 export default function Dashboard() {
   const { currentWorkspace, loading: wsLoading } = useWorkspace()
   const { can } = usePermissions()
+  const [userName, setUserName] = useState('')
+
+  // Estado base
   const [clientes,   setClientes]   = useState<Cliente[]>([])
   const [polizas,    setPolizas]    = useState<Poliza[]>([])
   const [todasPolizas, setTodasPolizas] = useState<{ estado: string }[]>([])
@@ -33,16 +77,31 @@ export default function Dashboard() {
   const [tareasHoy,     setTareasHoy]     = useState(0)
   const [tareasVencidas,setTareasVencidas]= useState(0)
   const [tareasMañana,  setTareasMañana]  = useState(0)
-  // Financial metrics
-  const [cobrosPendiente,  setCobrosPendiente]  = useState(0)
-  const [cobrosVencido,    setCobrosVencido]    = useState(0)
-  const [liqPendiente,     setLiqPendiente]     = useState(0)
-  // Solicitudes
-  const [solNuevas,     setSolNuevas]     = useState(0)
-  const [solUrgentes,   setSolUrgentes]   = useState(0)
-  const [solActivas,    setSolActivas]    = useState(0)
-  const [solPorVencer,  setSolPorVencer]  = useState(0)
+  const [cobrosPendiente, setCobrosPendiente] = useState(0)
+  const [cobrosVencido,   setCobrosVencido]   = useState(0)
+  const [liqPendiente,    setLiqPendiente]    = useState(0)
+  const [solNuevas,    setSolNuevas]    = useState(0)
+  const [solUrgentes,  setSolUrgentes]  = useState(0)
+  const [solActivas,   setSolActivas]   = useState(0)
+  const [solPorVencer, setSolPorVencer] = useState(0)
+  const [metasActivas,  setMetasActivas]  = useState(0)
+  const [metasProgress, setMetasProgress] = useState(0)
+  const [metasCumplidas,setMetasCumplidas]= useState(0)
   const [loading, setLoading] = useState(true)
+
+  // Datos para charts
+  const [trendData,        setTrendData]        = useState<TrendDatum[]>([])
+  const [renovacionesData, setRenovacionesData] = useState<BarsDatum[]>([])
+  const [clientesSpark,    setClientesSpark]    = useState<number[]>([])
+  const [polizasSpark,     setPolizasSpark]     = useState<number[]>([])
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      const meta = user?.user_metadata || {}
+      const name = meta.nombre || meta.full_name || meta.name || ''
+      setUserName(name)
+    })
+  }, [])
 
   useEffect(() => {
     if (!currentWorkspace) return
@@ -52,25 +111,23 @@ export default function Dashboard() {
       const today    = new Date().toISOString().split('T')[0]
       const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
       const in7days  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
+      const year12Ago = new Date()
+      year12Ago.setMonth(year12Ago.getMonth() - 11)
+      year12Ago.setDate(1)
+      const trendStart = year12Ago.toISOString().split('T')[0]
+      const days30Ago = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
+      const in90days = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
 
       const [
-        { data: c },
-        { data: p },
-        { data: allP },
-        { data: sin },
-        { data: tareasV },
-        { data: tareasH },
-        { data: tareasM },
-        { data: cobros },
-        { data: liqs },
-        { data: sols },
+        { data: c }, { data: p }, { data: allP }, { data: sin },
+        { data: tareasV }, { data: tareasH }, { data: tareasM },
+        { data: cobros }, { data: liqs }, { data: sols },
+        { data: polizasTrend }, { data: renovs90 },
+        { data: clientesNew }, { data: polizasNew },
+        { data: metas },
       ] = await Promise.all([
         supabase.from('clientes').select('*').eq('workspace_id', wsId).order('created_at', { ascending: false }),
-        supabase.from('polizas')
-          .select('*, cliente:clientes(nombre)')
-          .eq('workspace_id', wsId)
-          .eq('estado', 'activa')
-          .eq('eliminada', false),
+        supabase.from('polizas').select('*, cliente:clientes(nombre)').eq('workspace_id', wsId).eq('estado', 'activa').eq('eliminada', false),
         supabase.from('polizas').select('estado').eq('workspace_id', wsId).eq('eliminada', false),
         supabase.from('siniestros').select('id').eq('workspace_id', wsId).eq('finalizado', false),
         supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).lt('fecha_vencimiento', today),
@@ -79,6 +136,21 @@ export default function Dashboard() {
         supabase.from('cobros').select('valor, estado, tipo').eq('workspace_id', wsId).neq('estado', 'anulado'),
         supabase.from('liquidaciones').select('total_comision, estado').eq('workspace_id', wsId).eq('estado', 'pendiente'),
         supabase.from('solicitudes').select('id, estado, prioridad, fecha_limite').eq('workspace_id', wsId),
+        supabase.from('polizas')
+          .select('fecha_inicio, prima_neta, comision_agencia')
+          .eq('workspace_id', wsId).eq('eliminada', false).gte('fecha_inicio', trendStart),
+        supabase.from('polizas')
+          .select('fecha_fin')
+          .eq('workspace_id', wsId).eq('estado', 'activa').eq('eliminada', false)
+          .gte('fecha_fin', today).lte('fecha_fin', in90days),
+        supabase.from('clientes').select('created_at').eq('workspace_id', wsId).gte('created_at', days30Ago),
+        supabase.from('polizas').select('fecha_inicio').eq('workspace_id', wsId).eq('eliminada', false).gte('fecha_inicio', days30Ago),
+        // Metas activas (fecha actual entre fecha_inicio y fecha_fin)
+        supabase.from('metas')
+          .select('valor_meta, valor_actual')
+          .eq('workspace_id', wsId)
+          .lte('fecha_inicio', today)
+          .gte('fecha_fin', today),
       ])
 
       setClientes(c || [])
@@ -89,19 +161,14 @@ export default function Dashboard() {
       setTareasHoy((tareasH || []).length)
       setTareasMañana((tareasM || []).length)
 
-      // Cobros financials (solo por_cobrar + comision_por_cobrar)
       const cList = (cobros || []) as { valor: number; estado: string; tipo: string }[]
       setCobrosPendiente(
         cList.filter(c => c.estado === 'pendiente' && (c.tipo === 'por_cobrar' || c.tipo === 'comision_por_cobrar'))
           .reduce((s, c) => s + c.valor, 0)
       )
-      setCobrosVencido(
-        cList.filter(c => c.estado === 'vencido')
-          .reduce((s, c) => s + c.valor, 0)
-      )
+      setCobrosVencido(cList.filter(c => c.estado === 'vencido').reduce((s, c) => s + c.valor, 0))
       setLiqPendiente((liqs || []).reduce((s, l) => s + (l.total_comision || 0), 0))
 
-      // Solicitudes
       const sList = (sols || []) as { id: string; estado: string; prioridad: string; fecha_limite: string | null }[]
       const activas = sList.filter(s => s.estado === 'nueva' || s.estado === 'en_proceso')
       setSolNuevas(sList.filter(s => s.estado === 'nueva').length)
@@ -109,22 +176,123 @@ export default function Dashboard() {
       setSolActivas(activas.length)
       setSolPorVencer(activas.filter(s => s.fecha_limite && s.fecha_limite <= in7days).length)
 
+      // Tendencia mensual
+      const monthMap = new Map<string, { prima: number; comision: number }>()
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date()
+        d.setMonth(d.getMonth() - i)
+        d.setDate(1)
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        monthMap.set(key, { prima: 0, comision: 0 })
+      }
+      ;(polizasTrend || []).forEach((p: { fecha_inicio: string; prima_neta?: number; comision_agencia?: number }) => {
+        if (!p.fecha_inicio) return
+        const d = new Date(p.fecha_inicio + 'T00:00:00')
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        const slot = monthMap.get(key)
+        if (slot) {
+          slot.prima    += p.prima_neta || 0
+          slot.comision += p.comision_agencia || 0
+        }
+      })
+      const trend: TrendDatum[] = Array.from(monthMap.entries()).map(([key, v]) => {
+        const monthIdx = parseInt(key.split('-')[1], 10) - 1
+        return { label: MONTH_LABELS_ES[monthIdx], value: v.prima, secondary: v.comision }
+      })
+      setTrendData(trend)
+
+      // Renovaciones por bloque de 15 días
+      const buckets = ['0-15d', '16-30d', '31-45d', '46-60d', '61-75d', '76-90d']
+      const renovMap = new Map<string, number>(buckets.map(b => [b, 0]))
+      ;(renovs90 || []).forEach((r: { fecha_fin: string }) => {
+        const d = daysUntil(r.fecha_fin)
+        let bucket = '76-90d'
+        if (d <= 15) bucket = '0-15d'
+        else if (d <= 30) bucket = '16-30d'
+        else if (d <= 45) bucket = '31-45d'
+        else if (d <= 60) bucket = '46-60d'
+        else if (d <= 75) bucket = '61-75d'
+        renovMap.set(bucket, (renovMap.get(bucket) || 0) + 1)
+      })
+      const renovData: BarsDatum[] = buckets.map((b, i) => ({
+        label: b,
+        value: renovMap.get(b) || 0,
+        tone: i === 0 ? 'error' : i === 1 ? 'warning' : 'primary',
+      }))
+      setRenovacionesData(renovData)
+
+      // Sparklines
+      const sparkClientes = bucketByDay(clientesNew as { created_at: string }[] || [], 'created_at', 30)
+      const sparkPolizas  = bucketByDay(polizasNew  as { fecha_inicio: string }[]  || [], 'fecha_inicio', 30)
+      setClientesSpark(sparkClientes)
+      setPolizasSpark(sparkPolizas)
+
+      // Metas — progreso promedio
+      const mList = (metas || []) as { valor_meta: number; valor_actual: number }[]
+      setMetasActivas(mList.length)
+      if (mList.length > 0) {
+        const progresos = mList.map(m =>
+          m.valor_meta > 0 ? Math.min((m.valor_actual / m.valor_meta) * 100, 100) : 0
+        )
+        const promedio = progresos.reduce((a, b) => a + b, 0) / mList.length
+        setMetasProgress(Math.round(promedio))
+        setMetasCumplidas(progresos.filter(p => p >= 100).length)
+      } else {
+        setMetasProgress(0)
+        setMetasCumplidas(0)
+      }
+
       setLoading(false)
     }
     load()
   }, [currentWorkspace?.id])
 
+  // Distribución por ramo (de pólizas activas)
+  const carteraRamo: DonutSlice[] = useMemo(() => {
+    const map = new Map<string, number>()
+    polizas.forEach(p => {
+      const ramo = p.ramo || 'Sin ramo'
+      map.set(ramo, (map.get(ramo) || 0) + 1)
+    })
+    const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+    return entries.slice(0, 6).map(([label, value], i) => ({
+      label, value, color: RAMO_COLORS[i % RAMO_COLORS.length],
+    }))
+  }, [polizas])
+
+  // Distribución por aseguradora (de pólizas activas)
+  const carteraAseguradora: DonutSlice[] = useMemo(() => {
+    const map = new Map<string, number>()
+    polizas.forEach(p => {
+      const aseg = p.aseguradora || 'Sin asignar'
+      map.set(aseg, (map.get(aseg) || 0) + 1)
+    })
+    const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1])
+    return entries.slice(0, 6).map(([label, value], i) => ({
+      label, value, color: ASEG_COLORS[i % ASEG_COLORS.length],
+    }))
+  }, [polizas])
+
+  // Distribución por estado (todas las pólizas)
+  const estadosDist = useMemo(() => {
+    const map = new Map<string, number>()
+    todasPolizas.forEach(p => {
+      const e = p.estado || 'otro'
+      map.set(e, (map.get(e) || 0) + 1)
+    })
+    const order = ['activa', 'pendiente', 'vencida', 'cancelada']
+    return order
+      .map(estado => ({ estado, count: map.get(estado) || 0 }))
+      .filter(s => s.count > 0)
+  }, [todasPolizas])
+
   const porEtapa = (e: Etapa) => clientes.filter(c => c.etapa === e).length
-
-  // Use prima_neta if available, fallback to prima for legacy records
-  const primaTotal = polizas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
+  const primaTotal    = polizas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
   const comisionTotal = polizas.reduce((s, p) => s + (p.comision_agencia || 0), 0)
-
   const renovaciones30 = polizas.filter(p => { if (!p.fecha_fin) return false; const d = daysUntil(p.fecha_fin); return d >= 0 && d <= 30 })
   const renovaciones60 = polizas.filter(p => { if (!p.fecha_fin) return false; const d = daysUntil(p.fecha_fin); return d > 30 && d <= 60 })
-  const polizasVencidas   = todasPolizas.filter(p => p.estado === 'vencida').length
-  const polizasPendientes = todasPolizas.filter(p => p.estado === 'pendiente').length
-
+  const totalRenovaciones90 = renovaciones30.length + renovaciones60.length
+  const totalPolizas = todasPolizas.length
   const cumpleaños = clientes.filter(c => {
     if (!c.fecha_nacimiento) return false
     const hoy = new Date()
@@ -136,332 +304,469 @@ export default function Dashboard() {
 
   if (wsLoading || loading) return (
     <div className="flex items-center justify-center h-full">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+      <Loader2 className="w-8 h-8 text-primary-500 animate-spin" />
     </div>
   )
 
   if (!currentWorkspace) return (
-    <div className="flex items-center justify-center h-full text-slate-400 text-sm">
-      No se encontró un workspace. Recarga la página.
+    <div className="flex items-center justify-center h-full text-ink-400 text-sm">
+      No se encontró un workspace.
     </div>
   )
 
+  const displayName = userName || 'Bienvenido'
+  const firstName = displayName.split(' ')[0]
+  const pctActivas = totalPolizas > 0 ? Math.round((polizas.length / totalPolizas) * 100) : 0
+  const totalLeads = clientes.length
+
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500 text-sm mt-1">Resumen de Senda Seguros</p>
+    <div className="px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-4">
+
+      {/* ── Header con greeting + indicador de metas ──────────── */}
+      <div className="flex items-center justify-between gap-6 flex-wrap mb-2">
+        <div>
+          <p className="text-xs uppercase tracking-widest text-ink-400 mb-1.5">Hola</p>
+          <h1 className="text-4xl lg:text-5xl font-semibold text-ink-700 tracking-tight">{firstName}</h1>
+          <p className="text-sm text-ink-400 mt-1.5">
+            Resumen de <span className="font-medium text-ink-500">{currentWorkspace.name}</span>
+          </p>
+        </div>
+
+        <MetasIndicator
+          progress={metasProgress}
+          activas={metasActivas}
+          cumplidas={metasCumplidas}
+        />
       </div>
 
-      {/* ── Fila 0: KPIs financieros ──────────────────────────────────── */}
+      {/* ── Hero · 3 KPIs compactos (Pólizas + Producción + Clientes) ── */}
       {can('dashboard_ver_global') && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <FinCard
-            icon={<DollarSign className="w-5 h-5 text-emerald-600"/>}
-            label="Prima neta activa"
-            value={formatCOP(primaTotal)}
-            sub={`${polizas.length} pólizas activas`}
-            bg="bg-emerald-50" href="/polizas" color="text-emerald-800"
-          />
-          <FinCard
-            icon={<Percent className="w-5 h-5 text-blue-600"/>}
-            label="Comisión agencia"
-            value={formatCOP(comisionTotal)}
-            sub="Total pólizas activas"
-            bg="bg-blue-50" href="/polizas" color="text-blue-800"
-          />
-          <FinCard
-            icon={<Banknote className="w-5 h-5 text-amber-600"/>}
-            label="Por cobrar"
-            value={formatCOP(cobrosPendiente)}
-            sub={cobrosVencido > 0 ? `⚠ ${formatCOP(cobrosVencido)} vencido` : 'Al día'}
-            bg={cobrosVencido > 0 ? 'bg-amber-50' : 'bg-slate-50'}
-            href="/cobros" color="text-amber-800"
-            urgent={cobrosVencido > 0}
-          />
-          <FinCard
-            icon={<BarChart3 className="w-5 h-5 text-violet-600"/>}
-            label="Comisiones pendientes"
-            value={formatCOP(liqPendiente)}
-            sub="A liquidar vendedores"
-            bg="bg-violet-50" href="/liquidaciones" color="text-violet-800"
-          />
-        </div>
-      )}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-      {/* ── Fila 1: 4 métricas estado pólizas ─────────────────────────── */}
-      {can('dashboard_ver_global') && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <MetricCard icon={<RefreshCw className="w-5 h-5 text-purple-600"/>} label="Cotizaciones" value={porEtapa('cotizacion')} bg="bg-purple-50" href="/leads" color="text-purple-700"/>
-          <MetricCard icon={<Send className="w-5 h-5 text-blue-600"/>} label="En expedición" value={polizasPendientes} bg="bg-blue-50" href="/polizas" color="text-blue-700"/>
-          <MetricCard icon={<AlertTriangle className="w-5 h-5 text-amber-600"/>} label="Por renovar (30d)" value={renovaciones30.length} bg="bg-amber-50" href="/renovaciones" color="text-amber-700" urgent={renovaciones30.length > 0}/>
-          <MetricCard icon={<ShieldAlert className="w-5 h-5 text-red-500"/>} label="Pólizas vencidas" value={polizasVencidas} bg="bg-red-50" href="/polizas" color="text-red-700"/>
-        </div>
-      )}
-
-      {/* ── Fila 2: Solicitudes + Clientes + Producción ───────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Solicitudes */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <ClipboardList className="w-4 h-4 text-emerald-600"/> Solicitudes
-            </h2>
-            <Link href="/solicitudes" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver todas <ChevronRight className="w-3 h-3"/>
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: 'Nuevas',     value: solNuevas,    color: 'bg-blue-50 text-blue-700'     },
-              { label: 'Urgentes',   value: solUrgentes,  color: solUrgentes>0?'bg-red-50 text-red-700':'bg-slate-50 text-slate-500' },
-              { label: 'Activas',    value: solActivas,   color: 'bg-emerald-50 text-emerald-700'},
-              { label: 'Por vencer', value: solPorVencer, color: solPorVencer>0?'bg-amber-50 text-amber-700':'bg-slate-50 text-slate-500' },
-            ].map(b => (
-              <div key={b.label} className={`${b.color} rounded-lg px-3 py-2.5 text-center`}>
-                <p className="text-2xl font-bold">{b.value}</p>
-                <p className="text-xs font-medium mt-0.5">{b.label}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Clientes */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <Users className="w-4 h-4 text-blue-600"/> Clientes activos
-            </h2>
-            <Link href="/clientes" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver todos <ChevronRight className="w-3 h-3"/>
-            </Link>
-          </div>
-          <p className="text-3xl font-bold text-slate-900 mb-3">{clientes.length}</p>
-          <div className="space-y-1.5">
-            {(['nuevo','contactado','cotizacion','cerrado'] as Etapa[]).map(etapa => {
-              const count = porEtapa(etapa)
-              const pct   = clientes.length ? Math.round((count / clientes.length) * 100) : 0
-              return (
-                <div key={etapa}>
-                  <div className="flex justify-between text-xs mb-0.5">
-                    <span className={`px-1.5 py-0.5 rounded-full font-medium ${ETAPA_COLORS[etapa]}`}>{ETAPA_LABELS[etapa]}</span>
-                    <span className="text-slate-500 font-medium">{count}</span>
-                  </div>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${etapa==='nuevo'?'bg-blue-400':etapa==='contactado'?'bg-amber-400':etapa==='cotizacion'?'bg-purple-400':'bg-emerald-400'}`}
-                      style={{width:`${pct}%`}}/>
-                  </div>
+          <ClickCard href="/polizas" className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+                  <FileText className="w-4 h-4 text-primary-700" />
                 </div>
-              )
-            })}
-          </div>
-        </div>
+                <div>
+                  <p className="text-[11px] text-ink-400 leading-tight">Cartera</p>
+                  <p className="text-sm font-semibold text-ink-700 leading-tight mt-0.5">Pólizas activas</p>
+                </div>
+              </div>
+              <Sparkline data={polizasSpark} tone="primary" width={60} height={22} />
+            </div>
 
-        {/* Producción */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+            <div className="flex items-baseline gap-1.5 mb-2.5">
+              <span className="text-3xl font-semibold text-ink-700 tracking-tight tabular-nums">{polizas.length}</span>
+              <span className="text-base text-ink-300 tabular-nums">/ {totalPolizas}</span>
+              <Badge variant="success" size="sm" dot className="ml-auto">{pctActivas}%</Badge>
+            </div>
+
+            {totalPolizas > 0 && (
+              <>
+                <div className="h-2 bg-cream-100 rounded-pill overflow-hidden flex">
+                  {estadosDist.map(({ estado, count }) => (
+                    <div
+                      key={estado}
+                      className={cn('h-full transition-all duration-700', ESTADO_COLOR[estado] || 'bg-ink-300')}
+                      style={{ width: `${(count / totalPolizas) * 100}%` }}
+                      title={`${ESTADO_LABEL[estado] || estado}: ${count}`}
+                    />
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2.5">
+                  {estadosDist.map(({ estado, count }) => (
+                    <div key={estado} className="flex items-center gap-1.5 text-[11px]">
+                      <span className={cn('w-1.5 h-1.5 rounded-full', ESTADO_COLOR[estado] || 'bg-ink-300')} />
+                      <span className="text-ink-500">{ESTADO_LABEL[estado] || estado}</span>
+                      <span className="text-ink-700 font-semibold tabular-nums">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </ClickCard>
+
+          <ClickCard href="/polizas" className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+                  <TrendingUp className="w-4 h-4 text-primary-700" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-ink-400 leading-tight">Producción</p>
+                  <p className="text-sm font-semibold text-ink-700 leading-tight mt-0.5">Prima neta activa</p>
+                </div>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-ink-400" />
+            </div>
+
+            <p className="text-2xl font-semibold text-ink-700 tracking-tight tabular-nums">{formatCOP(primaTotal)}</p>
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-cream-100">
+              <Percent className="w-3 h-3 text-primary-700" />
+              <span className="text-xs text-ink-400">Comisión:</span>
+              <span className="text-xs font-semibold text-primary-700 ml-auto tabular-nums">{formatCOP(comisionTotal)}</span>
+            </div>
+          </ClickCard>
+
+          <ClickCard href="/clientes" className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-primary-700" />
+                </div>
+                <div>
+                  <p className="text-[11px] text-ink-400 leading-tight">Total cartera</p>
+                  <p className="text-sm font-semibold text-ink-700 leading-tight mt-0.5">Clientes</p>
+                </div>
+              </div>
+              <Sparkline data={clientesSpark} tone="primary" width={60} height={22} />
+            </div>
+
+            <p className="text-3xl font-semibold text-ink-700 tracking-tight tabular-nums">{totalLeads}</p>
+            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-cream-100 text-xs text-ink-500">
+              <span><span className="font-semibold text-ink-700 tabular-nums">{porEtapa('nuevo')}</span> nuevos</span>
+              <span className="text-ink-200">·</span>
+              <span><span className="font-semibold text-ink-700 tabular-nums">{porEtapa('cotizacion')}</span> cotizando</span>
+            </div>
+          </ClickCard>
+        </div>
+      )}
+
+      {/* ── Renovaciones compact + Pipeline + Solicitudes (1 línea) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <ClickCard href="/renovaciones" className="lg:col-span-4 p-5">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-emerald-600"/> Producción
-            </h2>
-            <Link href="/polizas" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver pólizas <ChevronRight className="w-3 h-3"/>
-            </Link>
-          </div>
-          <p className="text-xs text-slate-500 mb-0.5">Prima neta total activa</p>
-          <p className="text-2xl font-bold text-emerald-700 mb-1">{formatCOP(primaTotal)}</p>
-          {comisionTotal > 0 && (
-            <p className="text-xs text-blue-600 font-medium mb-3">
-              Comisión agencia: {formatCOP(comisionTotal)}
-            </p>
-          )}
-          <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-100">
-            <div className="text-center">
-              <p className="text-xl font-bold text-slate-800">{polizas.length}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Activas</p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-warning-soft flex items-center justify-center">
+                <RefreshCw className="w-4 h-4 text-ink-700" />
+              </div>
+              <div>
+                <p className="text-[11px] text-ink-400 leading-tight">90 días</p>
+                <p className="text-sm font-semibold text-ink-700 mt-0.5">Renovaciones</p>
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-xl font-bold text-amber-600">{renovaciones30.length + renovaciones60.length}</p>
-              <p className="text-xs text-slate-500 mt-0.5">Por renovar</p>
-            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
           </div>
-        </div>
-      </div>
 
-      {/* ── Fila 3: Pipeline + Renovaciones ───────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">Pipeline de leads</h2>
-            <Link href="/leads" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver pipeline <ChevronRight className="w-3 h-3"/>
-            </Link>
+          <div className="flex items-baseline gap-3 mb-3">
+            <p className={cn(
+              'text-3xl font-semibold tracking-tight tabular-nums',
+              totalRenovaciones90 > 0 ? 'text-ink-700' : 'text-ink-200'
+            )}>{totalRenovaciones90}</p>
+            <p className="text-xs text-ink-400">
+              <span className="font-semibold text-ink-700 tabular-nums">{renovaciones30.length}</span> próximos 30d
+            </p>
           </div>
+
+          {totalRenovaciones90 === 0 ? (
+            <p className="text-xs text-ink-400 py-2">Sin renovaciones en los siguientes 90 días</p>
+          ) : (
+            <BarsChart data={renovacionesData} height={120} valueLabel="Pólizas" />
+          )}
+        </ClickCard>
+
+        <ClickCard href="/leads" className="lg:col-span-5 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+                <Users className="w-4 h-4 text-primary-700" />
+              </div>
+              <div>
+                <p className="text-[11px] text-ink-400 leading-tight">Distribución por etapa</p>
+                <p className="text-sm font-semibold text-ink-700 mt-0.5">Pipeline de leads</p>
+              </div>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
+          </div>
+
           <div className="space-y-3">
             {(['nuevo','contactado','cotizacion','cerrado'] as Etapa[]).map(etapa => {
               const count = porEtapa(etapa)
-              const pct   = clientes.length ? Math.round((count / clientes.length) * 100) : 0
+              const pct   = totalLeads ? (count / totalLeads) * 100 : 0
               return (
-                <div key={etapa} className="flex items-center gap-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium w-24 text-center flex-shrink-0 ${ETAPA_COLORS[etapa]}`}>{ETAPA_LABELS[etapa]}</span>
-                  <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${etapa==='nuevo'?'bg-blue-400':etapa==='contactado'?'bg-amber-400':etapa==='cotizacion'?'bg-purple-400':'bg-emerald-400'}`}
-                      style={{width:`${pct}%`}}/>
+                <div key={etapa}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Badge variant={ETAPA_COLORS[etapa]} size="sm">{ETAPA_LABELS[etapa]}</Badge>
+                    <span className="text-sm font-semibold text-ink-700 tabular-nums">{count}</span>
                   </div>
-                  <span className="text-sm font-semibold text-slate-700 w-8 text-right">{count}</span>
+                  <div className="h-1.5 bg-cream-100 rounded-pill overflow-hidden">
+                    <div
+                      className={cn(
+                        'h-full rounded-pill transition-all duration-700',
+                        etapa === 'cerrado'      ? 'bg-primary-500'
+                        : etapa === 'cotizacion' ? 'bg-primary-300'
+                        : etapa === 'contactado' ? 'bg-warning'
+                        : 'bg-ink-300'
+                      )}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
               )
             })}
           </div>
-        </div>
+        </ClickCard>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        {/* Solicitudes — PRESERVADA */}
+        <ClickCard href="/solicitudes" className="lg:col-span-3 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800">Próximas renovaciones</h2>
-            <Link href="/renovaciones" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver todas <ChevronRight className="w-3 h-3"/>
-            </Link>
+            <div>
+              <p className="text-[11px] text-ink-400 leading-tight">Bandeja</p>
+              <p className="text-sm font-semibold text-ink-700 mt-0.5">Solicitudes</p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
           </div>
-          {[...renovaciones30, ...renovaciones60].length === 0 ? (
-            <div className="text-center py-8 text-slate-400">
-              <RefreshCw className="w-8 h-8 mx-auto mb-2 opacity-30"/>
-              <p className="text-sm">Sin renovaciones próximas</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {[...renovaciones30, ...renovaciones60].slice(0,5).map(p => {
-                const days = daysUntil(p.fecha_fin!)
-                return (
-                  <div key={p.id} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-slate-800 truncate">{(p as any).cliente?.nombre || '—'}</p>
-                      <p className="text-xs text-slate-500">{p.aseguradora} · {p.ramo}</p>
-                    </div>
-                    <div className="flex flex-col items-end ml-3">
-                      <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${days<=15?'bg-red-100 text-red-700':days<=30?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>
-                        <Clock className="w-3 h-3"/>{days}d
-                      </span>
-                      {p.prima_neta && <span className="text-xs text-slate-400 mt-1">{formatCOP(p.prima_neta)}</span>}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+
+          <div className="grid grid-cols-2 gap-2.5">
+            <MiniStat label="Nuevas"     value={solNuevas}    tone={solNuevas > 0 ? 'primary' : 'muted'} />
+            <MiniStat label="Urgentes"   value={solUrgentes}  tone={solUrgentes > 0 ? 'error' : 'muted'} />
+            <MiniStat label="Activas"    value={solActivas}   tone="neutral" />
+            <MiniStat label="Por vencer" value={solPorVencer} tone={solPorVencer > 0 ? 'warning' : 'muted'} />
+          </div>
+        </ClickCard>
       </div>
 
-      {/* ── Fila 4: Cumpleaños + Siniestros + Tareas ──────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h2 className="font-semibold text-slate-800 flex items-center gap-2 mb-4">
-            <Cake className="w-4 h-4 text-pink-500"/> Cumpleaños
-            <span className="text-xs text-slate-400 font-normal ml-1">próximos 5 días</span>
-          </h2>
-          {cumpleaños.length === 0 ? (
-            <div className="text-center py-6 text-slate-400">
-              <Cake className="w-8 h-8 mx-auto mb-2 opacity-20"/>
-              <p className="text-xs">Sin cumpleaños próximos</p>
+      {/* ── Quick stats · Cobros + Comisiones + Tareas + Siniestros ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <ClickCard href="/cobros" className="p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-8 h-8 rounded-lg bg-cream-200 flex items-center justify-center">
+              <Banknote className="w-4 h-4 text-ink-700" />
             </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
+          </div>
+          <p className="text-[11px] text-ink-400">Por cobrar</p>
+          <p className="text-xl font-semibold text-ink-700 tracking-tight tabular-nums mt-0.5">{formatCOP(cobrosPendiente)}</p>
+          {cobrosVencido > 0 ? (
+            <Badge variant="error" size="sm" dot className="mt-2.5">
+              {formatCOP(cobrosVencido)} vencido
+            </Badge>
           ) : (
-            <div className="space-y-2">
-              {cumpleaños.map(c => {
-                const fn = new Date(c.fecha_nacimiento!)
-                const hoy = new Date()
-                const esteAño = new Date(hoy.getFullYear(), fn.getMonth(), fn.getDate())
-                if (esteAño < hoy) esteAño.setFullYear(hoy.getFullYear() + 1)
-                const diff = Math.ceil((esteAño.getTime() - hoy.getTime()) / 86400000)
-                return (
-                  <div key={c.id} className="flex items-center justify-between py-1.5 border-b border-slate-50 last:border-0">
-                    <Link href={`/clientes/${c.id}`} className="text-sm font-medium text-slate-800 hover:text-emerald-600 truncate">{c.nombre}</Link>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-2 ${diff===0?'bg-pink-100 text-pink-700':'bg-slate-100 text-slate-600'}`}>
-                      {diff===0 ? '¡Hoy!' : `en ${diff}d`}
-                    </span>
-                  </div>
-                )
-              })}
+            <Badge variant="success" size="sm" dot className="mt-2.5">Al día</Badge>
+          )}
+        </ClickCard>
+
+        <ClickCard href="/liquidaciones" className="p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div className="w-8 h-8 rounded-lg bg-cream-200 flex items-center justify-center">
+              <Percent className="w-4 h-4 text-ink-700" />
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
+          </div>
+          <p className="text-[11px] text-ink-400">Comisiones</p>
+          <p className="text-xl font-semibold text-ink-700 tracking-tight tabular-nums mt-0.5">{formatCOP(liqPendiente)}</p>
+          <p className="text-xs text-ink-400 mt-2.5">Pendientes de liquidar</p>
+        </ClickCard>
+
+        {/* Tareas — PRESERVADA (3 mini-cells) */}
+        {can('dashboard_ver_propias') && (
+          <ClickCard href="/tareas" className="p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-primary-700"/>
+                <p className="text-sm font-semibold text-ink-700">Tareas</p>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-ink-400" />
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <TareaCell value={tareasVencidas} label="Vencidas" tone={tareasVencidas > 0 ? 'error' : 'muted'} />
+              <TareaCell value={tareasHoy}      label="Hoy"      tone={tareasHoy > 0 ? 'warning' : 'muted'} />
+              <TareaCell value={tareasMañana}   label="Mañana"   tone={tareasMañana > 0 ? 'primary' : 'muted'} />
+            </div>
+          </ClickCard>
+        )}
+
+        <ClickCard href="/siniestros" className="p-5">
+          <div className="flex items-start justify-between mb-3">
+            <div className={cn(
+              'w-8 h-8 rounded-lg flex items-center justify-center',
+              siniestrosPendientes > 0 ? 'bg-error-soft' : 'bg-cream-200'
+            )}>
+              <ShieldAlert className={cn(
+                'w-4 h-4',
+                siniestrosPendientes > 0 ? 'text-error' : 'text-ink-700'
+              )} />
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
+          </div>
+          <p className="text-[11px] text-ink-400">Siniestros</p>
+          <p className={cn(
+            'text-xl font-semibold tracking-tight tabular-nums mt-0.5',
+            siniestrosPendientes > 0 ? 'text-error' : 'text-ink-700'
+          )}>{siniestrosPendientes}</p>
+          <p className="text-xs text-ink-400 mt-2.5">
+            {siniestrosPendientes === 0
+              ? 'Todo al día'
+              : siniestrosPendientes === 1 ? 'Sin finalizar' : 'Sin finalizar'}
+          </p>
+        </ClickCard>
+      </div>
+
+      {/* ── Distribuciones · Ramo + Aseguradora ───────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <ClickCard href="/polizas" className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="text-[11px] text-ink-400">Cartera activa</p>
+              <p className="text-sm font-semibold text-ink-700 mt-0.5">Distribución por ramo</p>
+            </div>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
+          </div>
+
+          {carteraRamo.length === 0 ? (
+            <p className="text-sm text-ink-400 py-8 text-center">Sin pólizas activas</p>
+          ) : (
+            <div className="flex items-center gap-6">
+              <Donut data={carteraRamo} size={150} thickness={18} />
+              <DonutLegend data={carteraRamo} className="flex-1" />
             </div>
           )}
-        </div>
+        </ClickCard>
 
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-              <Activity className="w-4 h-4 text-orange-500"/> Siniestros pendientes
-            </h2>
-            <Link href="/siniestros" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-              Ver <ChevronRight className="w-3 h-3"/>
-            </Link>
-          </div>
-          <div className="text-center py-4">
-            <p className={`text-5xl font-bold ${siniestrosPendientes > 0 ? 'text-orange-500' : 'text-slate-200'}`}>
-              {siniestrosPendientes}
-            </p>
-            <p className="text-sm text-slate-400 mt-2">sin finalizar</p>
-          </div>
-        </div>
-
-        {can('dashboard_ver_propias') && (
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-slate-800 flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-blue-500"/> Tareas
-              </h2>
-              <Link href="/tareas" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-                Ver <ChevronRight className="w-3 h-3"/>
-              </Link>
+        <ClickCard href="/polizas" className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="text-[11px] text-ink-400">Cartera activa</p>
+              <p className="text-sm font-semibold text-ink-700 mt-0.5">Distribución por aseguradora</p>
             </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Vencidas', value: tareasVencidas, cls: tareasVencidas>0?'bg-red-50 border border-red-200 text-red-700':'bg-slate-50 border border-slate-200 text-slate-400' },
-                { label: 'Hoy',      value: tareasHoy,      cls: tareasHoy>0    ?'bg-amber-50 border border-amber-200 text-amber-700':'bg-slate-50 border border-slate-200 text-slate-400' },
-                { label: 'Mañana',   value: tareasMañana,   cls: 'bg-slate-50 border border-slate-200 text-slate-600' },
-              ].map(t => (
-                <div key={t.label} className={`${t.cls} rounded-lg p-2 text-center`}>
-                  <p className="text-2xl font-bold">{t.value}</p>
-                  <p className="text-xs font-medium mt-0.5">{t.label}</p>
+            <ArrowUpRight className="w-4 h-4 text-ink-400" />
+          </div>
+
+          {carteraAseguradora.length === 0 ? (
+            <p className="text-sm text-ink-400 py-8 text-center">Sin pólizas activas</p>
+          ) : (
+            <div className="flex items-center gap-6">
+              <Donut data={carteraAseguradora} size={150} thickness={18} />
+              <DonutLegend data={carteraAseguradora} className="flex-1" />
+            </div>
+          )}
+        </ClickCard>
+      </div>
+
+      {/* ── Tendencia (movido más abajo) ───────────────────────── */}
+      {can('dashboard_ver_global') && (
+        <ClickCard href="/polizas" className="p-5">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <p className="text-[11px] text-ink-400">Últimos 12 meses</p>
+              <p className="text-sm font-semibold text-ink-700 mt-0.5">Tendencia de producción</p>
+            </div>
+            <div className="flex items-center gap-4 text-xs">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-primary-500" />
+                <span className="text-ink-500">Prima neta</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-sm bg-info" />
+                <span className="text-ink-500">Comisión</span>
+              </span>
+            </div>
+          </div>
+
+          <TrendChart
+            data={trendData}
+            height={200}
+            formatValue={(n) => {
+              if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`
+              if (n >= 1_000)     return `$${Math.round(n / 1_000)}k`
+              return `$${n}`
+            }}
+            primaryLabel="Prima neta"
+            secondaryLabel="Comisión"
+          />
+        </ClickCard>
+      )}
+
+      {/* ── Cumpleaños (full width) ─────────────────────────────── */}
+      <ClickCard href="/clientes" className="p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-warning-soft flex items-center justify-center">
+              <Cake className="w-4 h-4 text-ink-700" />
+            </div>
+            <div>
+              <p className="text-[11px] text-ink-400 leading-tight">Próximos 5 días</p>
+              <p className="text-sm font-semibold text-ink-700 mt-0.5">Cumpleaños</p>
+            </div>
+          </div>
+          <Badge variant={cumpleaños.length > 0 ? 'warning' : 'neutral'} size="sm">{cumpleaños.length}</Badge>
+        </div>
+
+        {cumpleaños.length === 0 ? (
+          <p className="text-sm text-ink-400 py-2">Sin cumpleaños próximos</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+            {cumpleaños.slice(0, 9).map(c => {
+              const fn = new Date(c.fecha_nacimiento!)
+              const hoy = new Date()
+              const esteAño = new Date(hoy.getFullYear(), fn.getMonth(), fn.getDate())
+              if (esteAño < hoy) esteAño.setFullYear(hoy.getFullYear() + 1)
+              const diff = Math.ceil((esteAño.getTime() - hoy.getTime()) / 86400000)
+              return (
+                <div key={c.id} className="flex items-center gap-2.5">
+                  <Avatar fallback={c.nombre} size="sm" />
+                  <span className="flex-1 text-sm text-ink-700 truncate">{c.nombre}</span>
+                  <Badge variant={diff === 0 ? 'warning' : 'neutral'} size="sm">
+                    {diff === 0 ? '¡Hoy!' : `${diff}d`}
+                  </Badge>
                 </div>
-              ))}
-            </div>
+              )
+            })}
           </div>
         )}
-      </div>
+      </ClickCard>
 
-      {/* ── Fila 5: Últimos clientes ───────────────────────────────────── */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      {/* ── Últimos clientes ─────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-cream-200 shadow-soft p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-slate-800">Últimos clientes registrados</h2>
-          <Link href="/clientes" className="text-xs text-emerald-600 hover:underline flex items-center gap-1">
-            Ver todos <ChevronRight className="w-3 h-3"/>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-cream-200 flex items-center justify-center">
+              <ClipboardList className="w-4 h-4 text-ink-700" />
+            </div>
+            <div>
+              <p className="text-[11px] text-ink-400 leading-tight">Recientes</p>
+              <p className="text-sm font-semibold text-ink-700 mt-0.5">Últimos clientes</p>
+            </div>
+          </div>
+          <Link href="/clientes" className="text-xs text-primary-700 hover:text-primary-800 font-medium">
+            Ver todos →
           </Link>
         </div>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-5 px-5">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-slate-400 border-b border-slate-100">
-                <th className="pb-2 font-medium">Nombre</th>
-                <th className="pb-2 font-medium hidden sm:table-cell">Ciudad</th>
-                <th className="pb-2 font-medium">Etapa</th>
-                <th className="pb-2 font-medium hidden md:table-cell">Categoría</th>
-                <th className="pb-2 font-medium hidden sm:table-cell">Teléfono</th>
+              <tr className="text-left text-[10px] uppercase tracking-widest text-ink-400 border-b border-cream-200">
+                <th className="pb-2.5 font-medium w-1/2">Nombre</th>
+                <th className="pb-2.5 font-medium hidden sm:table-cell">Ciudad</th>
+                <th className="pb-2.5 font-medium">Etapa</th>
+                <th className="pb-2.5 font-medium hidden md:table-cell">Categoría</th>
+                <th className="pb-2.5 font-medium hidden sm:table-cell">Teléfono</th>
               </tr>
             </thead>
             <tbody>
               {clientes.slice(0,5).map(c => (
-                <tr key={c.id} className="border-b border-slate-50 hover:bg-slate-50">
+                <tr key={c.id} className="border-b border-cream-100 last:border-0 hover:bg-cream-50/60 transition-colors">
                   <td className="py-2.5">
-                    <Link href={`/clientes/${c.id}`} className="font-medium text-slate-800 hover:text-emerald-600">{c.nombre}</Link>
+                    <Link href={`/clientes/${c.id}`} className="flex items-center gap-3 group">
+                      <Avatar fallback={c.nombre} size="sm" />
+                      <span className="font-medium text-ink-700 group-hover:text-primary-700 transition-colors">{c.nombre}</span>
+                    </Link>
                   </td>
-                  <td className="py-2.5 text-slate-500 hidden sm:table-cell">{c.ciudad || '—'}</td>
+                  <td className="py-2.5 text-ink-500 hidden sm:table-cell">{c.ciudad || '—'}</td>
                   <td className="py-2.5">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ETAPA_COLORS[c.etapa]}`}>{ETAPA_LABELS[c.etapa]}</span>
+                    <Badge variant={ETAPA_COLORS[c.etapa]} size="sm">{ETAPA_LABELS[c.etapa]}</Badge>
                   </td>
                   <td className="py-2.5 hidden md:table-cell">
                     {c.categoria
-                      ? <span className="text-xs text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full">{c.categoria}</span>
-                      : <span className="text-slate-300 text-xs">—</span>
-                    }
+                      ? <Badge variant="outline" size="sm">{c.categoria}</Badge>
+                      : <span className="text-ink-300 text-xs">—</span>}
                   </td>
-                  <td className="py-2.5 text-slate-500 hidden sm:table-cell">{c.telefono || '—'}</td>
+                  <td className="py-2.5 text-ink-500 hidden sm:table-cell">{c.telefono || '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -474,29 +779,146 @@ export default function Dashboard() {
 
 /* ── Sub-components ─────────────────────────────────────────────── */
 
-function MetricCard({ icon, label, value, bg, href, color, urgent }: {
-  icon: React.ReactNode; label: string; value: number
-  bg: string; href: string; color: string; urgent?: boolean
+function ClickCard({ href, className, children }: {
+  href: string
+  className?: string
+  children: React.ReactNode
 }) {
   return (
-    <Link href={href} className={`${bg} rounded-xl p-4 border ${urgent?'border-amber-300':'border-transparent'} hover:shadow-sm transition-shadow block`}>
-      <div className="flex items-center gap-2 mb-2">{icon}</div>
-      <p className={`text-3xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-slate-500 mt-1 font-medium">{label}</p>
+    <Link
+      href={href}
+      className={cn(
+        'block bg-white rounded-2xl border border-cream-200/80 shadow-soft',
+        'hover:shadow-card hover:-translate-y-0.5 transition-all duration-200',
+        className,
+      )}
+    >
+      {children}
     </Link>
   )
 }
 
-function FinCard({ icon, label, value, sub, bg, href, color, urgent }: {
-  icon: React.ReactNode; label: string; value: string; sub?: string
-  bg: string; href: string; color: string; urgent?: boolean
+function MiniStat({ label, value, tone }: {
+  label: string
+  value: number
+  tone: 'primary' | 'neutral' | 'error' | 'warning' | 'muted'
 }) {
+  const styles = {
+    primary: 'bg-primary-100 text-primary-800',
+    neutral: 'bg-white border border-cream-200 text-ink-700',
+    error:   'bg-error-soft text-error',
+    warning: 'bg-warning-soft text-ink-700',
+    muted:   'bg-cream-100 text-ink-400',
+  }
   return (
-    <Link href={href} className={`${bg} rounded-xl p-4 border ${urgent?'border-amber-300 bg-amber-50':'border-transparent'} hover:shadow-sm transition-shadow block`}>
-      <div className="flex items-center gap-2 mb-2">{icon}</div>
-      <p className={`text-lg font-bold ${color} leading-tight`}>{value}</p>
-      <p className="text-xs font-medium text-slate-500 mt-0.5">{label}</p>
-      {sub && <p className={`text-xs mt-1 ${urgent?'text-amber-600 font-medium':'text-slate-400'}`}>{sub}</p>}
+    <div className={cn('rounded-md px-4 py-3', styles[tone])}>
+      <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+      <p className="text-[10px] uppercase tracking-widest mt-1 opacity-75">{label}</p>
+    </div>
+  )
+}
+
+function TareaCell({ value, label, tone }: {
+  value: number
+  label: string
+  tone: 'error' | 'warning' | 'primary' | 'muted'
+}) {
+  const styles = {
+    error:   'bg-error-soft text-error',
+    warning: 'bg-warning-soft text-ink-700',
+    primary: 'bg-primary-100 text-primary-800',
+    muted:   'bg-cream-100 text-ink-400',
+  }
+  return (
+    <div className={cn('rounded-md px-2 py-3 text-center', styles[tone])}>
+      <p className="text-xl font-semibold tracking-tight tabular-nums">{value}</p>
+      <p className="text-[10px] uppercase tracking-widest mt-0.5 opacity-75">{label}</p>
+    </div>
+  )
+}
+
+function MetasIndicator({ progress, activas, cumplidas }: {
+  progress: number
+  activas: number
+  cumplidas: number
+}) {
+  const size = 88
+  const stroke = 8
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference * (1 - Math.min(progress, 100) / 100)
+
+  return (
+    <Link
+      href="/metas"
+      className="flex items-center gap-4 bg-white rounded-2xl border border-cream-200/80 shadow-soft px-5 py-4 hover:shadow-card hover:-translate-y-0.5 transition-all duration-200"
+    >
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg width={size} height={size} className="-rotate-90">
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--color-cream-200)"
+            strokeWidth={stroke}
+          />
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke="var(--color-primary-500)"
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            style={{ transition: 'stroke-dashoffset 0.7s ease' }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-lg font-semibold text-ink-700 tabular-nums leading-none">{progress}%</span>
+        </div>
+      </div>
+
+      <div className="text-right">
+        <div className="flex items-center gap-1.5 justify-end mb-1">
+          <Target className="w-3.5 h-3.5 text-primary-700" />
+          <p className="text-[11px] uppercase tracking-widest text-ink-400 leading-none">Metas</p>
+        </div>
+        {activas === 0 ? (
+          <>
+            <p className="text-sm font-semibold text-ink-700">Sin metas</p>
+            <p className="text-xs text-primary-700 hover:underline mt-0.5">Configurar →</p>
+          </>
+        ) : (
+          <>
+            <p className="text-sm font-semibold text-ink-700 tabular-nums">
+              {cumplidas} <span className="text-ink-400 font-normal">/ {activas}</span>
+            </p>
+            <p className="text-xs text-ink-400 mt-0.5">
+              {cumplidas === activas ? '¡Todas cumplidas!' : `${activas - cumplidas} en curso`}
+            </p>
+          </>
+        )}
+      </div>
     </Link>
   )
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────── */
+
+function bucketByDay<T extends Record<string, unknown>>(items: T[], dateKey: keyof T, days: number): number[] {
+  const buckets = new Array(days).fill(0)
+  const todayStart = new Date()
+  todayStart.setHours(0, 0, 0, 0)
+  items.forEach(item => {
+    const raw = item[dateKey]
+    if (typeof raw !== 'string') return
+    const d = new Date(raw)
+    const diff = Math.floor((todayStart.getTime() - d.getTime()) / 86400000)
+    const idx = days - 1 - diff
+    if (idx >= 0 && idx < days) buckets[idx]++
+  })
+  return buckets
 }

@@ -23,9 +23,9 @@ interface Invitation {
 }
 
 const ROLE_CONFIG = {
-  admin:      { label: 'Administrador', icon: Shield,    cls: 'bg-red-100 text-red-700' },
-  supervisor: { label: 'Supervisor',    icon: Eye,       cls: 'bg-amber-100 text-amber-700' },
-  agente:     { label: 'Agente',        icon: User,      cls: 'bg-blue-100 text-blue-700' },
+  admin:      { label: 'Administrador', icon: Shield,    cls: 'bg-error-soft text-error' },
+  supervisor: { label: 'Supervisor',    icon: Eye,       cls: 'bg-warning-soft text-ink-700' },
+  agente:     { label: 'Agente',        icon: User,      cls: 'bg-info/20 text-info' },
 }
 
 export default function WorkspaceMembersView() {
@@ -147,21 +147,21 @@ export default function WorkspaceMembersView() {
   return (
     <div className="space-y-6">
       {/* Nombre del workspace */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
-        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <Shield className="w-4 h-4 text-emerald-600" /> Nombre del workspace
+      <div className="bg-white rounded-xl border border-ink-200 p-5">
+        <h3 className="font-semibold text-ink-700 mb-4 flex items-center gap-2">
+          <Shield className="w-4 h-4 text-primary-500" /> Nombre del workspace
         </h3>
         <div className="flex gap-3">
           <input
             value={wsName}
             onChange={e => setWsName(e.target.value)}
             placeholder="Nombre del workspace"
-            className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+            className="flex-1 px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
           />
           <button
             onClick={saveWorkspaceName}
             disabled={savingName || wsName === currentWorkspace.name}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition-colors"
           >
             {nameSaved ? <Check className="w-4 h-4" /> : savingName ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
             {nameSaved ? 'Guardado' : 'Guardar'}
@@ -170,15 +170,15 @@ export default function WorkspaceMembersView() {
       </div>
 
       {/* Miembros */}
-      <div className="bg-white rounded-xl border border-slate-200 p-5">
+      <div className="bg-white rounded-xl border border-ink-200 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-            <Users className="w-4 h-4 text-emerald-600" /> Miembros ({members.length})
+          <h3 className="font-semibold text-ink-700 flex items-center gap-2">
+            <Users className="w-4 h-4 text-primary-500" /> Miembros ({members.length})
           </h3>
           {isAdmin && (
             <button
               onClick={() => setShowInviteForm(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
             >
               <UserPlus className="w-4 h-4" /> Invitar
             </button>
@@ -187,7 +187,7 @@ export default function WorkspaceMembersView() {
 
         {loading ? (
           <div className="flex justify-center py-8">
-            <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
           <div className="space-y-2">
@@ -195,15 +195,15 @@ export default function WorkspaceMembersView() {
               const cfg = ROLE_CONFIG[m.role]
               const Icon = cfg.icon
               return (
-                <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <User className="w-4 h-4 text-emerald-600" />
+                <div key={m.id} className="flex items-center gap-3 p-3 rounded-lg bg-cream-100 border border-cream-200">
+                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center flex-shrink-0">
+                    <User className="w-4 h-4 text-primary-500" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-800 truncate">
+                    <p className="text-sm font-medium text-ink-700 truncate">
                       {m.nombre || `Usuario ${m.user_id.substring(0, 8)}...`}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-ink-400">
                       Unido {new Date(m.joined_at).toLocaleDateString('es-CO')}
                     </p>
                   </div>
@@ -215,7 +215,7 @@ export default function WorkspaceMembersView() {
                       <select
                         value={m.role}
                         onChange={e => changeRole(m.id, e.target.value as any)}
-                        className="text-xs border border-slate-200 rounded px-1.5 py-1 text-slate-600 focus:outline-none focus:ring-1 focus:ring-emerald-400"
+                        className="text-xs border border-ink-200 rounded px-1.5 py-1 text-ink-500 focus:outline-none focus:ring-1 focus:ring-primary-400"
                       >
                         <option value="agente">Agente</option>
                         <option value="supervisor">Supervisor</option>
@@ -223,7 +223,7 @@ export default function WorkspaceMembersView() {
                       </select>
                       <button
                         onClick={() => removeMember(m.id)}
-                        className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                        className="p-1 text-ink-400 hover:text-error transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -238,24 +238,24 @@ export default function WorkspaceMembersView() {
 
       {/* Invitaciones pendientes */}
       {invitations.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
-          <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-            <Clock className="w-4 h-4 text-amber-500" /> Invitaciones pendientes ({invitations.length})
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <h3 className="font-semibold text-ink-700 mb-4 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-warning" /> Invitaciones pendientes ({invitations.length})
           </h3>
           <div className="space-y-2">
             {invitations.map(inv => (
-              <div key={inv.id} className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 border border-amber-100">
-                <Mail className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <div key={inv.id} className="flex items-center gap-3 p-3 rounded-lg bg-warning-soft border border-warning/30">
+                <Mail className="w-4 h-4 text-warning flex-shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{inv.email}</p>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-sm font-medium text-ink-700 truncate">{inv.email}</p>
+                  <p className="text-xs text-ink-400">
                     Expira {new Date(inv.expires_at).toLocaleDateString('es-CO')}
                     {' · '}<span className="capitalize">{inv.role}</span>
                   </p>
                 </div>
                 <button
                   onClick={() => copyInviteLink(inv.token)}
-                  className="flex items-center gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 font-medium px-2 py-1 rounded-lg hover:bg-emerald-50 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-primary-500 hover:text-primary-700 font-medium px-2 py-1 rounded-lg hover:bg-primary-50 transition-colors"
                 >
                   {copiedToken === inv.token ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                   {copiedToken === inv.token ? 'Copiado' : 'Copiar link'}
@@ -263,7 +263,7 @@ export default function WorkspaceMembersView() {
                 {isAdmin && (
                   <button
                     onClick={() => cancelInvitation(inv.id)}
-                    className="p-1 text-slate-400 hover:text-red-600 transition-colors"
+                    className="p-1 text-ink-400 hover:text-error transition-colors"
                   >
                     <X className="w-3.5 h-3.5" />
                   </button>
@@ -278,21 +278,21 @@ export default function WorkspaceMembersView() {
       {inviteSuccessLink && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                <Check className="w-4 h-4 text-emerald-600" /> Link de invitación generado
+            <div className="flex items-center justify-between p-5 border-b border-ink-200">
+              <h3 className="font-semibold text-ink-700 flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary-500" /> Link de invitación generado
               </h3>
-              <button onClick={() => { setInviteSuccessLink(null); setCopiedSuccess(false) }} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => { setInviteSuccessLink(null); setCopiedSuccess(false) }} className="text-ink-400 hover:text-ink-500">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-5 space-y-4">
-              <p className="text-sm text-slate-500">Comparte este enlace con la persona que quieres invitar. Es válido por 7 días.</p>
+              <p className="text-sm text-ink-400">Comparte este enlace con la persona que quieres invitar. Es válido por 7 días.</p>
               <div className="flex gap-2">
                 <input
                   readOnly
                   value={inviteSuccessLink}
-                  className="flex-1 px-3 py-2 text-xs border border-slate-200 rounded-lg bg-slate-50 text-slate-700 truncate focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="flex-1 px-3 py-2 text-xs border border-ink-200 rounded-lg bg-cream-100 text-ink-600 truncate focus:outline-none focus:ring-2 focus:ring-primary-400"
                   onClick={e => (e.target as HTMLInputElement).select()}
                 />
                 <button
@@ -302,9 +302,9 @@ export default function WorkspaceMembersView() {
                       setTimeout(() => setCopiedSuccess(false), 2000)
                     })
                   }}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors flex-shrink-0"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors flex-shrink-0"
                 >
-                  {copiedSuccess ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                  {copiedSuccess ? <Check className="w-4 h-4 text-primary-500" /> : <Copy className="w-4 h-4" />}
                   {copiedSuccess ? 'Copiado' : 'Copiar'}
                 </button>
               </div>
@@ -315,16 +315,16 @@ export default function WorkspaceMembersView() {
                   )
                   window.open(`https://wa.me/?text=${text}`, '_blank')
                 }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-green-500 hover:bg-green-600 text-white text-sm font-medium transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-primary-500 hover:bg-green-600 text-white text-sm font-medium transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
                 Enviar por WhatsApp
               </button>
             </div>
-            <div className="p-5 border-t border-slate-200">
+            <div className="p-5 border-t border-ink-200">
               <button
                 onClick={() => { setInviteSuccessLink(null); setCopiedSuccess(false) }}
-                className="w-full px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors"
+                className="w-full px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors"
               >
                 Listo
               </button>
@@ -337,49 +337,49 @@ export default function WorkspaceMembersView() {
       {showInviteForm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200">
-              <h3 className="font-semibold text-slate-800">Invitar miembro</h3>
-              <button onClick={() => setShowInviteForm(false)} className="text-slate-400 hover:text-slate-600">
+            <div className="flex items-center justify-between p-5 border-b border-ink-200">
+              <h3 className="font-semibold text-ink-700">Invitar miembro</h3>
+              <button onClick={() => setShowInviteForm(false)} className="text-ink-400 hover:text-ink-500">
                 <X className="w-5 h-5" />
               </button>
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Correo electrónico</label>
+                <label className="block text-xs font-medium text-ink-500 mb-1">Correo electrónico</label>
                 <input
                   type="email"
                   value={inviteEmail}
                   onChange={e => setInviteEmail(e.target.value)}
                   placeholder="correo@ejemplo.com"
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-slate-600 mb-1">Rol</label>
+                <label className="block text-xs font-medium text-ink-500 mb-1">Rol</label>
                 <select
                   value={inviteRole}
                   onChange={e => setInviteRole(e.target.value as any)}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  className="w-full px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
                 >
                   <option value="agente">Agente — ve todo, edita lo suyo</option>
                   <option value="supervisor">Supervisor — ve y edita todo</option>
                   <option value="admin">Administrador — control total</option>
                 </select>
               </div>
-              <div className="bg-blue-50 rounded-lg p-3 text-xs text-blue-700">
+              <div className="bg-info/10 rounded-lg p-3 text-xs text-info">
                 Se generará un enlace de invitación que podrás copiar y enviar por WhatsApp, correo o como prefieras. El enlace es válido por 7 días.
               </div>
               {inviteError && (
-                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{inviteError}</p>
+                <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{inviteError}</p>
               )}
             </div>
-            <div className="flex gap-3 p-5 border-t border-slate-200">
+            <div className="flex gap-3 p-5 border-t border-ink-200">
               <button onClick={() => setShowInviteForm(false)}
-                className="flex-1 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 text-sm hover:bg-slate-50 transition-colors">
+                className="flex-1 px-4 py-2 rounded-lg border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors">
                 Cancelar
               </button>
               <button onClick={sendInvitation} disabled={inviting || !inviteEmail.trim()}
-                className="flex-1 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700 disabled:opacity-60 transition-colors">
+                className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 disabled:opacity-60 transition-colors">
                 {inviting ? 'Generando...' : 'Generar link de invitación'}
               </button>
             </div>

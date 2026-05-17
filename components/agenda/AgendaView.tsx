@@ -204,7 +204,7 @@ export default function AgendaView() {
       {/* ── Header ─────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 capitalize">{navLabel()}</h1>
+          <h1 className="text-2xl font-bold text-ink-700 capitalize">{navLabel()}</h1>
           <div className="flex items-center gap-3 mt-1">
             {/* Leyenda */}
             {[
@@ -214,7 +214,7 @@ export default function AgendaView() {
               { label: 'Cobros',      color: CRM_COLORS.cobro.color },
               { label: 'Prospectos',  color: CRM_COLORS.prospecto.color },
             ].map(l => (
-              <span key={l.label} className="flex items-center gap-1 text-xs text-slate-500">
+              <span key={l.label} className="flex items-center gap-1 text-xs text-ink-400">
                 <span className="w-2 h-2 rounded-full" style={{ background: l.color }} />
                 {l.label}
               </span>
@@ -224,10 +224,10 @@ export default function AgendaView() {
 
         <div className="flex items-center gap-2 flex-wrap">
           {/* View toggle */}
-          <div className="flex border border-slate-200 rounded-lg overflow-hidden">
+          <div className="flex border border-ink-200 rounded-lg overflow-hidden">
             {VIEWS.map(v => (
               <button key={v.key} onClick={() => setView(v.key)}
-                className={`px-3 py-1.5 text-sm transition-colors ${view === v.key ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:bg-slate-50'}`}>
+                className={`px-3 py-1.5 text-sm transition-colors ${view === v.key ? 'bg-primary-500 text-white' : 'text-ink-400 hover:bg-cream-100'}`}>
                 {v.label}
               </button>
             ))}
@@ -236,21 +236,21 @@ export default function AgendaView() {
           {/* Navigation */}
           <div className="flex items-center gap-1">
             <button onClick={() => navigate('prev')}
-              className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+              className="p-2 rounded-lg text-ink-400 hover:bg-cream-200 hover:text-ink-500 transition-colors">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <button onClick={() => navigate('today')}
-              className="px-3 py-1.5 text-sm border border-slate-200 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors">
+              className="px-3 py-1.5 text-sm border border-ink-200 rounded-lg text-ink-500 hover:bg-cream-100 transition-colors">
               Hoy
             </button>
             <button onClick={() => navigate('next')}
-              className="p-2 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+              className="p-2 rounded-lg text-ink-400 hover:bg-cream-200 hover:text-ink-500 transition-colors">
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
 
           <button onClick={() => setModal({ open: true })}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
             <Plus className="w-4 h-4" /> Nuevo evento
           </button>
         </div>
@@ -259,10 +259,10 @@ export default function AgendaView() {
       {/* ── Calendar ─────────────────────────────────────────── */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" />
         </div>
       ) : (
-        <div className="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+        <div className="flex-1 bg-white rounded-2xl border border-ink-200 overflow-hidden shadow-sm">
           <Calendar
             localizer={localizer}
             events={events}
