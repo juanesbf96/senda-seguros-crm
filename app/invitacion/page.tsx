@@ -20,51 +20,38 @@ function InvitacionContent() {
   }, [token])
 
   async function init() {
-    const [{ data: { user } }, invResult] = await Promise.all([
-      supabase.auth.getUser(),
-      supabase
-        .from('workspace_invitations')
-        .select('*, workspace:workspaces(id, name)')
-        .eq('token', token!)
-        .gt('expires_at', new Date().toISOString())
-        .is('accepted_at', null)
-        .single(),
-    ])
+    // Get current user (may be null if not logged in)
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    setUser(currentUser)
 
-    setUser(user)
+    // Use SECURITY DEFINER RPC to read invitation — works for both
+    // authenticated and unauthenticated users (direct SELECT fails RLS for guests)
+    const { data: invData, error: invErr } = await supabase
+      .rpc('get_invitation_by_token', { p_token: token! })
 
-    if (invResult.error || !invResult.data) {
+    if (invErr || !invData) {
       setStatus('error')
       setError('La invitación no existe, ya fue usada, o expiró.')
       return
     }
 
-    setInvitation(invResult.data)
+    setInvitation(invData)
     setStatus('found')
   }
 
   async function acceptInvitation() {
     if (!user) return
     setAccepting(true)
+    setError('')
 
     try {
-      // Agregar al workspace
-      const { error: e1 } = await supabase
-        .from('workspace_members')
-        .insert({
-          workspace_id: invitation.workspace_id,
-          user_id: user.id,
-          role: invitation.role,
-          invited_by: invitation.created_by,
-        })
+      // Use SECURITY DEFINER RPC — direct INSERT into workspace_members
+      // fails RLS because the invitee is not yet an admin of that workspace.
+      const { data, error: rpcErr } = await supabase
+        .rpc('accept_workspace_invitation', { p_token: token! })
 
-      if (e1 && !e1.message.includes('unique')) throw e1
-
-      // Marcar como aceptada
-      await supabase
-        .from('workspace_invitations')
-        .update({ accepted_at: new Date().toISOString() })
-        .eq('id', invitation.id)
+      if (rpcErr) throw rpcErr
+      if (data?.error) throw new Error(data.error)
 
       setStatus('accepted')
       setTimeout(() => { window.location.href = '/' }, 2000)
@@ -136,15 +123,13 @@ function InvitacionContent() {
 
       {user ? (
         // Authenticated: show accept button
-        <>
-          <button
-            onClick={acceptInvitation}
-            disabled={accepting}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
-          >
-            {accepting ? 'Aceptando...' : 'Aceptar invitación'}
-          </button>
-        </>
+        <button
+          onClick={acceptInvitation}
+          disabled={accepting}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white py-2.5 rounded-lg text-sm font-medium transition-colors"
+        >
+          {accepting ? 'Aceptando...' : 'Aceptar invitación'}
+        </button>
       ) : (
         // Not authenticated: show register / login CTAs
         <div className="space-y-3">

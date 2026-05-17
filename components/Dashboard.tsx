@@ -23,7 +23,7 @@ const ETAPA_COLORS: Record<Etapa, string> = {
 }
 
 export default function Dashboard() {
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, loading: wsLoading } = useWorkspace()
   const [clientes,   setClientes]   = useState<Cliente[]>([])
   const [polizas,    setPolizas]    = useState<Poliza[]>([])
   const [todasPolizas, setTodasPolizas] = useState<{ estado: string }[]>([])
@@ -44,6 +44,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!currentWorkspace) return
+    setLoading(true)
     async function load() {
       const wsId     = currentWorkspace!.id
       const today    = new Date().toISOString().split('T')[0]
@@ -131,9 +132,15 @@ export default function Dashboard() {
     return Math.ceil((esteAño.getTime() - hoy.getTime()) / 86400000) <= 5
   })
 
-  if (loading) return (
+  if (wsLoading || loading) return (
     <div className="flex items-center justify-center h-full">
       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600" />
+    </div>
+  )
+
+  if (!currentWorkspace) return (
+    <div className="flex items-center justify-center h-full text-slate-400 text-sm">
+      No se encontró un workspace. Recarga la página.
     </div>
   )
 

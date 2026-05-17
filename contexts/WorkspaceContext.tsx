@@ -46,29 +46,26 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setLoading(false); return }
 
-    const { data, error } = await supabase
-      .from('workspace_members')
-      .select(`
-        role,
-        workspace:workspaces (
-          id, name, owner_id, slug, setup_completed, created_at
-        )
-      `)
-      .eq('user_id', user.id)
+    // Usamos RPC SECURITY DEFINER para evitar bloqueos de RLS en
+    // workspace_members y workspaces al leer desde el cliente (anon key)
+    const { data, error } = await supabase.rpc('get_user_workspaces')
 
     if (error || !data) { setLoading(false); return }
 
-    const wsList: Workspace[] = data
+    const rows = Array.isArray(data) ? data : []
+
+    const wsList: Workspace[] = rows
       .map((row: any) => row.workspace)
       .filter(Boolean)
 
     const roles: Record<string, WorkspaceRole> = {}
-    data.forEach((row: any) => {
+    rows.forEach((row: any) => {
       if (row.workspace?.id) roles[row.workspace.id] = row.role
     })
 
     setWorkspaces(wsList)
     setRolesMap(roles)
+
 
     // Restaurar workspace activo desde localStorage
     const savedId = typeof window !== 'undefined'
