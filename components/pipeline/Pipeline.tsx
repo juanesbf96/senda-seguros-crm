@@ -6,6 +6,7 @@ import { Plus, Phone, Mail, MapPin, Lock } from 'lucide-react'
 import Link from 'next/link'
 import ClienteModal from '@/components/clientes/ClienteModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ETAPAS: { id: Etapa; label: string; color: string; header: string }[] = [
   { id: 'nuevo', label: 'Nuevo', color: 'border-t-blue-500', header: 'bg-info/10' },
@@ -23,21 +24,26 @@ const ETAPA_DOT: Record<Etapa, string> = {
 
 export default function Pipeline() {
   const { can } = usePermissions()
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [dragging, setDragging] = useState<string | null>(null)
 
   async function load() {
-    const { data } = await supabase.from('clientes').select('*').order('created_at', { ascending: false })
+    if (!currentWorkspace) return
+    const { data } = await supabase.from('clientes').select('*')
+      .eq('workspace_id', currentWorkspace.id)
+      .order('created_at', { ascending: false })
     setClientes(data || [])
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [currentWorkspace])
 
   async function moveToEtapa(clienteId: string, etapa: Etapa) {
-    await supabase.from('clientes').update({ etapa }).eq('id', clienteId)
+    if (!currentWorkspace) return
+    await supabase.from('clientes').update({ etapa }).eq('id', clienteId).eq('workspace_id', currentWorkspace.id)
     setClientes(prev => prev.map(c => c.id === clienteId ? { ...c, etapa } : c))
   }
 

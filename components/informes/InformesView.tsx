@@ -10,6 +10,7 @@ import {
   DollarSign, FileText, Users, TrendingUp,
   AlertTriangle, CheckCircle, Clock,
 } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 type Periodo = '30d' | '3m' | '6m' | '1a'
 
@@ -42,6 +43,7 @@ function MetricCard({ label, value, sub, icon: Icon, color }: {
 }
 
 export default function InformesView() {
+  const { currentWorkspace } = useWorkspace()
   const [periodo, setPeriodo] = useState<Periodo>('3m')
   const [loading, setLoading] = useState(true)
 
@@ -65,18 +67,22 @@ export default function InformesView() {
   }
 
   async function load() {
+    if (!currentWorkspace) return
     setLoading(true)
+    const wid  = currentWorkspace.id
     const from = getDateFrom(periodo).toISOString()
 
     const [polizasRes, cobrosRes, clientesRes, prospectosRes, liquidacionesRes] = await Promise.all([
       supabase.from('polizas')
         .select('id, prima, prima_neta, comision_agencia, comision_vendedor, ramo, estado, fecha_inicio, created_at, vendedor:vendedores(nombre)')
+        .eq('workspace_id', wid)
         .eq('eliminada', false),
-      supabase.from('cobros').select('id, valor, estado, created_at'),
-      supabase.from('clientes').select('id, created_at'),
-      supabase.from('prospectos').select('id, etapa'),
+      supabase.from('cobros').select('id, valor, estado, created_at').eq('workspace_id', wid),
+      supabase.from('clientes').select('id, created_at').eq('workspace_id', wid),
+      supabase.from('prospectos').select('id, etapa').eq('workspace_id', wid),
       supabase.from('liquidaciones')
         .select('total_primas, total_comision, periodo, vendedor:vendedores(nombre)')
+        .eq('workspace_id', wid)
         .gte('created_at', from),
     ])
 

@@ -1,10 +1,16 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Solicitud, EstadoSolicitud } from '@/types'
-import { Plus, Search, Pencil, Trash2, ClipboardList, FileCheck, Archive } from 'lucide-react'
+import { Solicitud, EstadoSolicitud, TipoSolicitud } from '@/types'
+import {
+  Plus, Search, Pencil, Trash2,
+  ClipboardList, FileCheck, Archive, RefreshCw,
+  FilePen, XCircle, FileText, UserPlus, UserMinus,
+  AlertTriangle, LayoutGrid,
+} from 'lucide-react'
 import Link from 'next/link'
 import SolicitudModal from './SolicitudModal'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoSolicitud, string> = {
   nueva:      'bg-info/20 text-info',
@@ -18,25 +24,37 @@ const ESTADO_LABELS: Record<EstadoSolicitud, string> = {
   cancelada: 'Cancelada', inactiva: 'Inactiva',
 }
 
-type Tab = 'cotizaciones' | 'expediciones' | 'inactivas'
+type Tab = 'todas' | TipoSolicitud | 'inactivas'
 
-function formatDate(d: string | null) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' })
+const TIPO_LABELS: Record<TipoSolicitud, string> = {
+  cotizacion:  'Cotizaciones',
+  expedicion:  'Expediciones',
+  renovacion:  'Renovaciones',
+  endoso:      'Endosos',
+  cancelacion: 'Cancelaciones',
+  certificado: 'Certificados',
+  siniestro:   'Siniestros',
+  inclusion:   'Inclusiones',
+  exclusion:   'Exclusiones',
+  otro:        'Otros',
 }
 
+
 export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
+  const { currentWorkspace } = useWorkspace()
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
-  const [activeTab, setActiveTab]     = useState<Tab>('cotizaciones')
+  const [activeTab, setActiveTab]     = useState<Tab>('todas')
   const [showModal, setShowModal]     = useState(false)
   const [editing, setEditing]         = useState<Solicitud | undefined>()
 
   async function load() {
+    if (!currentWorkspace) return
     let q = supabase
       .from('solicitudes')
       .select('*, cliente:clientes(id, nombre), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .eq('workspace_id', currentWorkspace.id)
       .order('numero_solicitud', { ascending: false })
     if (clienteId) q = q.eq('client_id', clienteId)
     const { data } = await q
@@ -44,7 +62,7 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [clienteId])
+  useEffect(() => { load() }, [clienteId, currentWorkspace])
 
   async function deleteSolicitud(id: string) {
     if (!confirm('¿Eliminar esta solicitud?')) return
@@ -53,14 +71,17 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   }
 
   // Tab filtering
-  const cotizaciones  = solicitudes.filter(s => s.tipo === 'cotizacion'  && s.estado !== 'inactiva')
-  const expediciones  = solicitudes.filter(s => s.tipo === 'expedicion'  && s.estado !== 'inactiva')
-  const inactivas     = solicitudes.filter(s => s.estado === 'inactiva')
+  const activas   = solicitudes.filter(s => s.estado !== 'inactiva')
+  const inactivas = solicitudes.filter(s => s.estado === 'inactiva')
 
-  const tabData: Record<Tab, Solicitud[]> = { cotizaciones, expediciones, inactivas }
+  function getTabData(tab: Tab): Solicitud[] {
+    if (tab === 'todas')    return activas
+    if (tab === 'inactivas') return inactivas
+    return activas.filter(s => s.tipo === tab)
+  }
 
   const q = search.toLowerCase()
-  const filtered = tabData[activeTab].filter(s =>
+  const filtered = getTabData(activeTab).filter(s =>
     !search ||
     s.cliente?.nombre?.toLowerCase().includes(q) ||
     s.descripcion?.toLowerCase().includes(q) ||
@@ -70,9 +91,18 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
   )
 
   const TABS: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: 'cotizaciones', label: 'Cotizaciones', icon: ClipboardList, count: cotizaciones.length },
-    { key: 'expediciones', label: 'Expediciones', icon: FileCheck,     count: expediciones.length },
-    { key: 'inactivas',    label: 'Inactivas',    icon: Archive,       count: inactivas.length    },
+    { key: 'todas',        label: 'Todas',         icon: LayoutGrid,   count: activas.length },
+    { key: 'cotizacion',   label: 'Cotizaciones',  icon: ClipboardList, count: activas.filter(s => s.tipo === 'cotizacion').length },
+    { key: 'expedicion',   label: 'Expediciones',  icon: FileCheck,     count: activas.filter(s => s.tipo === 'expedicion').length },
+    { key: 'renovacion',   label: 'Renovaciones',  icon: RefreshCw,     count: activas.filter(s => s.tipo === 'renovacion').length },
+    { key: 'endoso',       label: 'Endosos',       icon: FilePen,       count: activas.filter(s => s.tipo === 'endoso').length },
+    { key: 'cancelacion',  label: 'Cancelaciones', icon: XCircle,       count: activas.filter(s => s.tipo === 'cancelacion').length },
+    { key: 'certificado',  label: 'Certificados',  icon: FileText,      count: activas.filter(s => s.tipo === 'certificado').length },
+    { key: 'siniestro',    label: 'Siniestros',    icon: AlertTriangle, count: activas.filter(s => s.tipo === 'siniestro').length },
+    { key: 'inclusion',    label: 'Inclusiones',   icon: UserPlus,      count: activas.filter(s => s.tipo === 'inclusion').length },
+    { key: 'exclusion',    label: 'Exclusiones',   icon: UserMinus,     count: activas.filter(s => s.tipo === 'exclusion').length },
+    { key: 'otro',         label: 'Otros',         icon: ClipboardList, count: activas.filter(s => s.tipo === 'otro').length },
+    { key: 'inactivas',    label: 'Inactivas',     icon: Archive,       count: inactivas.length },
   ]
 
   if (loading) return (
@@ -137,13 +167,11 @@ export default function SolicitudesList({ clienteId }: { clienteId?: string }) {
               <th className="px-4 py-3 font-medium w-20">N°</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
               <th className="px-4 py-3 font-medium">Estado</th>
-              {activeTab === 'inactivas' && (
-                <>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Tipo</th>
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
-                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Riesgo</th>
-                </>
+              {(activeTab === 'todas' || activeTab === 'inactivas') && (
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Tipo</th>
               )}
+              <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
+              <th className="px-4 py-3 font-medium hidden lg:table-cell">Riesgo</th>
               <th className="px-4 py-3 font-medium hidden md:table-cell">Observaciones</th>
               <th className="px-4 py-3 font-medium hidden lg:table-cell">Asignado a</th>
               <th className="px-4 py-3 font-medium text-right">Acciones</th>

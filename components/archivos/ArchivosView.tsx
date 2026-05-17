@@ -73,15 +73,18 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
+    if (!currentWorkspace) return
+    const wid = currentWorkspace.id
     let archQ = supabase.from('archivos')
       .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora), prospecto:prospectos(id,nombre)')
+      .eq('workspace_id', wid)
       .order('created_at', { ascending: false })
     if (clienteId) archQ = archQ.eq('client_id', clienteId)
 
     const [archRes, clRes, proRes] = await Promise.all([
       archQ,
-      supabase.from('clientes').select('id,nombre').order('nombre'),
-      supabase.from('prospectos').select('id,nombre').order('nombre'),
+      supabase.from('clientes').select('id,nombre').eq('workspace_id', wid).order('nombre'),
+      supabase.from('prospectos').select('id,nombre').eq('workspace_id', wid).order('nombre'),
     ])
     setArchivos((archRes.data || []) as Archivo[])
     setClientes(clRes.data || [])
@@ -89,7 +92,7 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [clienteId])
+  useEffect(() => { load() }, [clienteId, currentWorkspace])
 
   useEffect(() => {
     if (!uploadForm.client_id) { setPolizas([]); return }

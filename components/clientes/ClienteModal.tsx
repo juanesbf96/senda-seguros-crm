@@ -1,13 +1,16 @@
 'use client'
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase/client'
+import { useState, useEffect } from 'react'
 import { Cliente, Etapa, TipoCliente } from '@/types'
-import { X, ChevronDown } from 'lucide-react'
+import { X, UserCircle2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
 
+interface Member { user_id: string; nombre: string; email: string; role: string }
+
 interface Props {
   cliente?: Cliente
+  members?: Member[]   // pasados desde el padre (ya cargados)
   onClose: () => void
   onSaved: () => void
 }
@@ -28,12 +31,22 @@ const TIPO_LABELS: Record<TipoCliente, string> = {
 
 const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 
-export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
-  const { currentWorkspace } = useWorkspace()
+export default function ClienteModal({ cliente, members = [], onClose, onSaved }: Props) {
+  const { currentWorkspace, currentUserId, isSupervisor, isAdmin } = useWorkspace()
   const { can } = usePermissions()
-  const canEdit = can('clientes_editar_todos') || can('clientes_editar_propios')
+
+  // RBAC: puede editar si tiene permiso global, O si tiene permiso de propios Y es el dueño
+  const isOwner = !!cliente && cliente.assigned_to === currentUserId
+  const canEdit = !cliente /* crear siempre OK */
+    || can('clientes_editar_todos')
+    || (can('clientes_editar_propios') && isOwner)
   const saveDisabled = !!cliente && !canEdit
+
+  // Puede reasignar el cliente a otro usuario (admin/supervisor)
+  const canReassign = isAdmin || isSupervisor
+
   const [tipo, setTipo] = useState<TipoCliente>(cliente?.tipo_cliente || 'persona_natural')
+  const [assignedTo, setAssignedTo] = useState<string>(cliente?.assigned_to || '')
   const [form, setForm] = useState({
     nombre:                   cliente?.nombre || '',
     email:                    cliente?.email || '',
@@ -43,7 +56,7 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
     razon_social:             cliente?.razon_social || '',
     sobrenombre:              cliente?.sobrenombre || '',
     fecha_nacimiento:         cliente?.fecha_nacimiento || '',
-    fecha_vencimiento_cedula: cliente?.fecha_vencimiento_cedula || '',
+    fecha_expedicion_cedula:  cliente?.fecha_expedicion_cedula || '',
     fecha_constitucion:       cliente?.fecha_constitucion || '',
     genero:                   cliente?.genero || '',
     estado_civil:             cliente?.estado_civil || '',
@@ -62,6 +75,13 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Pre-asignar al usuario actual cuando se crea un cliente nuevo
+  useEffect(() => {
+    if (!cliente && currentUserId && !assignedTo) {
+      setAssignedTo(currentUserId)
+    }
+  }, [currentUserId])
 
   function set(field: string, val: string | boolean) {
     setForm(f => ({ ...f, [field]: val }))
@@ -86,7 +106,7 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
       cedula:                   tipo === 'persona_natural' ? form.cedula.trim() || null : null,
       nit:                      tipo !== 'persona_natural' ? form.nit.trim() || null : null,
       fecha_nacimiento:         tipo === 'persona_natural' && form.fecha_nacimiento ? form.fecha_nacimiento : null,
-      fecha_vencimiento_cedula: tipo === 'persona_natural' && form.fecha_vencimiento_cedula ? form.fecha_vencimiento_cedula : null,
+      fecha_expedicion_cedula:  tipo === 'persona_natural' && form.fecha_expedicion_cedula ? form.fecha_expedicion_cedula : null,
       fecha_constitucion:       tipo !== 'persona_natural' && form.fecha_constitucion ? form.fecha_constitucion : null,
       genero:                   tipo === 'persona_natural' ? form.genero || null : null,
       estado_civil:             tipo === 'persona_natural' ? form.estado_civil || null : null,
@@ -103,6 +123,7 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
       num_hijos:                form.tiene_hijos && form.num_hijos ? parseInt(form.num_hijos) : null,
       autoriza_datos:           form.autoriza_datos,
       workspace_id:             currentWorkspace?.id,
+      assigned_to:              assignedTo || currentUserId || null,
     }
 
     const { error: err } = cliente
@@ -157,9 +178,9 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
                     <input value={form.cedula} onChange={e => set('cedula', e.target.value)}
                       placeholder="12345678" className={cls} />
                   </Field>
-                  <Field label="Fecha vencimiento cédula">
-                    <input type="date" value={form.fecha_vencimiento_cedula}
-                      onChange={e => set('fecha_vencimiento_cedula', e.target.value)} className={cls} />
+                  <Field label="Fecha expedición cédula">
+                    <input type="date" value={form.fecha_expedicion_cedula}
+                      onChange={e => set('fecha_expedicion_cedula', e.target.value)} className={cls} />
                   </Field>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -302,6 +323,31 @@ export default function ClienteModal({ cliente, onClose, onSaved }: Props) {
 
           {/* ── Sección: CRM ── */}
           <Section title="CRM">
+            {/* Asignación — solo admin/supervisor pueden ver y cambiar */}
+            {canReassign && (
+              <Field label={<span className="flex items-center gap-1.5"><UserCircle2 className="w-3.5 h-3.5" />Asesor responsable</span>}>
+                <select value={assignedTo} onChange={e => setAssignedTo(e.target.value)} className={cls}>
+                  <option value="">Sin asignar</option>
+                  {members.map(m => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.nombre}{m.user_id === currentUserId ? ' (yo)' : ''}
+                    </option>
+                  ))}
+                </select>
+                {members.length === 0 && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Se asignará a ti automáticamente al guardar.
+                  </p>
+                )}
+              </Field>
+            )}
+            {/* Para agentes: solo lectura — quién tiene el cliente */}
+            {!canReassign && cliente?.assigned_to && (
+              <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">
+                <UserCircle2 className="w-4 h-4 text-slate-400" />
+                {isOwner ? 'Este cliente está asignado a ti' : 'Este cliente pertenece a otro asesor'}
+              </div>
+            )}
             <Field label="Etapa">
               <select value={form.etapa} onChange={e => set('etapa', e.target.value as Etapa)} className={cls}>
                 <option value="nuevo">Nuevo</option>
@@ -352,7 +398,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <label className="block text-xs font-medium text-ink-500 mb-1">{label}</label>

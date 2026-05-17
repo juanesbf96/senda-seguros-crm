@@ -24,7 +24,7 @@ export interface Cliente {
   fecha_nacimiento: string | null
   // Sprint A
   genero: string | null
-  fecha_vencimiento_cedula: string | null
+  fecha_expedicion_cedula: string | null
   estado_civil: string | null
   tiene_vehiculo: boolean
   tiene_hijos: boolean
@@ -34,6 +34,7 @@ export interface Cliente {
   ingresos_aprox: number | null
   categoria: string | null
   autoriza_datos: boolean
+  assigned_to: string | null   // user_id del responsable del cliente
   created_at: string
   updated_at: string
 }

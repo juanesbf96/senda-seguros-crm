@@ -80,7 +80,7 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
     if (!currentWorkspace) { setLoading(false); return }
 
     // Admin tiene todos los permisos sin necesidad de consultar
-    if (isAdmin || currentRole === null) {
+    if (isAdmin) {
       setPermissions({})  // vacío → can() retorna true para admin
       setLoading(false)
       return
@@ -115,7 +115,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   function can(key: PermissionKey): boolean {
     // Admin siempre puede todo
-    if (isAdmin || currentRole === null) return true
+    if (isAdmin) return true
+    // Durante carga o sin rol definido: denegar por defecto (no escalar privilegios)
+    if (loading || currentRole === null) return false
     // Supervisor: tiene todo excepto lo que se haya desactivado
     if (currentRole === 'supervisor') {
       return permissions[key] !== false  // true si no hay override en false

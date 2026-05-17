@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase/client'
 import { Cliente, Etapa, TipoCliente } from '@/types'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
+
+interface Member { user_id: string; nombre: string; email: string; role: string }
 import {
   Plus, Search, Phone, MapPin, Pencil, Trash2, Upload, Users, UserSquare2,
   SlidersHorizontal, X, Download, Eye, MoreHorizontal, Wallet, TrendingUp,
@@ -50,10 +52,11 @@ interface Filters {
   genero:      string
   vehiculo:    string   // 'all' | 'si' | 'no'
   autoriza:    string   // 'all' | 'si' | 'no'
+  assignedTo:  string   // '' = todos, uuid = filtrar por asesor
 }
 
 const defaultFilters: Filters = {
-  etapa: 'all', tipo: 'all', categoria: '', departamento: '', genero: '', vehiculo: 'all', autoriza: 'all',
+  etapa: 'all', tipo: 'all', categoria: '', departamento: '', genero: '', vehiculo: 'all', autoriza: 'all', assignedTo: '',
 }
 
 function countActiveFilters(f: Filters) {
@@ -65,6 +68,7 @@ function countActiveFilters(f: Filters) {
     !!f.genero,
     f.vehiculo !== 'all',
     f.autoriza !== 'all',
+    !!f.assignedTo,
   ].filter(Boolean).length
 }
 
@@ -102,8 +106,9 @@ function downloadCSV(content: string, filename: string) {
 }
 
 export default function ClientesList() {
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, currentUserId } = useWorkspace()
   const { can } = usePermissions()
+  const [members, setMembers] = useState<Member[]>([])
   const [clientes,      setClientes]      = useState<Cliente[]>([])
   const [loading,       setLoading]       = useState(true)
   const [search,        setSearch]        = useState('')
@@ -130,11 +135,20 @@ export default function ClientesList() {
   }
 
   async function loadContactCount() {
-    const { count } = await supabase.from('contactos').select('*', { count: 'exact', head: true })
+    if (!currentWorkspace) return
+    const { count } = await supabase.from('contactos').select('*', { count: 'exact', head: true }).eq('workspace_id', currentWorkspace.id)
     setContactCount(count || 0)
   }
 
-  useEffect(() => { load(); loadContactCount() }, [currentWorkspace?.id])
+  useEffect(() => {
+    load()
+    loadContactCount()
+    // Cargar miembros para filtro y visualización
+    if (currentWorkspace) {
+      supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
+        .then(({ data }) => { if (data) setMembers(data as Member[]) })
+    }
+  }, [currentWorkspace?.id])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -179,11 +193,20 @@ export default function ClientesList() {
       (filters.vehiculo === 'si' ? c.tiene_vehiculo : !c.tiene_vehiculo)
     const matchAutoriza    = filters.autoriza === 'all'  ||
       (filters.autoriza === 'si' ? c.autoriza_datos : !c.autoriza_datos)
+    const matchAssigned    = !filters.assignedTo || c.assigned_to === filters.assignedTo
 
-    return matchSearch && matchEtapa && matchTipo && matchCategoria && matchDepto && matchGenero && matchVehiculo && matchAutoriza
+    return matchSearch && matchEtapa && matchTipo && matchCategoria && matchDepto && matchGenero && matchVehiculo && matchAutoriza && matchAssigned
   })
 
   const activeFilterCount = countActiveFilters(filters)
+
+  /* ── Pagination ── */
+  const PAGE_SIZE = 50
+  const [page, setPage] = useState(1)
+  // Reset page when filters/search change
+  useEffect(() => { setPage(1) }, [search, filters])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   /* ── Selection helpers ── */
   function toggleSelect(id: string) {
@@ -251,7 +274,7 @@ export default function ClientesList() {
           <h1 className="text-2xl font-bold text-ink-700">Clientes</h1>
           <p className="text-ink-400 text-sm mt-1">
             {activeTab === 'clientes'
-              ? `${filtered.length} de ${clientes.length} registros`
+              ? `${filtered.length} de ${clientes.length} registros${totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ''}`
               : activeTab === 'contactos'
               ? `${contactCount} contactos vinculados`
               : 'Pipeline comercial y oportunidades'}
@@ -402,6 +425,16 @@ export default function ClientesList() {
                 <option value="si">Autoriza</option>
                 <option value="no">No autoriza</option>
               </FilterSelect>
+
+              {members.length > 1 && (
+                <FilterSelect label="Asesor asignado" value={filters.assignedTo} onChange={v => setF('assignedTo', v)}>
+                  <option value="">Todos los asesores</option>
+                  <option value={currentUserId || ''}>Mis clientes</option>
+                  {members.filter(m => m.user_id !== currentUserId).map(m => (
+                    <option key={m.user_id} value={m.user_id}>{m.nombre}</option>
+                  ))}
+                </FilterSelect>
+              )}
             </div>
           )}
 
@@ -425,6 +458,7 @@ export default function ClientesList() {
                   <th className="px-4 py-3 font-medium hidden lg:table-cell">Ciudad</th>
                   <th className="px-4 py-3 font-medium">Etapa</th>
                   <th className="px-4 py-3 font-medium hidden xl:table-cell">Categoría</th>
+                  <th className="px-4 py-3 font-medium hidden lg:table-cell">Asesor</th>
                   <th className="px-4 py-3 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
@@ -481,6 +515,19 @@ export default function ClientesList() {
                       {c.categoria
                         ? <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-cream-200 text-ink-500">{c.categoria}</span>
                         : <span className="text-ink-300 text-xs">—</span>}
+                    </td>
+                    {/* Asesor asignado */}
+                    <td className="px-4 py-3 hidden lg:table-cell">
+                      {(() => {
+                        const m = members.find(m => m.user_id === c.assigned_to)
+                        if (!m) return <span className="text-slate-300 text-xs">—</span>
+                        const isMe = c.assigned_to === currentUserId
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${isMe ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {isMe ? 'Yo' : m.nombre.split(' ')[0]}
+                          </span>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
@@ -570,6 +617,36 @@ export default function ClientesList() {
             )}
           </div>
 
+          {/* ── Pagination ── */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
+              <p>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} clientes</p>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setPage(1)} disabled={page === 1}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">«</button>
+                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">‹</button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(n => n === 1 || n === totalPages || Math.abs(n - page) <= 2)
+                  .reduce<(number | '...')[]>((acc, n, i, arr) => {
+                    if (i > 0 && (n as number) - (arr[i - 1] as number) > 1) acc.push('...')
+                    acc.push(n)
+                    return acc
+                  }, [])
+                  .map((n, i) => n === '...'
+                    ? <span key={`dots-${i}`} className="px-2">…</span>
+                    : <button key={n} onClick={() => setPage(n as number)}
+                        className={`px-3 py-1 rounded font-medium transition-colors ${page === n ? 'bg-emerald-600 text-white' : 'hover:bg-slate-100'}`}>{n}</button>
+                  )
+                }
+                <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">›</button>
+                <button onClick={() => setPage(totalPages)} disabled={page === totalPages}
+                  className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">»</button>
+              </div>
+            </div>
+          )}
+
           {/* ── Floating bulk action bar ── */}
           {selected.size > 0 && (
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-ink-700 text-white px-5 py-3 rounded-2xl shadow-2xl">
@@ -632,6 +709,7 @@ export default function ClientesList() {
       {showModal && (
         <ClienteModal
           cliente={editing}
+          members={members}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load() }}
         />

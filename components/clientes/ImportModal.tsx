@@ -2,6 +2,7 @@
 import { useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { X, Upload, CheckCircle, AlertCircle, FileText } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface ParsedRow {
   nombre: string
@@ -123,6 +124,7 @@ function parseCSV(text: string): { rows: ParsedRow[]; errors: string[]; sep: str
 type Stage = 'idle' | 'preview' | 'importing' | 'done'
 
 export default function ImportModal({ onClose, onImported }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const inputRef = useRef<HTMLInputElement>(null)
   const [stage, setStage] = useState<Stage>('idle')
   const [fileName, setFileName] = useState('')
@@ -170,6 +172,7 @@ export default function ImportModal({ onClose, onImported }: Props) {
         email: r.email || null,
         notas: r.notas || null,
         etapa: r.etapa,
+        workspace_id: currentWorkspace?.id,
       }))
       const { error } = await supabase.from('clientes').insert(batch)
       if (error) {

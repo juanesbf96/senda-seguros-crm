@@ -5,6 +5,7 @@ import { Meta, TipoMeta } from '@/types'
 import { Plus, Pencil, Trash2, Target, TrendingUp, RefreshCw, CheckCircle2 } from 'lucide-react'
 import MetasModal from './MetasModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const TIPO_LABELS: Record<TipoMeta, string> = {
   prima_total:     'Prima total',
@@ -24,36 +25,36 @@ function formatVal(tipo: TipoMeta, val: number): string {
   return val.toLocaleString('es-CO')
 }
 
-async function calcActual(tipo: TipoMeta, fechaInicio: string, fechaFin: string): Promise<number> {
+async function calcActual(tipo: TipoMeta, fechaInicio: string, fechaFin: string, wid: string): Promise<number> {
   switch (tipo) {
     case 'prima_total': {
       const { data } = await supabase.from('polizas').select('prima')
-        .gte('fecha_inicio', fechaInicio).lte('fecha_inicio', fechaFin).eq('estado', 'activa').eq('eliminada', false)
+        .eq('workspace_id', wid).gte('fecha_inicio', fechaInicio).lte('fecha_inicio', fechaFin).eq('estado', 'activa').eq('eliminada', false)
       return (data || []).reduce((s, p) => s + (p.prima || 0), 0)
     }
     case 'clientes_nuevos': {
       const { count } = await supabase.from('clientes').select('id', { count: 'exact', head: true })
-        .gte('created_at', fechaInicio).lte('created_at', fechaFin + 'T23:59:59')
+        .eq('workspace_id', wid).gte('created_at', fechaInicio).lte('created_at', fechaFin + 'T23:59:59')
       return count || 0
     }
     case 'renovaciones': {
       const { count } = await supabase.from('polizas').select('id', { count: 'exact', head: true })
-        .gte('fecha_inicio', fechaInicio).lte('fecha_inicio', fechaFin).eq('estado', 'activa').eq('eliminada', false)
+        .eq('workspace_id', wid).gte('fecha_inicio', fechaInicio).lte('fecha_inicio', fechaFin).eq('estado', 'activa').eq('eliminada', false)
       return count || 0
     }
     case 'polizas_activas': {
       const { count } = await supabase.from('polizas').select('id', { count: 'exact', head: true })
-        .eq('estado', 'activa').eq('eliminada', false)
+        .eq('workspace_id', wid).eq('estado', 'activa').eq('eliminada', false)
       return count || 0
     }
     case 'comisiones': {
       const { data } = await supabase.from('polizas').select('comision')
-        .gte('fecha_inicio', fechaInicio).lte('fecha_inicio', fechaFin).eq('eliminada', false)
-      return (data || []).reduce((s, p) => s + (p.comision || 0), 0)
+        .eq('workspace_id', wid).gte('fecha_inicio', fechaInicio).lte('fecha_inicio', fechaFin).eq('eliminada', false)
+      return (data || []).reduce((s, p) => s + ((p as any).comision || 0), 0)
     }
     case 'cobros': {
       const { data } = await supabase.from('cobros').select('valor')
-        .eq('estado', 'pagado').gte('created_at', fechaInicio).lte('created_at', fechaFin + 'T23:59:59')
+        .eq('workspace_id', wid).eq('estado', 'pagado').gte('created_at', fechaInicio).lte('created_at', fechaFin + 'T23:59:59')
       return (data || []).reduce((s, c) => s + (c.valor || 0), 0)
     }
     default:
@@ -77,6 +78,7 @@ function ProgressRing({ pct, color, size = 80 }: { pct: number; color: string; s
 
 export default function MetasView() {
   const { can } = usePermissions()
+  const { currentWorkspace } = useWorkspace()
   const [metas, setMetas]       = useState<Meta[]>([])
   const [loading, setLoading]   = useState(true)
   const [showModal, setShowModal] = useState(false)
@@ -84,17 +86,21 @@ export default function MetasView() {
   const [recalcId, setRecalcId] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const { data } = await supabase.from('metas').select('*').order('created_at', { ascending: false })
+    if (!currentWorkspace) return
+    const { data } = await supabase.from('metas').select('*')
+      .eq('workspace_id', currentWorkspace.id)
+      .order('created_at', { ascending: false })
     setMetas((data || []) as Meta[])
     setLoading(false)
-  }, [])
+  }, [currentWorkspace])
 
   useEffect(() => { load() }, [load])
 
   async function recalcular(m: Meta) {
+    if (!currentWorkspace) return
     setRecalcId(m.id)
-    const actual = await calcActual(m.tipo, m.fecha_inicio, m.fecha_fin)
-    await supabase.from('metas').update({ valor_actual: actual }).eq('id', m.id)
+    const actual = await calcActual(m.tipo, m.fecha_inicio, m.fecha_fin, currentWorkspace.id)
+    await supabase.from('metas').update({ valor_actual: actual }).eq('id', m.id).eq('workspace_id', currentWorkspace.id)
     setMetas(prev => prev.map(x => x.id === m.id ? { ...x, valor_actual: actual } : x))
     setRecalcId(null)
   }
@@ -109,10 +115,11 @@ export default function MetasView() {
     setShowModal(false)
     await load()
     // Auto-recalculate metas with auto_calcular=true
-    const { data: fresh } = await supabase.from('metas').select('*').eq('auto_calcular', true)
+    if (!currentWorkspace) return
+    const { data: fresh } = await supabase.from('metas').select('*').eq('auto_calcular', true).eq('workspace_id', currentWorkspace.id)
     for (const m of (fresh || []) as Meta[]) {
-      const actual = await calcActual(m.tipo, m.fecha_inicio, m.fecha_fin)
-      await supabase.from('metas').update({ valor_actual: actual }).eq('id', m.id)
+      const actual = await calcActual(m.tipo, m.fecha_inicio, m.fecha_fin, currentWorkspace.id)
+      await supabase.from('metas').update({ valor_actual: actual }).eq('id', m.id).eq('workspace_id', currentWorkspace.id)
     }
     load()
   }

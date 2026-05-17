@@ -59,10 +59,10 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
   }
 
   useEffect(() => {
-    if (!clienteId)
-      supabase.from('clientes').select('id, nombre').order('nombre')
+    if (!clienteId && currentWorkspace)
+      supabase.from('clientes').select('id, nombre').eq('workspace_id', currentWorkspace.id).order('nombre')
         .then(({ data }) => setClientes(data || []))
-  }, [clienteId])
+  }, [clienteId, currentWorkspace])
 
   useEffect(() => {
     const cid = form.client_id
@@ -77,6 +77,8 @@ export default function SolicitudModal({ solicitud, clienteId, onClose, onSaved 
   }, [form.client_id])
 
   async function save() {
+    if (!form.tipo) { setError('El tipo de solicitud es obligatorio'); return }
+    if (!form.client_id && !clienteId) { setError('Selecciona un cliente'); return }
     setSaving(true); setError('')
     const payload = {
       client_id:    form.client_id    || null,
