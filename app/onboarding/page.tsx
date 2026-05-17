@@ -20,21 +20,24 @@ export default function OnboardingPage() {
       setUserNombre(nombre)
       setWorkspaceName(`${nombre} Workspace`)
 
-      // Buscar workspace existente (creado por el trigger)
-      const { data: members } = await supabase
-        .from('workspace_members')
-        .select('workspace_id, workspace:workspaces(id, name, setup_completed)')
-        .eq('user_id', user.id)
+      // Buscar workspace PROPIO (owner) — no membresías de otros workspaces
+      // Esto evita que un usuario invitado a otro workspace lo confunda con el suyo
+      const { data: ownWs } = await supabase
+        .from('workspaces')
+        .select('id, name, setup_completed')
+        .eq('owner_id', user.id)
         .limit(1)
+        .maybeSingle()
 
-      if (members && members.length > 0) {
-        const ws = (members[0] as any).workspace
-        if (ws) {
-          setWorkspaceId(ws.id)
-          if (ws.setup_completed) {
-            window.location.href = '/'
-          }
+      if (ownWs) {
+        setWorkspaceId(ownWs.id)
+        // Si ya completó el onboarding, ir directo al CRM
+        if (ownWs.setup_completed) {
+          window.location.href = '/'
+          return
         }
+        // Pre-llenar con el nombre actual del workspace
+        if (ownWs.name) setWorkspaceName(ownWs.name)
       }
     }
     init()
