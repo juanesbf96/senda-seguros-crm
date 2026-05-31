@@ -7,7 +7,7 @@ import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Search, AlertTriangle, Plus, Pencil, Trash2,
   FileText, ShieldCheck, Paperclip, Users, Archive, RefreshCw,
-  SlidersHorizontal, X,
+  SlidersHorizontal, X, ChevronUp, ChevronDown, ChevronsUpDown,
 } from 'lucide-react'
 import Link from 'next/link'
 import PolizaModal from './PolizaModal'
@@ -700,6 +700,29 @@ function FiltroSelect({ label, value, onChange, children }: {
 }
 
 // ── Shared pólizas table ────────────────────────────────────────────────────
+type SortKey = 'tipo_poliza' | 'numero_poliza' | 'aseguradora' | 'ramo' | 'cliente' | 'fecha_fin' | 'estado'
+
+function sortList(list: PolizaConCliente[], key: SortKey, dir: 'asc' | 'desc') {
+  return [...list].sort((a, b) => {
+    let va: string | number = ''
+    let vb: string | number = ''
+    if (key === 'cliente') {
+      va = a.cliente?.nombre?.toLowerCase() ?? ''
+      vb = b.cliente?.nombre?.toLowerCase() ?? ''
+    } else if (key === 'fecha_fin') {
+      va = a.fecha_fin ?? ''
+      vb = b.fecha_fin ?? ''
+    } else {
+      va = ((a[key] as string | null) ?? '').toLowerCase()
+      vb = ((b[key] as string | null) ?? '').toLowerCase()
+    }
+    if (va === '' && vb !== '') return 1
+    if (vb === '' && va !== '') return -1
+    const cmp = va < vb ? -1 : va > vb ? 1 : 0
+    return dir === 'asc' ? cmp : -cmp
+  })
+}
+
 function PolizasTable({
   polizas, onEdit, onDelete, showRiesgo,
 }: {
@@ -708,23 +731,50 @@ function PolizasTable({
   onDelete: (id: string) => void
   showRiesgo: boolean
 }) {
+  const [sortKey, setSortKey] = useState<SortKey>('fecha_fin')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  function handleSort(key: SortKey) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const sorted = sortList(polizas, sortKey, sortDir)
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return <ChevronsUpDown className="w-3 h-3 opacity-30 ml-1 inline" />
+    return sortDir === 'asc'
+      ? <ChevronUp   className="w-3 h-3 ml-1 inline text-primary-500" />
+      : <ChevronDown className="w-3 h-3 ml-1 inline text-primary-500" />
+  }
+
+  function Th({ col, label, className = '' }: { col: SortKey; label: string; className?: string }) {
+    return (
+      <th
+        onClick={() => handleSort(col)}
+        className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-ink-600 transition-colors ${sortKey === col ? 'text-primary-600' : ''} ${className}`}>
+        {label}<SortIcon col={col} />
+      </th>
+    )
+  }
+
   return (
     <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
       <table className="w-full text-sm">
         <thead className="bg-cream-100 border-b border-ink-200">
           <tr className="text-left text-xs text-ink-400">
-            <th className="px-4 py-3 font-medium">Tipo póliza</th>
-            <th className="px-4 py-3 font-medium">N° Póliza</th>
-            <th className="px-4 py-3 font-medium">Aseguradora</th>
-            <th className="px-4 py-3 font-medium hidden md:table-cell">Ramo</th>
+            <Th col="tipo_poliza"   label="Tipo póliza" />
+            <Th col="numero_poliza" label="N° Póliza" />
+            <Th col="aseguradora"   label="Aseguradora" />
+            <Th col="ramo"          label="Ramo"        className="hidden md:table-cell" />
             <th className="px-4 py-3 font-medium hidden md:table-cell">Riesgo</th>
-            <th className="px-4 py-3 font-medium">Cliente</th>
-            <th className="px-4 py-3 font-medium hidden md:table-cell">Vencimiento</th>
+            <Th col="cliente"       label="Cliente" />
+            <Th col="fecha_fin"     label="Vencimiento"  className="hidden md:table-cell" />
             <th className="px-4 py-3 font-medium text-right">Acciones</th>
           </tr>
         </thead>
         <tbody>
-          {polizas.map(p => {
+          {sorted.map(p => {
             const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
             const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
             const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
