@@ -69,7 +69,10 @@ interface ImportResult {
   errores: string[]
 }
 
-type Stage = 'idle' | 'preview' | 'importing' | 'done'
+type Stage = 'idle' | 'select_sheet' | 'preview' | 'importing' | 'done'
+
+/** Hojas que contienen pólizas (formato año o nombre conocido) */
+const YEAR_SHEET_RE = /^(20\d{2}|2\d{3})$/
 
 /* ── Helpers ────────────────────────────────────────────────────── */
 
@@ -126,17 +129,23 @@ function norm(s: string) {
   return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
 }
 
-/** Parsea el archivo Excel y devuelve filas de la hoja 2025 (o la primera) */
-function parseExcel(buffer: ArrayBuffer): { rows: ExcelRow[]; errors: string[]; sheetName: string } {
+/** Devuelve los nombres de hojas disponibles en el workbook */
+function getSheetNames(buffer: ArrayBuffer): { all: string[]; yearSheets: string[] } {
   const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
+  const all = wb.SheetNames
+  const yearSheets = all.filter(n => YEAR_SHEET_RE.test(n.trim()))
+  return { all, yearSheets }
+}
 
-  // Buscar hoja "2025", fallback a la primera
-  const sheetName = wb.SheetNames.find(n => n.trim() === '2025') ?? wb.SheetNames[0]
+/** Parsea UNA hoja específica y devuelve sus filas */
+function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[]; errors: string[] } {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
   const ws = wb.Sheets[sheetName]
+  if (!ws) return { rows: [], errors: [`Hoja "${sheetName}" no encontrada.`] }
 
   // Convertir a array de arrays
   const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
-  if (raw.length < 2) return { rows: [], errors: ['La hoja está vacía.'], sheetName }
+  if (raw.length < 2) return { rows: [], errors: [`La hoja "${sheetName}" está vacía.`] }
 
   // Primera fila = headers
   const headers = (raw[0] as string[]).map(h => norm(String(h)))
@@ -220,7 +229,7 @@ function parseExcel(buffer: ArrayBuffer): { rows: ExcelRow[]; errors: string[]; 
     errors.push(`No se encontraron filas válidas en la hoja "${sheetName}". Verifica que la hoja tenga datos con columna CLIENTE.`)
   }
 
-  return { rows, errors, sheetName }
+  return { rows, errors }
 }
 
 /* ── Importar a Supabase ────────────────────────────────────────── */
@@ -368,21 +377,31 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [stage, setStage]         = useState<Stage>('idle')
   const [fileName, setFileName]   = useState('')
-  const [sheetName, setSheetName] = useState('')
-  const [rows, setRows]           = useState<ExcelRow[]>([])
+  // Buffer guardado para re-parsear al cambiar hoja
+  const bufferRef = useRef<ArrayBuffer | null>(null)
+  // Hojas disponibles
+  const [allSheets, setAllSheets]   = useState<string[]>([])
+  const [yearSheets, setYearSheets] = useState<string[]>([])
+  // Hojas seleccionadas para importar
+  const [selectedSheets, setSelectedSheets] = useState<string[]>([])
+  // Datos consolidados de todas las hojas seleccionadas
+  const [rows, setRows]             = useState<ExcelRow[]>([])
+  const [sheetRowCounts, setSheetRowCounts] = useState<Record<string, number>>({})
   const [parseErrors, setParseErrors] = useState<string[]>([])
-  const [result, setResult]       = useState<ImportResult | null>(null)
+  const [result, setResult]         = useState<ImportResult | null>(null)
 
   function handleFile(file: File) {
     setFileName(file.name)
     const reader = new FileReader()
     reader.onload = e => {
       const buf = e.target?.result as ArrayBuffer
-      const { rows: parsed, errors, sheetName: sn } = parseExcel(buf)
-      setParseErrors(errors)
-      setRows(parsed)
-      setSheetName(sn)
-      setStage('preview')
+      bufferRef.current = buf
+      const { all, yearSheets: ys } = getSheetNames(buf)
+      setAllSheets(all)
+      setYearSheets(ys)
+      // Pre-seleccionar todas las hojas de año
+      setSelectedSheets(ys.length > 0 ? ys : [all[0]])
+      setStage('select_sheet')
     }
     reader.readAsArrayBuffer(file)
   }
@@ -396,6 +415,31 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
     e.preventDefault()
     const file = e.dataTransfer.files?.[0]
     if (file) handleFile(file)
+  }
+
+  function toggleSheet(name: string) {
+    setSelectedSheets(prev =>
+      prev.includes(name) ? prev.filter(s => s !== name) : [...prev, name]
+    )
+  }
+
+  function previewSheets() {
+    if (!bufferRef.current || selectedSheets.length === 0) return
+    const allRows: ExcelRow[] = []
+    const counts: Record<string, number> = {}
+    const errors: string[] = []
+
+    for (const sn of selectedSheets) {
+      const { rows: r, errors: e } = parseSheet(bufferRef.current, sn)
+      allRows.push(...r)
+      counts[sn] = r.length
+      errors.push(...e)
+    }
+
+    setRows(allRows)
+    setSheetRowCounts(counts)
+    setParseErrors(errors)
+    setStage('preview')
   }
 
   async function importar() {
@@ -462,14 +506,89 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
             </div>
           )}
 
-          {/* PREVIEW */}
-          {stage === 'preview' && (
-            <div className="space-y-4">
+          {/* SELECCIÓN DE HOJAS */}
+          {stage === 'select_sheet' && (
+            <div className="space-y-5">
               <div className="flex items-center gap-3">
                 <FileText className="w-4 h-4 text-ink-400" />
                 <span className="text-sm font-medium text-ink-700">{fileName}</span>
-                <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-pill">Hoja: {sheetName}</span>
-                <span className="text-xs text-ink-400">· {rows.length} filas encontradas</span>
+                <span className="text-xs text-ink-400">· {allSheets.length} hojas detectadas</span>
+              </div>
+
+              {/* Hojas de año (recomendadas) */}
+              {yearSheets.length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-ink-400 font-medium mb-3">
+                    Hojas de pólizas detectadas
+                  </p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {yearSheets.map(sn => {
+                      const sel = selectedSheets.includes(sn)
+                      return (
+                        <button
+                          key={sn}
+                          onClick={() => toggleSheet(sn)}
+                          className={`flex items-center justify-between px-4 py-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                            sel
+                              ? 'border-primary-500 bg-primary-50 text-primary-700'
+                              : 'border-cream-200 bg-white text-ink-500 hover:border-ink-300'
+                          }`}
+                        >
+                          <span>{sn}</span>
+                          {sel && <span className="text-primary-500">✓</span>}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Otras hojas disponibles */}
+              {allSheets.filter(s => !YEAR_SHEET_RE.test(s.trim())).length > 0 && (
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-ink-400 font-medium mb-3">
+                    Otras hojas (opcional)
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {allSheets.filter(s => !YEAR_SHEET_RE.test(s.trim())).map(sn => {
+                      const sel = selectedSheets.includes(sn)
+                      return (
+                        <button
+                          key={sn}
+                          onClick={() => toggleSheet(sn)}
+                          className={`px-3 py-1.5 rounded-pill border text-xs font-medium transition-all ${
+                            sel
+                              ? 'border-primary-400 bg-primary-50 text-primary-700'
+                              : 'border-cream-200 text-ink-400 hover:border-ink-300'
+                          }`}
+                        >
+                          {sel ? '✓ ' : ''}{sn}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 bg-cream-100 rounded-xl text-xs text-ink-500 space-y-1">
+                <p className="font-medium text-ink-700">¿Columnas diferentes entre años?</p>
+                <p>No hay problema — las columnas que no existen en hojas antiguas (2023, 2024) quedarán en blanco (<code className="bg-white px-1 rounded">null</code>) en la base de datos. La importación es compatible con todas las versiones del archivo.</p>
+              </div>
+            </div>
+          )}
+
+          {/* PREVIEW */}
+          {stage === 'preview' && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <FileText className="w-4 h-4 text-ink-400" />
+                <span className="text-sm font-medium text-ink-700">{fileName}</span>
+                {selectedSheets.map(sn => (
+                  <span key={sn} className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-pill font-medium">
+                    {sn}: {sheetRowCounts[sn] ?? 0} filas
+                  </span>
+                ))}
+                <span className="text-xs text-ink-400">· {rows.length} total</span>
               </div>
 
               {parseErrors.length > 0 && (
@@ -607,13 +726,30 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
               >
                 Cancelar
               </button>
-              {stage === 'preview' && rows.length > 0 && parseErrors.length === 0 && (
+              {stage === 'select_sheet' && (
                 <button
-                  onClick={importar}
-                  className="flex-1 px-4 py-2 rounded-pill bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors"
+                  onClick={previewSheets}
+                  disabled={selectedSheets.length === 0}
+                  className="flex-1 px-4 py-2 rounded-pill bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 disabled:opacity-40 transition-colors"
                 >
-                  Importar {rows.length} fila{rows.length !== 1 ? 's' : ''}
+                  Vista previa {selectedSheets.length > 1 ? `(${selectedSheets.length} hojas)` : selectedSheets[0] ?? ''}
                 </button>
+              )}
+              {stage === 'preview' && rows.length > 0 && parseErrors.length === 0 && (
+                <>
+                  <button
+                    onClick={() => setStage('select_sheet')}
+                    className="px-4 py-2 rounded-pill border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors"
+                  >
+                    ← Cambiar hojas
+                  </button>
+                  <button
+                    onClick={importar}
+                    className="flex-1 px-4 py-2 rounded-pill bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors"
+                  >
+                    Importar {rows.length} póliza{rows.length !== 1 ? 's' : ''}
+                  </button>
+                </>
               )}
               {stage === 'preview' && (rows.length === 0 || parseErrors.length > 0) && (
                 <button
