@@ -205,7 +205,7 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       comision_intermediario: toNum(r[col('comision intermediario inicial')]),
       // Asesor
       asesor:               toText(r[col('asesor')] || r[col('concesionario')]),
-      pct_comision_asesor:  toNum(r[col('comision asesor')]),
+      pct_comision_asesor:  toNum(r[col('% comision asesor')]),
       retencion_asesor:     toNum(r[col('retencion asesor')]),
       comision_asesor:      toNum(r[col('comision asesor')]),
       // Referido
