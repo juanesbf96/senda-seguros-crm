@@ -741,19 +741,21 @@ function PolizasTable({
 
   const sorted = sortList(polizas, sortKey, sortDir)
 
-  function SortIcon({ col }: { col: SortKey }) {
-    if (sortKey !== col) return <ChevronsUpDown className="w-3 h-3 opacity-30 ml-1 inline" />
-    return sortDir === 'asc'
-      ? <ChevronUp   className="w-3 h-3 ml-1 inline text-primary-500" />
-      : <ChevronDown className="w-3 h-3 ml-1 inline text-primary-500" />
-  }
-
   function Th({ col, label, className = '' }: { col: SortKey; label: string; className?: string }) {
+    const active = sortKey === col
     return (
       <th
         onClick={() => handleSort(col)}
-        className={`px-4 py-3 font-medium cursor-pointer select-none hover:text-ink-600 transition-colors ${sortKey === col ? 'text-primary-600' : ''} ${className}`}>
-        {label}<SortIcon col={col} />
+        className={`px-4 py-3 font-medium cursor-pointer select-none transition-colors ${active ? 'text-primary-600' : 'hover:text-ink-600'} ${className}`}>
+        <div className="flex items-center gap-1">
+          {label}
+          {active
+            ? sortDir === 'asc'
+              ? <ChevronUp   className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
+              : <ChevronDown className="w-3.5 h-3.5 text-primary-500 flex-shrink-0" />
+            : <ChevronsUpDown className="w-3.5 h-3.5 opacity-40 flex-shrink-0" />
+          }
+        </div>
       </th>
     )
   }
