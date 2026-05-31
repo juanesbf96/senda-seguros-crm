@@ -308,7 +308,7 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
 
       const polizaData: Record<string, unknown> = {
         workspace_id:               wsId,
-        cliente_id:                 clienteId,
+        client_id:                  clienteId,
         aseguradora:                r.aseguradora || 'Sin asignar',
         ramo:                       r.ramo || 'Sin ramo',
         numero_poliza:              r.numero_poliza || null,
