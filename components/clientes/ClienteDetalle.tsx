@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Cliente, Poliza, Actividad, TipoActividad, Cobro, Remision } from '@/types'
+import { Cliente, ClienteHistorial, Poliza, Actividad, TipoActividad, Cobro, Remision } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   ArrowLeft, Phone, Mail, MapPin, Pencil, AlertTriangle,
@@ -9,6 +9,7 @@ import {
   ShieldAlert, Plus, Trash2, PhoneCall, AtSign, StickyNote,
   User, Building2, Car, Baby, Briefcase, DollarSign, Tag,
   ShieldCheck, Calendar, IdCard, MessageCircle, Wallet, FileCheck,
+  History, UserCircle2, ArrowRight, PlusCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import ClienteModal from './ClienteModal'
@@ -76,7 +77,7 @@ const REMISION_ESTADO_COLORS: Record<string, string> = {
   anulada:   'bg-error-soft text-error',
 }
 
-type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros' | 'cobros' | 'remisiones'
+type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros' | 'cobros' | 'remisiones' | 'historial'
 
 /* ────────────────────────────────── inline tab components ── */
 
@@ -234,6 +235,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
   const [cliente,      setCliente]    = useState<Cliente | null>(null)
   const [polizas,      setPolizas]    = useState<Poliza[]>([])
   const [actividades,  setActividades]= useState<Actividad[]>([])
+  const [historial,    setHistorial]  = useState<ClienteHistorial[]>([])
   const [cobrosPendientes, setCobrosPendientes] = useState<{ id: string; valor: number; estado: string }[]>([])
   const [loading,      setLoading]    = useState(true)
   const [activeTab,    setActiveTab]  = useState<TabKey>('datos')
@@ -249,16 +251,18 @@ export default function ClienteDetalle({ id }: { id: string }) {
   const [savingAct, setSavingAct] = useState(false)
 
   async function load() {
-    const [{ data: c }, { data: p }, { data: a }, { data: cb }] = await Promise.all([
+    const [{ data: c }, { data: p }, { data: a }, { data: cb }, { data: h }] = await Promise.all([
       supabase.from('clientes').select('*').eq('id', id).single(),
       supabase.from('polizas').select('*').eq('client_id', id).eq('eliminada', false).order('created_at', { ascending: false }),
       supabase.from('actividades').select('*').eq('client_id', id).order('fecha', { ascending: false }),
       supabase.from('cobros').select('id, valor, estado').eq('client_id', id).eq('estado', 'pendiente'),
+      supabase.from('clientes_historial').select('*').eq('cliente_id', id).order('created_at', { ascending: false }),
     ])
     setCliente(c)
     setPolizas(p || [])
     setActividades(a || [])
     setCobrosPendientes(cb || [])
+    setHistorial(h || [])
     setLoading(false)
   }
 
@@ -316,6 +320,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
     { key: 'siniestros',  label: 'Siniestros',   icon: ShieldAlert },
     { key: 'cobros',      label: 'Cobros',       icon: Wallet },
     { key: 'remisiones',  label: 'Remisiones',   icon: FileCheck },
+    { key: 'historial',   label: 'Historial',    icon: History,       count: historial.length },
   ]
 
   return (
@@ -726,6 +731,11 @@ export default function ClienteDetalle({ id }: { id: string }) {
         {activeTab === 'remisiones' && (
           <ClienteRemisiones id={id} />
         )}
+
+        {/* ── TAB: HISTORIAL ── */}
+        {activeTab === 'historial' && (
+          <HistorialTab historial={historial} clienteCreatedAt={cliente.created_at} />
+        )}
       </div>
 
       {/* ── Modals ── */}
@@ -743,6 +753,123 @@ export default function ClienteDetalle({ id }: { id: string }) {
           onClose={() => setShowPolizaModal(false)}
           onSaved={() => { setShowPolizaModal(false); load() }}
         />
+      )}
+    </div>
+  )
+}
+
+/* ── HistorialTab ── */
+
+function HistorialTab({ historial, clienteCreatedAt }: { historial: ClienteHistorial[]; clienteCreatedAt: string }) {
+  // Agrupa registros por batch_id (mismo guardado)
+  const grouped = historial.reduce<Map<string, ClienteHistorial[]>>((map, entry) => {
+    const key = entry.batch_id
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push(entry)
+    return map
+  }, new Map())
+
+  // Ordena grupos de más reciente a más antiguo
+  const groups = Array.from(grouped.entries()).sort(
+    ([, a], [, b]) => new Date(b[0].created_at).getTime() - new Date(a[0].created_at).getTime()
+  )
+
+  function formatDateTime(iso: string) {
+    return new Date(iso).toLocaleString('es-CO', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    })
+  }
+
+  return (
+    <div className="p-6 max-w-2xl">
+      {/* Fecha de creación del cliente */}
+      <div className="flex items-center gap-2 mb-1">
+        <span className="text-xs font-semibold text-ink-400 uppercase tracking-wide">
+          Cliente registrado el {formatDateTime(clienteCreatedAt)}
+        </span>
+      </div>
+      <p className="text-xs text-ink-400 mb-6">
+        Cada guardado queda registrado automáticamente.
+      </p>
+
+      {groups.length === 0 ? (
+        <div className="text-center py-12 text-ink-400 text-sm">
+          Aún no hay cambios registrados para este cliente.
+        </div>
+      ) : (
+        <div className="relative">
+          {/* línea vertical del timeline */}
+          <div className="absolute left-4 top-0 bottom-0 w-px bg-ink-200" />
+
+          <div className="space-y-6">
+            {groups.map(([batchId, entries]) => {
+              const first      = entries[0]
+              const isCreacion = first.tipo === 'creacion'
+              const fecha      = formatDateTime(first.created_at)
+              const usuario    = first.usuario_nombre || 'Usuario'
+
+              return (
+                <div key={batchId} className="relative pl-10">
+                  {/* Dot */}
+                  <div className={[
+                    'absolute left-2 top-1.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center',
+                    isCreacion ? 'bg-primary-500' : 'bg-ink-300',
+                  ].join(' ')}>
+                    {isCreacion
+                      ? <PlusCircle className="w-2.5 h-2.5 text-white" />
+                      : <Pencil      className="w-2.5 h-2.5 text-white" />
+                    }
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-ink-200 p-4">
+                    {/* Cabecera */}
+                    <div className="flex items-center justify-between mb-2 flex-wrap gap-1">
+                      <div className="flex items-center gap-1.5 text-xs font-medium text-ink-600">
+                        <UserCircle2 className="w-3.5 h-3.5 text-ink-400" />
+                        {usuario}
+                        <span className="text-ink-400 font-normal">
+                          {isCreacion ? '· creó este cliente' : '· actualizó datos'}
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-ink-400">{fecha}</span>
+                    </div>
+
+                    {/* Cambios */}
+                    {!isCreacion && (
+                      <div className="space-y-1.5 mt-2">
+                        {entries.map(e => (
+                          <div key={e.id} className="flex items-start gap-2 text-xs">
+                            <span className="font-medium text-ink-600 min-w-[120px] shrink-0">
+                              {e.label_campo}
+                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {e.valor_anterior ? (
+                                <span className="px-1.5 py-0.5 rounded bg-error-soft text-error line-through">
+                                  {e.valor_anterior}
+                                </span>
+                              ) : (
+                                <span className="text-ink-400 italic">vacío</span>
+                              )}
+                              <ArrowRight className="w-3 h-3 text-ink-400 shrink-0" />
+                              {e.valor_nuevo ? (
+                                <span className="px-1.5 py-0.5 rounded bg-primary-100 text-primary-700">
+                                  {e.valor_nuevo}
+                                </span>
+                              ) : (
+                                <span className="text-ink-400 italic">vacío</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
       )}
     </div>
   )

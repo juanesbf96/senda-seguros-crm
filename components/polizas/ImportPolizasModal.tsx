@@ -300,6 +300,12 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
       clienteCache.set(cedulaKey, clienteId)
 
       // 2. Crear póliza
+      // Auto-detectar estado según fecha_fin
+      const hoy = new Date().toISOString().split('T')[0]
+      let estadoPoliza: string = 'activa'
+      if (r.fecha_fin && r.fecha_fin < hoy) estadoPoliza = 'vencida'
+      else if (!r.fecha_inicio && !r.fecha_fin) estadoPoliza = 'pendiente'
+
       const polizaData: Record<string, unknown> = {
         workspace_id:               wsId,
         cliente_id:                 clienteId,
@@ -310,7 +316,7 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
         fecha_inicio:               r.fecha_inicio || null,
         fecha_fin:                  r.fecha_fin || null,
         periodicidad_pago:          r.periodicidad || null,
-        estado:                     'activa',
+        estado:                     estadoPoliza,
         eliminada:                  false,
         // Flags
         es_renovacion:              r.es_renovacion,

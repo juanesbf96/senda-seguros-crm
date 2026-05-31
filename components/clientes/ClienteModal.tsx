@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { Cliente, Etapa, TipoCliente } from '@/types'
+import { Cliente, ClienteHistorial, Etapa, TipoCliente } from '@/types'
 import { X, UserCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -30,6 +30,40 @@ const TIPO_LABELS: Record<TipoCliente, string> = {
 }
 
 const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
+
+const FIELD_LABELS: Record<string, string> = {
+  tipo_cliente:            'Tipo de cliente',
+  nombre:                  'Nombre',
+  razon_social:            'Razón social',
+  sobrenombre:             'Sobrenombre',
+  email:                   'Email',
+  telefono:                'Teléfono',
+  cedula:                  'Cédula',
+  nit:                     'NIT',
+  fecha_nacimiento:        'Fecha de nacimiento',
+  fecha_expedicion_cedula: 'Fecha exp. cédula',
+  fecha_constitucion:      'Fecha de constitución',
+  genero:                  'Género',
+  estado_civil:            'Estado civil',
+  ciudad:                  'Ciudad',
+  departamento:            'Departamento',
+  etapa:                   'Etapa',
+  categoria:               'Categoría',
+  ocupacion:               'Ocupación',
+  empresa_trabajo:         'Empresa',
+  ingresos_aprox:          'Ingresos aprox.',
+  tiene_vehiculo:          'Tiene vehículo',
+  tiene_hijos:             'Tiene hijos',
+  num_hijos:               'Número de hijos',
+  autoriza_datos:          'Autorización datos',
+  notas:                   'Notas',
+  assigned_to:             'Asesor asignado',
+}
+
+function normalizeVal(v: unknown): string {
+  if (v === null || v === undefined || v === '') return ''
+  return String(v)
+}
 
 export default function ClienteModal({ cliente, members = [], onClose, onSaved }: Props) {
   const { currentWorkspace, currentUserId, isSupervisor, isAdmin } = useWorkspace()
@@ -126,11 +160,65 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
       assigned_to:              assignedTo || currentUserId || null,
     }
 
-    const { error: err } = cliente
-      ? await supabase.from('clientes').update(payload).eq('id', cliente.id)
-      : await supabase.from('clientes').insert(payload)
+    const { data: saved, error: err } = cliente
+      ? await supabase.from('clientes').update(payload).eq('id', cliente.id).select('id').single()
+      : await supabase.from('clientes').insert(payload).select('id').single()
 
     if (err) { setError(err.message); setSaving(false); return }
+
+    const clienteId = saved?.id ?? cliente?.id
+    if (clienteId && currentWorkspace?.id) {
+      const batchId  = crypto.randomUUID()
+      const userName = members.find(m => m.user_id === currentUserId)?.nombre || 'Usuario'
+      const resolveUser = (uid: string) => members.find(m => m.user_id === uid)?.nombre || uid
+
+      const entries: Omit<ClienteHistorial, 'id' | 'created_at'>[] = []
+
+      if (!cliente) {
+        entries.push({
+          cliente_id:     clienteId,
+          workspace_id:   currentWorkspace.id,
+          batch_id:       batchId,
+          tipo:           'creacion',
+          campo:          null,
+          label_campo:    null,
+          valor_anterior: null,
+          valor_nuevo:    null,
+          usuario_id:     currentUserId,
+          usuario_nombre: userName,
+        })
+      } else {
+        for (const campo of Object.keys(FIELD_LABELS)) {
+          const oldRaw = (cliente as unknown as Record<string, unknown>)[campo]
+          const newRaw = payload[campo]
+          let anterior = normalizeVal(oldRaw)
+          let nuevo    = normalizeVal(newRaw)
+          if (anterior === nuevo) continue
+
+          if (campo === 'assigned_to') {
+            anterior = anterior ? resolveUser(anterior) : ''
+            nuevo    = nuevo    ? resolveUser(nuevo)    : ''
+            if (anterior === nuevo) continue
+          }
+
+          entries.push({
+            cliente_id:     clienteId,
+            workspace_id:   currentWorkspace.id,
+            batch_id:       batchId,
+            tipo:           'actualizacion',
+            campo,
+            label_campo:    FIELD_LABELS[campo],
+            valor_anterior: anterior || null,
+            valor_nuevo:    nuevo    || null,
+            usuario_id:     currentUserId,
+            usuario_nombre: userName,
+          })
+        }
+      }
+
+      if (entries.length) await supabase.from('clientes_historial').insert(entries)
+    }
+
     onSaved()
   }
 

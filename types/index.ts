@@ -1,4 +1,19 @@
 export type Etapa = 'nuevo' | 'contactado' | 'cotizacion' | 'cerrado'
+
+export interface ClienteHistorial {
+  id: string
+  cliente_id: string
+  workspace_id: string
+  batch_id: string
+  tipo: 'creacion' | 'actualizacion'
+  campo: string | null
+  label_campo: string | null
+  valor_anterior: string | null
+  valor_nuevo: string | null
+  usuario_id: string | null
+  usuario_nombre: string | null
+  created_at: string
+}
 export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'nota'
 export type EstadoPoliza = 'activa' | 'vencida' | 'cancelada' | 'pendiente'
 export type TipoCliente = 'persona_natural' | 'empresa' | 'consorcio'
