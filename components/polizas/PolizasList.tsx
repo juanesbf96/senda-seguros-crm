@@ -13,6 +13,7 @@ import Link from 'next/link'
 import PolizaModal from './PolizaModal'
 import PolizaAnexoModal from './PolizaAnexoModal'
 import PolizaVinculadoModal from './PolizaVinculadoModal'
+import ImportPolizasModal from './ImportPolizasModal'
 
 const ESTADO_COLORS: Record<EstadoPoliza, string> = {
   activa:    'bg-primary-100 text-primary-700',
@@ -69,6 +70,7 @@ export default function PolizasList() {
   const [editingAnexo, setEditingAnexo]                 = useState<PolizaAnexo | undefined>()
   const [showVinculadoModal, setShowVinculadoModal]     = useState(false)
   const [editingVinculado, setEditingVinculado]         = useState<PolizaVinculado | undefined>()
+  const [showImportModal, setShowImportModal]           = useState(false)
 
   async function loadPolizas() {
     const { data } = await supabase
@@ -220,11 +222,18 @@ export default function PolizasList() {
         </div>
         <div className="flex gap-2">
           {activeTab === 'polizas' || activeTab === 'cumplimiento' ? (
-            <button
-              onClick={() => { setEditingPoliza(undefined); setShowPolizaModal(true) }}
-              className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-              <Plus className="w-4 h-4" /> Nueva póliza
-            </button>
+            <>
+              <button
+                onClick={() => setShowImportModal(true)}
+                className="flex items-center gap-2 border border-ink-200 text-ink-500 hover:bg-cream-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <Archive className="w-4 h-4" /> Importar Excel
+              </button>
+              <button
+                onClick={() => { setEditingPoliza(undefined); setShowPolizaModal(true) }}
+                className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <Plus className="w-4 h-4" /> Nueva póliza
+              </button>
+            </>
           ) : activeTab === 'anexos' ? (
             <button
               onClick={() => { setEditingAnexo(undefined); setShowAnexoModal(true) }}
@@ -656,6 +665,12 @@ export default function PolizasList() {
           vinculado={editingVinculado}
           onClose={() => setShowVinculadoModal(false)}
           onSaved={() => { setShowVinculadoModal(false); loadVinculados() }}
+        />
+      )}
+      {showImportModal && (
+        <ImportPolizasModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => { setShowImportModal(false); load() }}
         />
       )}
     </div>

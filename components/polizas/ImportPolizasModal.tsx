@@ -1,0 +1,632 @@
+'use client'
+import { useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
+import { supabase } from '@/lib/supabase/client'
+import { X, Upload, CheckCircle, AlertCircle, FileText, Loader2, Info } from 'lucide-react'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
+
+/* ── Tipos ──────────────────────────────────────────────────────── */
+
+interface ExcelRow {
+  // Flags
+  es_renovacion: boolean
+  mes_emision: string
+  oneroso: boolean
+  endoso_enviado: boolean
+  cancelada_anterior: boolean
+  aseguradora_anterior: string
+  // Cliente
+  tipo_poliza: string
+  nombre: string
+  tipo_documento: string
+  cedula: string
+  fecha_nacimiento: string
+  telefono: string
+  email: string
+  // Póliza base
+  fecha_inicio: string
+  fecha_fin: string
+  aseguradora: string
+  numero_poliza: string
+  ramo: string
+  periodicidad: string
+  // Financiero
+  pct_comision_negocio: number | null
+  prima_neta: number | null
+  prima_periodica: number | null
+  comision_agencia: number | null
+  comision_periodica: number | null
+  retencion_agencia: number | null
+  // Intermediario
+  intermediario: string
+  pct_comision_int: number | null
+  comision_intermediario: number | null
+  // Asesor
+  asesor: string
+  pct_comision_asesor: number | null
+  retencion_asesor: number | null
+  comision_asesor: number | null
+  // Referido
+  referido: string
+  pct_comision_referido: number | null
+  retencion_referido: number | null
+  comision_referido: number | null
+  // ABC / Agencia neta
+  comision_abc_periodica: number | null
+  pct_comision_abc: number | null
+  retencion_abc: number | null
+  comision_abc_anual: number | null
+  comision_abc_recibida: number | null
+  fecha_pago_abc: string
+  comision_asesor_pagada: number | null
+  fecha_pago_asesor: string
+}
+
+interface ImportResult {
+  clientesCreados: number
+  clientesExistentes: number
+  polizasCreadas: number
+  errores: string[]
+}
+
+type Stage = 'idle' | 'preview' | 'importing' | 'done'
+
+/* ── Helpers ────────────────────────────────────────────────────── */
+
+/** Convierte número serial de Excel a string "YYYY-MM-DD" o '' */
+function excelDateToISO(val: unknown): string {
+  if (!val || val === 'NA' || val === '-' || val === '') return ''
+  if (typeof val === 'number') {
+    const date = XLSX.SSF.parse_date_code(val)
+    if (!date) return ''
+    const y = date.y
+    const m = String(date.m).padStart(2, '0')
+    const d = String(date.d).padStart(2, '0')
+    return `${y}-${m}-${d}`
+  }
+  if (typeof val === 'string') {
+    // Puede venir "13/07/1977" o "7/13/2025" — lo normalizamos
+    const parts = val.trim().split(/[\/\-]/)
+    if (parts.length === 3) {
+      let [a, b, c] = parts.map(p => parseInt(p, 10))
+      // Heurística: si el primer número > 12, es dd/mm/yyyy
+      if (a > 12) return `${c}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`
+      // si tercero tiene 4 dígitos, es mm/dd/yyyy → convertir a ISO
+      if (String(parts[2]).length === 4) return `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`
+      // Asumir yyyy-mm-dd
+      return `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`
+    }
+    return ''
+  }
+  return ''
+}
+
+/** Convierte valor de celda a número, null si vacío/no numérico */
+function toNum(val: unknown): number | null {
+  if (val === null || val === undefined || val === '' || val === '-' || val === 'NA') return null
+  const n = typeof val === 'number' ? val : parseFloat(String(val).replace(/[$,\s]/g, ''))
+  return isNaN(n) ? null : n
+}
+
+/** Normaliza flag booleano (Sí, SI, sí, YES, X, mes-año → true) */
+function toBool(val: unknown): boolean {
+  if (!val || val === '-' || val === 'NA' || val === '') return false
+  const s = String(val).toLowerCase().trim()
+  return ['si', 'sí', 'yes', 'x', '1', 'true'].includes(s) || /^[a-z]{3}-\d{2}$/.test(s)
+}
+
+/** Normaliza texto, convierte NA/- a '' */
+function toText(val: unknown): string {
+  if (!val || val === 'NA' || val === '-') return ''
+  return String(val).trim()
+}
+
+/** Normaliza header para comparación */
+function norm(s: string) {
+  return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+}
+
+/** Parsea el archivo Excel y devuelve filas de la hoja 2025 (o la primera) */
+function parseExcel(buffer: ArrayBuffer): { rows: ExcelRow[]; errors: string[]; sheetName: string } {
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
+
+  // Buscar hoja "2025", fallback a la primera
+  const sheetName = wb.SheetNames.find(n => n.trim() === '2025') ?? wb.SheetNames[0]
+  const ws = wb.Sheets[sheetName]
+
+  // Convertir a array de arrays
+  const raw: unknown[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' })
+  if (raw.length < 2) return { rows: [], errors: ['La hoja está vacía.'], sheetName }
+
+  // Primera fila = headers
+  const headers = (raw[0] as string[]).map(h => norm(String(h)))
+
+  // Mapa de índices por nombre normalizado
+  const col = (name: string) => headers.findIndex(h => h.includes(norm(name)))
+
+  const rows: ExcelRow[] = []
+  const errors: string[] = []
+
+  for (let i = 1; i < raw.length; i++) {
+    const r = raw[i] as unknown[]
+
+    // Ignorar filas vacías
+    const nombre = toText(r[col('cliente')])
+    if (!nombre) continue
+
+    // Ignorar filas de totales o separadores
+    if (nombre.toLowerCase().startsWith('total') || nombre === '—') continue
+
+    const cedula = toText(r[col('nit')] || r[col('cc')]) ||
+                   toText(r[headers.findIndex(h => h.includes('nit') || h.includes('c.c'))])
+
+    rows.push({
+      // Flags
+      es_renovacion:      toBool(r[col('renovacion')]),
+      mes_emision:        toText(r[col('mes emision')]),
+      oneroso:            toBool(r[col('oneroso')]),
+      endoso_enviado:     toBool(r[col('endoso')]),
+      cancelada_anterior: toBool(r[col('cancelada anterior')]),
+      aseguradora_anterior: toText(r[col('aseguradora nueva')]),
+      // Cliente
+      tipo_poliza:    toText(r[col('tipo')]),
+      nombre,
+      tipo_documento: toText(r[col('tipo id')]),
+      cedula:         cedula || String(toNum(r[col('nit')]) ?? toNum(r[col('cc')]) ?? ''),
+      fecha_nacimiento: excelDateToISO(r[col('nacimiento')]),
+      telefono:       toText(r[col('celular')]),
+      email:          toText(r[col('correo')]),
+      // Póliza
+      fecha_inicio:   excelDateToISO(r[col('inicio')]),
+      fecha_fin:      excelDateToISO(r[col('fin')]),
+      aseguradora:    toText(r[col('aseguradora')]),
+      numero_poliza:  toText(r[col('numero poliza')] || r[col('no poliza')]),
+      ramo:           toText(r[col('ramo')]),
+      periodicidad:   toText(r[col('periodicidad')]),
+      // Financiero
+      pct_comision_negocio: toNum(r[col('comision del negocio')] ?? r[col('% comision')]),
+      prima_neta:           toNum(r[col('prima anual')]),
+      prima_periodica:      toNum(r[col('prima periodica')]),
+      comision_agencia:     toNum(r[col('comision anual negocio')]),
+      comision_periodica:   toNum(r[col('comision periodica abc')]),
+      retencion_agencia:    toNum(r[col('retencion')]),
+      // Intermediario
+      intermediario:        toText(r[col('intermediario')]),
+      pct_comision_int:     toNum(r[col('comision intermediario')]) ,
+      comision_intermediario: toNum(r[col('comision intermediario inicial')]),
+      // Asesor
+      asesor:               toText(r[col('asesor')] || r[col('concesionario')]),
+      pct_comision_asesor:  toNum(r[col('comision asesor')]),
+      retencion_asesor:     toNum(r[col('retencion asesor')]),
+      comision_asesor:      toNum(r[col('comision asesor')]),
+      // Referido
+      referido:             toText(r[col('referido')]),
+      pct_comision_referido: toNum(r[col('comision referido')]),
+      retencion_referido:   toNum(r[col('retencion referido')]),
+      comision_referido:    toNum(r[col('comision referido')]),
+      // ABC
+      comision_abc_periodica: toNum(r[col('comision abc periodica')]),
+      pct_comision_abc:       toNum(r[col('% comision abc')]),
+      retencion_abc:          toNum(r[col('retencion asumida')]),
+      comision_abc_anual:     toNum(r[col('comision abc anual')]),
+      comision_abc_recibida:  toNum(r[col('abc recibida')]),
+      fecha_pago_abc:         excelDateToISO(r[col('fecha pago abc')]),
+      comision_asesor_pagada: toNum(r[col('pago comision asesor')]),
+      fecha_pago_asesor:      excelDateToISO(r[col('fecha pago asesor')]),
+    })
+  }
+
+  if (rows.length === 0) {
+    errors.push(`No se encontraron filas válidas en la hoja "${sheetName}". Verifica que la hoja tenga datos con columna CLIENTE.`)
+  }
+
+  return { rows, errors, sheetName }
+}
+
+/* ── Importar a Supabase ────────────────────────────────────────── */
+
+async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResult> {
+  const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [] }
+
+  // Cache de cedula → cliente_id para no re-buscar
+  const clienteCache = new Map<string, string>()
+
+  for (let i = 0; i < rows.length; i++) {
+    const r = rows[i]
+
+    try {
+      // 1. Buscar o crear cliente
+      const cedulaKey = r.cedula || r.nombre.toLowerCase()
+      let clienteId: string | null = clienteCache.get(cedulaKey) ?? null
+
+      if (!clienteId && r.cedula) {
+        // Buscar por cédula en el workspace
+        const { data: existing } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('workspace_id', wsId)
+          .eq('cedula', r.cedula)
+          .maybeSingle()
+
+        if (existing) {
+          clienteId = existing.id
+          result.clientesExistentes++
+        }
+      }
+
+      if (!clienteId) {
+        // Crear cliente nuevo
+        const clienteData: Record<string, unknown> = {
+          workspace_id:    wsId,
+          nombre:          r.nombre,
+          tipo_documento:  r.tipo_documento || null,
+          cedula:          r.cedula || null,
+          telefono:        r.telefono || null,
+          email:           r.email || null,
+          etapa:           'cerrado',  // Ya tiene póliza → cliente activo
+        }
+        if (r.fecha_nacimiento) clienteData.fecha_nacimiento = r.fecha_nacimiento
+        // Tipo cliente según tipo_documento
+        if (r.tipo_documento?.toUpperCase() === 'NIT') {
+          clienteData.tipo_cliente = 'empresa'
+          clienteData.nit = r.cedula || null
+        }
+
+        const { data: nuevo, error: errCliente } = await supabase
+          .from('clientes')
+          .insert(clienteData)
+          .select('id')
+          .single()
+
+        if (errCliente || !nuevo) {
+          result.errores.push(`Fila ${i + 2}: No se pudo crear cliente "${r.nombre}" — ${errCliente?.message}`)
+          continue
+        }
+
+        clienteId = nuevo.id
+        result.clientesCreados++
+      }
+
+      if (!clienteId) continue
+      clienteCache.set(cedulaKey, clienteId)
+
+      // 2. Crear póliza
+      const polizaData: Record<string, unknown> = {
+        workspace_id:               wsId,
+        cliente_id:                 clienteId,
+        aseguradora:                r.aseguradora || 'Sin asignar',
+        ramo:                       r.ramo || 'Sin ramo',
+        numero_poliza:              r.numero_poliza || null,
+        tipo_poliza:                r.tipo_poliza || null,
+        fecha_inicio:               r.fecha_inicio || null,
+        fecha_fin:                  r.fecha_fin || null,
+        periodicidad_pago:          r.periodicidad || null,
+        estado:                     'activa',
+        eliminada:                  false,
+        // Flags
+        es_renovacion:              r.es_renovacion,
+        mes_emision:                r.mes_emision || null,
+        beneficiario_oneroso:       r.oneroso,
+        endoso_enviado:             r.endoso_enviado,
+        cancelada_anterior:         r.cancelada_anterior,
+        aseguradora_anterior:       r.aseguradora_anterior || null,
+        // Financiero
+        prima_neta:                 r.prima_neta,
+        prima_periodica:            r.prima_periodica,
+        porcentaje_comision_agencia: r.pct_comision_negocio,
+        comision_agencia:           r.comision_agencia,
+        comision_periodica:         r.comision_periodica,
+        retencion_agencia:          r.retencion_agencia,
+        // Intermediario
+        intermediario:              r.intermediario || null,
+        pct_comision_int:           r.pct_comision_int,
+        comision_intermediario:     r.comision_intermediario,
+        // Asesor
+        porcentaje_comision_vendedor: r.pct_comision_asesor,
+        retencion_vendedor:         r.retencion_asesor,
+        comision_vendedor:          r.comision_asesor,
+        // Referido
+        referido:                   r.referido || null,
+        pct_comision_referido:      r.pct_comision_referido,
+        retencion_referido:         r.retencion_referido,
+        comision_referido:          r.comision_referido,
+        // ABC
+        comision_abc_periodica:     r.comision_abc_periodica,
+        pct_comision_abc:           r.pct_comision_abc,
+        retencion_abc:              r.retencion_abc,
+        comision_abc_anual:         r.comision_abc_anual,
+        comision_abc_recibida:      r.comision_abc_recibida,
+        fecha_pago_abc:             r.fecha_pago_abc || null,
+        comision_asesor_pagada:     r.comision_asesor_pagada,
+        fecha_pago_asesor:          r.fecha_pago_asesor || null,
+      }
+
+      const { error: errPoliza } = await supabase.from('polizas').insert(polizaData)
+
+      if (errPoliza) {
+        result.errores.push(`Fila ${i + 2}: No se pudo crear póliza para "${r.nombre}" — ${errPoliza.message}`)
+      } else {
+        result.polizasCreadas++
+      }
+    } catch (e) {
+      result.errores.push(`Fila ${i + 2}: Error inesperado — ${String(e)}`)
+    }
+  }
+
+  return result
+}
+
+/* ── Componente ─────────────────────────────────────────────────── */
+
+interface Props {
+  onClose: () => void
+  onImported: () => void
+}
+
+export default function ImportPolizasModal({ onClose, onImported }: Props) {
+  const { currentWorkspace } = useWorkspace()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [stage, setStage]         = useState<Stage>('idle')
+  const [fileName, setFileName]   = useState('')
+  const [sheetName, setSheetName] = useState('')
+  const [rows, setRows]           = useState<ExcelRow[]>([])
+  const [parseErrors, setParseErrors] = useState<string[]>([])
+  const [result, setResult]       = useState<ImportResult | null>(null)
+
+  function handleFile(file: File) {
+    setFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = e => {
+      const buf = e.target?.result as ArrayBuffer
+      const { rows: parsed, errors, sheetName: sn } = parseExcel(buf)
+      setParseErrors(errors)
+      setRows(parsed)
+      setSheetName(sn)
+      setStage('preview')
+    }
+    reader.readAsArrayBuffer(file)
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault()
+    const file = e.dataTransfer.files?.[0]
+    if (file) handleFile(file)
+  }
+
+  async function importar() {
+    if (!currentWorkspace) return
+    setStage('importing')
+    const res = await importarFilas(rows, currentWorkspace.id)
+    setResult(res)
+    setStage('done')
+  }
+
+  // Preview — primeras 5 filas
+  const preview = rows.slice(0, 5)
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-lifted w-full max-w-4xl max-h-[92vh] flex flex-col">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-cream-200 flex-shrink-0">
+          <h2 className="font-semibold text-ink-700 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-primary-500" />
+            Importar pólizas desde Excel
+          </h2>
+          <button onClick={onClose} className="text-ink-400 hover:text-ink-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+
+          {/* IDLE */}
+          {stage === 'idle' && (
+            <div>
+              <div className="flex items-start gap-3 p-4 bg-primary-50 rounded-xl border border-primary-100 mb-5 text-sm text-ink-600">
+                <Info className="w-4 h-4 text-primary-700 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-medium text-ink-700 mb-1">¿Qué importa este proceso?</p>
+                  <ul className="space-y-0.5 text-xs text-ink-500">
+                    <li>• Lee la hoja <strong>2025</strong> (o la primera disponible)</li>
+                    <li>• Crea <strong>clientes</strong> nuevos si no existen por cédula/NIT</li>
+                    <li>• Crea <strong>pólizas</strong> con los 44 campos del Excel</li>
+                    <li>• Los clientes existentes no se duplican</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div
+                onDrop={onDrop}
+                onDragOver={e => e.preventDefault()}
+                onClick={() => inputRef.current?.click()}
+                className="border-2 border-dashed border-ink-200 hover:border-primary-400 rounded-2xl p-12 text-center cursor-pointer transition-colors"
+              >
+                <Upload className="w-10 h-10 text-ink-300 mx-auto mb-3" />
+                <p className="text-ink-500 text-sm font-medium">Arrastra el archivo aquí o haz clic para seleccionar</p>
+                <p className="text-xs text-ink-400 mt-1">Acepta <strong>.xlsx</strong> · VENTAS_SENDA_SEGUROS_CONSOLIDADO.xlsx</p>
+                <input
+                  ref={inputRef}
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  onChange={onFileChange}
+                  className="hidden"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* PREVIEW */}
+          {stage === 'preview' && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <FileText className="w-4 h-4 text-ink-400" />
+                <span className="text-sm font-medium text-ink-700">{fileName}</span>
+                <span className="text-xs bg-primary-100 text-primary-700 px-2 py-0.5 rounded-pill">Hoja: {sheetName}</span>
+                <span className="text-xs text-ink-400">· {rows.length} filas encontradas</span>
+              </div>
+
+              {parseErrors.length > 0 && (
+                <div className="p-4 bg-error-soft border border-error/30 rounded-xl text-sm text-error space-y-1">
+                  {parseErrors.map((e, i) => <p key={i}>⚠ {e}</p>)}
+                </div>
+              )}
+
+              {rows.length > 0 && (
+                <>
+                  <p className="text-[10px] uppercase tracking-widest text-ink-400 font-medium">
+                    Vista previa — primeros {preview.length} registros
+                  </p>
+                  <div className="overflow-x-auto rounded-xl border border-cream-200">
+                    <table className="w-full text-xs">
+                      <thead className="bg-cream-100 text-ink-400">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Cliente</th>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Cédula/NIT</th>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Aseguradora</th>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Ramo</th>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">N° Póliza</th>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Inicio</th>
+                          <th className="px-3 py-2 text-left font-medium whitespace-nowrap">Fin</th>
+                          <th className="px-3 py-2 text-right font-medium whitespace-nowrap">Prima neta</th>
+                          <th className="px-3 py-2 text-center font-medium whitespace-nowrap">Renovación</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {preview.map((r, i) => (
+                          <tr key={i} className="border-t border-cream-100 hover:bg-cream-50">
+                            <td className="px-3 py-2 font-medium text-ink-700 whitespace-nowrap">{r.nombre}</td>
+                            <td className="px-3 py-2 text-ink-500">{r.cedula || '—'}</td>
+                            <td className="px-3 py-2 text-ink-500 whitespace-nowrap">{r.aseguradora || '—'}</td>
+                            <td className="px-3 py-2 text-ink-500">{r.ramo || '—'}</td>
+                            <td className="px-3 py-2 text-ink-500">{r.numero_poliza || '—'}</td>
+                            <td className="px-3 py-2 text-ink-500 whitespace-nowrap">{r.fecha_inicio || '—'}</td>
+                            <td className="px-3 py-2 text-ink-500 whitespace-nowrap">{r.fecha_fin || '—'}</td>
+                            <td className="px-3 py-2 text-right text-ink-700 tabular-nums">
+                              {r.prima_neta != null
+                                ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(r.prima_neta)
+                                : '—'}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {r.es_renovacion
+                                ? <span className="bg-primary-100 text-primary-800 text-[10px] px-2 py-0.5 rounded-pill font-medium">Sí</span>
+                                : <span className="text-ink-300 text-[10px]">No</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {rows.length > 5 && (
+                    <p className="text-xs text-ink-400">... y {rows.length - 5} filas más.</p>
+                  )}
+
+                  <div className="p-4 bg-warning-soft border border-warning/30 rounded-xl text-xs text-ink-700 space-y-1">
+                    <p className="font-medium">Resumen de importación:</p>
+                    <ul className="space-y-0.5 text-ink-500 ml-2">
+                      <li>• <strong>{rows.length}</strong> pólizas a importar</li>
+                      <li>• <strong>{new Set(rows.map(r => r.cedula || r.nombre)).size}</strong> clientes únicos (se crearán los que no existan)</li>
+                      <li>• Clientes existentes por cédula <strong>no se duplicarán</strong></li>
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* IMPORTING */}
+          {stage === 'importing' && (
+            <div className="flex flex-col items-center justify-center py-16">
+              <Loader2 className="w-10 h-10 text-primary-500 animate-spin mb-4" />
+              <p className="text-ink-600 font-medium">Importando {rows.length} pólizas...</p>
+              <p className="text-xs text-ink-400 mt-1">Creando clientes y pólizas · puede tardar unos segundos</p>
+            </div>
+          )}
+
+          {/* DONE */}
+          {stage === 'done' && result && (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center py-6">
+                <CheckCircle className="w-14 h-14 text-primary-500 mb-3" />
+                <p className="text-2xl font-semibold text-ink-700">
+                  {result.polizasCreadas} póliza{result.polizasCreadas !== 1 ? 's' : ''} importada{result.polizasCreadas !== 1 ? 's' : ''}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-primary-50 rounded-xl p-3">
+                  <p className="text-2xl font-semibold text-primary-700 tabular-nums">{result.polizasCreadas}</p>
+                  <p className="text-xs text-ink-400 mt-0.5">Pólizas creadas</p>
+                </div>
+                <div className="bg-cream-100 rounded-xl p-3">
+                  <p className="text-2xl font-semibold text-ink-700 tabular-nums">{result.clientesCreados}</p>
+                  <p className="text-xs text-ink-400 mt-0.5">Clientes nuevos</p>
+                </div>
+                <div className="bg-cream-100 rounded-xl p-3">
+                  <p className="text-2xl font-semibold text-ink-700 tabular-nums">{result.clientesExistentes}</p>
+                  <p className="text-xs text-ink-400 mt-0.5">Clientes existentes</p>
+                </div>
+              </div>
+
+              {result.errores.length > 0 && (
+                <div className="bg-error-soft border border-error/30 rounded-xl p-4 space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-sm font-medium text-error mb-2 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {result.errores.length} error{result.errores.length !== 1 ? 'es' : ''}
+                  </p>
+                  {result.errores.map((e, i) => (
+                    <p key={i} className="text-xs text-error/80">{e}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-6 py-4 border-t border-cream-200 flex-shrink-0">
+          {stage === 'done' ? (
+            <button
+              onClick={() => { onImported(); onClose() }}
+              className="w-full px-4 py-2 rounded-pill bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors"
+            >
+              Ver pólizas importadas
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 rounded-pill border border-ink-200 text-ink-500 text-sm hover:bg-cream-100 transition-colors"
+              >
+                Cancelar
+              </button>
+              {stage === 'preview' && rows.length > 0 && parseErrors.length === 0 && (
+                <button
+                  onClick={importar}
+                  className="flex-1 px-4 py-2 rounded-pill bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors"
+                >
+                  Importar {rows.length} fila{rows.length !== 1 ? 's' : ''}
+                </button>
+              )}
+              {stage === 'preview' && (rows.length === 0 || parseErrors.length > 0) && (
+                <button
+                  onClick={() => { setStage('idle'); setRows([]); setParseErrors([]) }}
+                  className="flex-1 px-4 py-2 rounded-pill bg-ink-600 text-white text-sm font-medium hover:bg-ink-700 transition-colors"
+                >
+                  Cargar otro archivo
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
