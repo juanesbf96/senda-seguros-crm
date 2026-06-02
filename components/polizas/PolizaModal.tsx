@@ -61,6 +61,10 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [vendedores, setVendedores] = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
 
   const defaultRamo = isCumplimiento ? 'Fianzas' : ''
+  const knownAseguradoras = ASEGURADORAS.filter(a => a !== 'Otro')
+  const [aseguradoraOtro, setAseguradoraOtro] = useState(
+    !!poliza?.aseguradora && !ASEGURADORAS.includes(poliza.aseguradora)
+  )
 
   const [form, setForm] = useState({
     // identidad
@@ -259,10 +263,30 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="Aseguradora *">
-                <select value={form.aseguradora} onChange={e => set('aseguradora', e.target.value)} className={cls}>
+                <select
+                  value={aseguradoraOtro ? 'Otro' : form.aseguradora}
+                  onChange={e => {
+                    if (e.target.value === 'Otro') {
+                      setAseguradoraOtro(true)
+                      set('aseguradora', '')
+                    } else {
+                      setAseguradoraOtro(false)
+                      set('aseguradora', e.target.value)
+                    }
+                  }}
+                  className={cls}>
                   <option value="">Seleccionar...</option>
                   {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
+                {aseguradoraOtro && (
+                  <input
+                    value={form.aseguradora}
+                    onChange={e => set('aseguradora', e.target.value)}
+                    placeholder="Nombre de la aseguradora..."
+                    autoFocus
+                    className={`${cls} mt-2`}
+                  />
+                )}
               </Field>
               <Field label="Ramo *">
                 <select value={form.ramo} onChange={e => set('ramo', e.target.value)} className={cls}>
