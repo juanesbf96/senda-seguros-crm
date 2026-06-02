@@ -176,6 +176,9 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
   // Primera fila = headers
   const headers = (raw[0] as string[]).map(h => norm(String(h)))
 
+  // Helper adicional: busca columna por función de matching personalizada
+  const colFn = (fn: (h: string) => boolean) => headers.findIndex(fn)
+
   // Mapa de índices: busca por inclusión parcial, con aliases
   const col = (...names: string[]) => {
     for (const name of names) {
@@ -184,6 +187,14 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
     }
     return -1
   }
+
+  // Debug: mostrar columnas detectadas en consola
+  const idxFechaFin = col('fecha fin de vigencia', 'fin de vigencia', 'fecha fin', 'fin vigencia', 'vencimiento') !== -1
+    ? col('fecha fin de vigencia', 'fin de vigencia', 'fecha fin', 'fin vigencia', 'vencimiento')
+    : colFn(h => h.includes('fin') && h.includes('vigencia'))
+  console.log('[Import] Headers detectados:', headers)
+  console.log('[Import] Índice columna fecha_fin:', idxFechaFin, '→', headers[idxFechaFin])
+  console.log('[Import] Valor fecha_fin fila 2:', (raw[1] as unknown[])?.[idxFechaFin])
 
   const rows: ExcelRow[] = []
   const errors: string[] = []
@@ -218,8 +229,15 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       telefono:       toText(r[col('celular', 'telefono', 'tel')]),
       email:          toText(r[col('correo', 'email', 'correo electronico')]),
       // Póliza
-      fecha_inicio:   excelDateToISO(r[col('fecha inicio de vigencia', 'inicio de vigencia', 'fecha inicio', 'inicio vigencia', 'inicio')]),
-      fecha_fin:      excelDateToISO(r[col('fecha fin de vigencia', 'fin de vigencia', 'fecha fin', 'fin vigencia', 'vencimiento')]),
+      fecha_inicio:   excelDateToISO(
+        r[col('fecha inicio de vigencia', 'inicio de vigencia', 'fecha inicio', 'inicio vigencia', 'inicio')] ??
+        r[colFn(h => h.includes('inicio') && h.includes('vigencia'))]
+      ),
+      fecha_fin:      excelDateToISO(
+        r[col('fecha fin de vigencia', 'fin de vigencia', 'fecha fin', 'fin vigencia', 'vencimiento')] ??
+        r[colFn(h => h.includes('fin') && h.includes('vigencia'))] ??
+        r[colFn(h => h.includes('vencimiento'))]
+      ),
       aseguradora:    toText(r[col('aseguradora')]),
       numero_poliza:  toText(r[col('numero de poliza', 'numero poliza', 'no poliza', 'n° poliza', 'nro poliza')]),
       ramo:           toText(r[col('ramo')]),
