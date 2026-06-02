@@ -229,8 +229,8 @@ export default function PolizasList() {
         <div>
           <h1 className="text-2xl font-bold text-ink-700">Pólizas</h1>
           <p className="text-ink-400 text-sm mt-1">
-            {polizasNormales.filter(p => p.estado === 'activa').length} activas ·{' '}
-            Prima: {formatCOP(polizasNormales.filter(p => p.estado === 'activa').reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0))}
+            {polizasNormales.filter(p => p.fecha_fin ? p.fecha_fin >= new Date().toISOString().split('T')[0] : p.estado === 'activa').length} activas ·{' '}
+            Prima: {formatCOP(polizasNormales.filter(p => p.fecha_fin ? p.fecha_fin >= new Date().toISOString().split('T')[0] : p.estado === 'activa').reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0))}
           </p>
         </div>
         <div className="flex gap-2">
@@ -534,7 +534,8 @@ export default function PolizasList() {
         <div className="space-y-4">
           {/* Stats */}
           {polizasCumplimiento.length > 0 && (() => {
-            const activas = polizasCumplimiento.filter(p => p.estado === 'activa')
+            const hoy = new Date().toISOString().split('T')[0]
+            const activas = polizasCumplimiento.filter(p => p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa')
             const primaNeta   = activas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
             const totalPrima  = activas.reduce((s, p) => s + (p.total_prima || 0), 0)
             const comision    = activas.reduce((s, p) => s + (p.comision_agencia || 0), 0)
@@ -576,9 +577,11 @@ export default function PolizasList() {
               </thead>
               <tbody>
                 {filteredCumplimiento.map(p => {
+                  const hoyStr = new Date().toISOString().split('T')[0]
+                  const esActiva = p.fecha_fin ? p.fecha_fin >= hoyStr : p.estado === 'activa'
                   const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
-                  const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
-                  const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
+                  const urgent = esActiva && days !== null && days >= 0 && days <= 30
+                  const warn   = esActiva && days !== null && days > 30 && days <= 60
                   return (
                     <tr key={p.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${urgent ? 'bg-warning-soft/30' : ''}`}>
                       <td className="px-4 py-3 text-xs font-mono text-ink-500">{p.numero_poliza || '—'}</td>
@@ -596,8 +599,8 @@ export default function PolizasList() {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-ink-500 text-xs">{p.nombre_tomador || '—'}</td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[p.estado]}`}>
-                          {ESTADO_LABELS[p.estado]}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${esActiva ? ESTADO_COLORS['activa'] : ESTADO_COLORS['vencida']}`}>
+                          {esActiva ? 'Activa' : 'Vencida'}
                         </span>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
@@ -790,9 +793,11 @@ function PolizasTable({
         </thead>
         <tbody>
           {sorted.map(p => {
+            const hoyStr = new Date().toISOString().split('T')[0]
+            const esActiva = p.fecha_fin ? p.fecha_fin >= hoyStr : p.estado === 'activa'
             const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
-            const urgent = days !== null && days >= 0 && days <= 30 && p.estado === 'activa'
-            const warn   = days !== null && days > 30 && days <= 60 && p.estado === 'activa'
+            const urgent = esActiva && days !== null && days >= 0 && days <= 30
+            const warn   = esActiva && days !== null && days > 30 && days <= 60
             return (
               <tr key={p.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${urgent ? 'bg-warning-soft/30' : ''}`}>
                 <td className="px-4 py-3 text-ink-500 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>

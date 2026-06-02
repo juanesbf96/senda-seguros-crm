@@ -301,10 +301,11 @@ export default function ClienteDetalle({ id }: { id: string }) {
   if (!cliente) return <div className="p-6 text-ink-400">Cliente no encontrado.</div>
 
   /* derived */
-  const polizasActivas = polizas.filter(p => p.estado === 'activa')
+  const hoyStr         = new Date().toISOString().split('T')[0]
+  const polizasActivas = polizas.filter(p => p.fecha_fin ? p.fecha_fin >= hoyStr : p.estado === 'activa')
   const primaTotal     = polizasActivas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
-  const proximoVence   = polizas
-    .filter(p => p.estado === 'activa' && p.fecha_fin)
+  const proximoVence   = polizasActivas
+    .filter(p => p.fecha_fin)
     .sort((a, b) => (a.fecha_fin! > b.fecha_fin! ? 1 : -1))[0]
 
   const totalCobrosPendientes = cobrosPendientes.reduce((s, c) => s + c.valor, 0)
@@ -545,8 +546,10 @@ export default function ClienteDetalle({ id }: { id: string }) {
             ) : (
               <div className="space-y-3">
                 {polizas.map(p => {
+                  const hoy    = new Date().toISOString().split('T')[0]
+                  const esActiva = p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa'
                   const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
-                  const urgent = days !== null && days >= 0 && days <= 30
+                  const urgent = esActiva && days !== null && days >= 0 && days <= 30
                   const primaDisplay = p.prima_neta ?? p.prima
                   return (
                     <div key={p.id} className={`bg-white rounded-xl border p-4 ${urgent ? 'border-warning/40' : 'border-ink-200'}`}>
@@ -556,8 +559,8 @@ export default function ClienteDetalle({ id }: { id: string }) {
                             <span className="font-semibold text-ink-700">{p.aseguradora}</span>
                             <span className="text-ink-400">·</span>
                             <span className="text-ink-500 text-sm">{p.ramo}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[p.estado]}`}>
-                              {p.estado}
+                            <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${esActiva ? ESTADO_COLORS['activa'] : ESTADO_COLORS['vencida']}`}>
+                              {esActiva ? 'Activa' : 'Vencida'}
                             </span>
                             {p.tipo_modalidad && (
                               <span className="px-2 py-0.5 rounded-full text-xs bg-cream-200 text-ink-400 capitalize">
@@ -598,18 +601,16 @@ export default function ClienteDetalle({ id }: { id: string }) {
                             <p className="font-semibold text-ink-600">{formatCOP(p.total_prima)}</p>
                           </div>
                         )}
-                        {p.fecha_inicio && (
-                          <div>
-                            <p className="text-ink-400">Inicio</p>
-                            <p>{formatDate(p.fecha_inicio)}</p>
-                          </div>
-                        )}
-                        {p.fecha_fin && (
-                          <div>
-                            <p className="text-ink-400">Vencimiento</p>
-                            <p className={urgent ? 'text-ink-700 font-medium' : ''}>{formatDate(p.fecha_fin)}</p>
-                          </div>
-                        )}
+                        <div>
+                          <p className="text-ink-400">Inicio vigencia</p>
+                          <p>{p.fecha_inicio ? formatDate(p.fecha_inicio) : '—'}</p>
+                        </div>
+                        <div>
+                          <p className="text-ink-400">Fin vigencia</p>
+                          <p className={urgent ? 'text-warning font-semibold' : esActiva ? '' : 'text-error font-medium'}>
+                            {p.fecha_fin ? formatDate(p.fecha_fin) : '—'}
+                          </p>
+                        </div>
                         {p.comision_agencia && (
                           <div>
                             <p className="text-ink-400">Comisión agencia</p>
