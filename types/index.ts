@@ -98,6 +98,31 @@ export interface Poliza {
   medio_pago: string | null
   banco_pago: string | null
   valor_asegurado: number | null
+  // Campos financieros extendidos
+  prima_periodica: number | null
+  pct_comision_negocio: number | null
+  comision_negocio_anual: number | null
+  comision_periodica: number | null
+  pct_comision_abc: number | null
+  retencion_agencia: number | null
+  comision_abc_periodica: number | null
+  comision_abc_anual: number | null
+  comision_abc_recibida: number | null
+  fecha_pago_abc: string | null
+  intermediario: string | null
+  pct_comision_int: number | null
+  comision_intermediario: number | null
+  referido: string | null
+  pct_comision_referido: number | null
+  retencion_referido: number | null
+  comision_referido: number | null
+  comision_asesor_pagada: number | null
+  fecha_pago_asesor: string | null
+  es_renovacion: boolean
+  mes_emision: string | null
+  endoso_enviado: boolean
+  cancelada_anterior: boolean
+  aseguradora_anterior: string | null
   created_at: string
   cliente?: Cliente
 }

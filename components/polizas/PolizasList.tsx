@@ -71,6 +71,19 @@ export default function PolizasList() {
   const [showVinculadoModal, setShowVinculadoModal]     = useState(false)
   const [editingVinculado, setEditingVinculado]         = useState<PolizaVinculado | undefined>()
   const [showImportModal, setShowImportModal]           = useState(false)
+  const [aseguradorasDB, setAseguradorasDB]             = useState<string[]>([])
+
+  async function loadAseguradoras() {
+    const { data } = await supabase
+      .from('polizas')
+      .select('aseguradora')
+      .eq('workspace_id', currentWorkspace?.id || '')
+      .eq('eliminada', false)
+    if (data) {
+      const unique = [...new Set(data.map(r => r.aseguradora).filter(Boolean))].sort()
+      setAseguradorasDB(unique)
+    }
+  }
 
   async function loadPolizas() {
     const { data } = await supabase
@@ -112,7 +125,7 @@ export default function PolizasList() {
 
   async function load() {
     setLoading(true)
-    await Promise.all([loadPolizas(), loadEliminadas(), loadAnexos(), loadVinculados()])
+    await Promise.all([loadPolizas(), loadEliminadas(), loadAnexos(), loadVinculados(), loadAseguradoras()])
     setLoading(false)
   }
 
@@ -319,7 +332,7 @@ export default function PolizasList() {
         <div className="bg-cream-100 border border-ink-200 rounded-xl p-4 mb-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <FiltroSelect label="Aseguradora" value={extra.aseguradora} onChange={v => setExtra(e => ({ ...e, aseguradora: v }))}>
             <option value="">Todas</option>
-            {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
+            {(aseguradorasDB.length > 0 ? aseguradorasDB : ASEGURADORAS).map(a => <option key={a} value={a}>{a}</option>)}
           </FiltroSelect>
           <FiltroSelect label="Ramo" value={extra.ramo} onChange={v => setExtra(e => ({ ...e, ramo: v }))}>
             <option value="">Todos</option>

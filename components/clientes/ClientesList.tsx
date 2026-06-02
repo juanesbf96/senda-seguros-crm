@@ -13,6 +13,7 @@ import {
 import Link from 'next/link'
 import ClienteModal from './ClienteModal'
 import ImportModal from './ImportModal'
+import ImportPolizasModal from '@/components/polizas/ImportPolizasModal'
 import ContactosTab from './ContactosTab'
 import CRMComercialView from './CRMComercialView'
 
@@ -285,7 +286,7 @@ export default function ClientesList() {
             <>
               <button onClick={() => setShowImport(true)}
                 className="flex items-center gap-2 bg-white border border-ink-200 hover:bg-cream-100 text-ink-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-                <Upload className="w-4 h-4" /> Importar CSV
+                <Upload className="w-4 h-4" /> Importar Excel
               </button>
               <button onClick={exportCSV}
                 className="flex items-center gap-2 bg-white border border-ink-200 hover:bg-cream-100 text-ink-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
@@ -715,7 +716,7 @@ export default function ClientesList() {
         />
       )}
       {showImport && (
-        <ImportModal
+        <ImportPolizasModal
           onClose={() => setShowImport(false)}
           onImported={() => { setShowImport(false); load() }}
         />

@@ -150,8 +150,14 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
   // Primera fila = headers
   const headers = (raw[0] as string[]).map(h => norm(String(h)))
 
-  // Mapa de índices por nombre normalizado
-  const col = (name: string) => headers.findIndex(h => h.includes(norm(name)))
+  // Mapa de índices: busca por inclusión parcial, con aliases
+  const col = (...names: string[]) => {
+    for (const name of names) {
+      const idx = headers.findIndex(h => h.includes(norm(name)))
+      if (idx !== -1) return idx
+    }
+    return -1
+  }
 
   const rows: ExcelRow[] = []
   const errors: string[] = []
@@ -172,53 +178,53 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
     rows.push({
       // Flags
       es_renovacion:      toBool(r[col('renovacion')]),
-      mes_emision:        toText(r[col('mes emision')]),
+      mes_emision:        toText(r[col('mes emision', 'mes')]),
       oneroso:            toBool(r[col('oneroso')]),
-      endoso_enviado:     toBool(r[col('endoso')]),
+      endoso_enviado:     toBool(r[col('endoso enviado', 'endoso')]),
       cancelada_anterior: toBool(r[col('cancelada anterior')]),
-      aseguradora_anterior: toText(r[col('aseguradora nueva')]),
+      aseguradora_anterior: toText(r[col('aseguradora anterior', 'aseguradora nueva')]),
       // Cliente
       tipo_poliza:    toText(r[col('tipo')]),
       nombre,
-      tipo_documento: toText(r[col('tipo id')]),
-      cedula:         cedula || String(toNum(r[col('nit')]) ?? toNum(r[col('cc')]) ?? ''),
-      fecha_nacimiento: excelDateToISO(r[col('nacimiento')]),
-      telefono:       toText(r[col('celular')]),
-      email:          toText(r[col('correo')]),
+      tipo_documento: toText(r[col('tipo id', 'tipo doc', 'tipo documento')]),
+      cedula:         cedula || String(toNum(r[col('nit', 'cc', 'nit/cc', 'cedula')]) ?? ''),
+      fecha_nacimiento: excelDateToISO(r[col('nacimiento', 'fecha nacimiento', 'fecha de nacimiento')]),
+      telefono:       toText(r[col('celular', 'telefono', 'tel')]),
+      email:          toText(r[col('correo', 'email', 'correo electronico')]),
       // Póliza
-      fecha_inicio:   excelDateToISO(r[col('inicio')]),
-      fecha_fin:      excelDateToISO(r[col('fin')]),
+      fecha_inicio:   excelDateToISO(r[col('inicio de vigencia', 'fecha inicio', 'inicio vigencia', 'inicio')]),
+      fecha_fin:      excelDateToISO(r[col('fin de vigencia', 'fecha fin', 'fin vigencia', 'fin')]),
       aseguradora:    toText(r[col('aseguradora')]),
-      numero_poliza:  toText(r[col('numero poliza')] || r[col('no poliza')]),
+      numero_poliza:  toText(r[col('numero de poliza', 'numero poliza', 'no poliza', 'n° poliza', 'nro poliza')]),
       ramo:           toText(r[col('ramo')]),
       periodicidad:   toText(r[col('periodicidad')]),
-      // Financiero
-      pct_comision_negocio: toNum(r[col('comision del negocio')] ?? r[col('% comision')]),
-      prima_neta:           toNum(r[col('prima anual')]),
-      prima_periodica:      toNum(r[col('prima periodica')]),
-      comision_agencia:     toNum(r[col('comision anual negocio')]),
-      comision_periodica:   toNum(r[col('comision periodica abc')]),
-      retencion_agencia:    toNum(r[col('retencion')]),
+      // Financiero — columnas exactas del formato Senda
+      pct_comision_negocio:  toNum(r[col('porcentaje comision del negocio', 'comision del negocio', '% comision negocio')]),
+      prima_neta:            toNum(r[col('prima anual antes de iva', 'prima anual', 'prima neta')]),
+      prima_periodica:       toNum(r[col('prima periodica pagada', 'prima periodica')]),
+      comision_agencia:      toNum(r[col('comision anual negocio', 'comision anual')]),
+      comision_periodica:    toNum(r[col('comision periodica abc', 'comision periodica')]),
+      retencion_agencia:     toNum(r[col('retencion 10', 'retencion')]),
       // Intermediario
-      intermediario:        toText(r[col('intermediario')]),
-      pct_comision_int:     toNum(r[col('comision intermediario')]) ,
-      comision_intermediario: toNum(r[col('comision intermediario inicial')]),
+      intermediario:         toText(r[col('intermediario inicial', 'intermediario')]),
+      pct_comision_int:      toNum(r[col('porcentaje comision intermediario', '% comision intermediario')]),
+      comision_intermediario: toNum(r[col('comision intermediario inicial', 'comision intermediario')]),
       // Asesor
-      asesor:               toText(r[col('asesor')] || r[col('concesionario')]),
-      pct_comision_asesor:  toNum(r[col('% comision asesor')]),
+      asesor:               toText(r[col('asesor', 'concesionario', 'vendedor')]),
+      pct_comision_asesor:  toNum(r[col('% comision asesor', 'porcentaje comision asesor')]),
       retencion_asesor:     toNum(r[col('retencion asesor')]),
       comision_asesor:      toNum(r[col('comision asesor')]),
       // Referido
-      referido:             toText(r[col('referido')]),
-      pct_comision_referido: toNum(r[col('comision referido')]),
-      retencion_referido:   toNum(r[col('retencion referido')]),
-      comision_referido:    toNum(r[col('comision referido')]),
-      // ABC
+      referido:              toText(r[col('referido')]),
+      pct_comision_referido: toNum(r[col('porcentaje comision referido', '% comision referido')]),
+      retencion_referido:    toNum(r[col('retencion referido')]),
+      comision_referido:     toNum(r[col('comision referido')]),
+      // ABC / Agencia
       comision_abc_periodica: toNum(r[col('comision abc periodica')]),
-      pct_comision_abc:       toNum(r[col('% comision abc')]),
-      retencion_abc:          toNum(r[col('retencion asumida')]),
+      pct_comision_abc:       toNum(r[col('% comision abc seguros', '% comision abc', 'porcentaje comision abc')]),
+      retencion_abc:          toNum(r[col('retencion asumida por abc', 'retencion asumida', 'retencion abc')]),
       comision_abc_anual:     toNum(r[col('comision abc anual')]),
-      comision_abc_recibida:  toNum(r[col('abc recibida')]),
+      comision_abc_recibida:  toNum(r[col('comision abc recibida', 'abc recibida')]),
       fecha_pago_abc:         excelDateToISO(r[col('fecha pago abc')]),
       comision_asesor_pagada: toNum(r[col('pago comision asesor')]),
       fecha_pago_asesor:      excelDateToISO(r[col('fecha pago asesor')]),
@@ -356,10 +362,14 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
         fecha_pago_asesor:          r.fecha_pago_asesor || null,
       }
 
-      const { error: errPoliza } = await supabase.from('polizas').insert(polizaData)
+      // Upsert: si ya existe la póliza por numero_poliza + workspace, la actualiza
+      const { error: errPoliza } = r.numero_poliza
+        ? await supabase.from('polizas')
+            .upsert(polizaData, { onConflict: 'numero_poliza,workspace_id', ignoreDuplicates: false })
+        : await supabase.from('polizas').insert(polizaData)
 
       if (errPoliza) {
-        result.errores.push(`Fila ${i + 2}: No se pudo crear póliza para "${r.nombre}" — ${errPoliza.message}`)
+        result.errores.push(`Fila ${i + 2}: No se pudo guardar póliza para "${r.nombre}" — ${errPoliza.message}`)
       } else {
         result.polizasCreadas++
       }
