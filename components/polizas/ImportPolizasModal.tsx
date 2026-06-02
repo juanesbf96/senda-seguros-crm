@@ -362,11 +362,27 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
         fecha_pago_asesor:          r.fecha_pago_asesor || null,
       }
 
-      // Upsert: si ya existe la póliza por numero_poliza + workspace, la actualiza
-      const { error: errPoliza } = r.numero_poliza
-        ? await supabase.from('polizas')
-            .upsert(polizaData, { onConflict: 'numero_poliza,workspace_id', ignoreDuplicates: false })
-        : await supabase.from('polizas').insert(polizaData)
+      // Buscar si ya existe la póliza por numero_poliza + workspace → actualizar, sino insertar
+      let errPoliza = null
+      if (r.numero_poliza) {
+        const { data: existente } = await supabase
+          .from('polizas')
+          .select('id')
+          .eq('workspace_id', wsId)
+          .eq('numero_poliza', r.numero_poliza)
+          .maybeSingle()
+
+        if (existente) {
+          const { error } = await supabase.from('polizas').update(polizaData).eq('id', existente.id)
+          errPoliza = error
+        } else {
+          const { error } = await supabase.from('polizas').insert(polizaData)
+          errPoliza = error
+        }
+      } else {
+        const { error } = await supabase.from('polizas').insert(polizaData)
+        errPoliza = error
+      }
 
       if (errPoliza) {
         result.errores.push(`Fila ${i + 2}: No se pudo guardar póliza para "${r.nombre}" — ${errPoliza.message}`)
