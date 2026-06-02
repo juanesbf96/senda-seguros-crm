@@ -76,28 +76,54 @@ const YEAR_SHEET_RE = /^(20\d{2}|2\d{3})$/
 
 /* ── Helpers ────────────────────────────────────────────────────── */
 
-/** Convierte número serial de Excel a string "YYYY-MM-DD" o '' */
+/** Convierte cualquier valor de celda de Excel a string "YYYY-MM-DD" o '' */
 function excelDateToISO(val: unknown): string {
-  if (!val || val === 'NA' || val === '-' || val === '') return ''
-  if (typeof val === 'number') {
-    const date = XLSX.SSF.parse_date_code(val)
-    if (!date) return ''
-    const y = date.y
-    const m = String(date.m).padStart(2, '0')
-    const d = String(date.d).padStart(2, '0')
+  if (val === null || val === undefined || val === '' || val === 'NA' || val === '-') return ''
+
+  // Date object (cuando cellDates:true o JS Date)
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return ''
+    const y = val.getFullYear()
+    const m = String(val.getMonth() + 1).padStart(2, '0')
+    const d = String(val.getDate()).padStart(2, '0')
     return `${y}-${m}-${d}`
   }
+
+  // Número serial de Excel (cellDates:false)
+  if (typeof val === 'number') {
+    if (val < 1 || val > 2958465) return '' // fuera de rango razonable
+    try {
+      const date = XLSX.SSF.parse_date_code(val)
+      if (!date) return ''
+      return `${date.y}-${String(date.m).padStart(2,'0')}-${String(date.d).padStart(2,'0')}`
+    } catch { return '' }
+  }
+
   if (typeof val === 'string') {
-    // Puede venir "13/07/1977" o "7/13/2025" — lo normalizamos
-    const parts = val.trim().split(/[\/\-]/)
+    const s = val.trim()
+    if (!s || s === '0' || s === 'NA' || s === '-') return ''
+
+    // Ya viene en formato ISO "2023-11-22"
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+
+    // Formato "22/11/2023" o "22-11-2023" (dd/mm/yyyy o dd-mm-yyyy)
+    const parts = s.split(/[\/\-\.]/)
     if (parts.length === 3) {
-      let [a, b, c] = parts.map(p => parseInt(p, 10))
-      // Heurística: si el primer número > 12, es dd/mm/yyyy
-      if (a > 12) return `${c}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`
-      // si tercero tiene 4 dígitos, es mm/dd/yyyy → convertir a ISO
-      if (String(parts[2]).length === 4) return `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`
-      // Asumir yyyy-mm-dd
-      return `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`
+      const nums = parts.map(p => parseInt(p.trim(), 10))
+      const [a, b, c] = nums
+      if (isNaN(a) || isNaN(b) || isNaN(c)) return ''
+
+      // Si el tercer elemento tiene 4 dígitos → a/b son día y mes
+      if (String(parts[2].trim()).length === 4) {
+        // Si a > 12 es dd/mm/yyyy
+        if (a > 12) return `${c}-${String(b).padStart(2,'0')}-${String(a).padStart(2,'0')}`
+        // sino puede ser mm/dd/yyyy — en Colombia usamos dd/mm/yyyy
+        return `${c}-${String(a).padStart(2,'0')}-${String(b).padStart(2,'0')}`
+      }
+      // Si el primer elemento tiene 4 dígitos → yyyy/mm/dd
+      if (String(parts[0].trim()).length === 4) {
+        return `${a}-${String(b).padStart(2,'0')}-${String(c).padStart(2,'0')}`
+      }
     }
     return ''
   }
@@ -131,7 +157,7 @@ function norm(s: string) {
 
 /** Devuelve los nombres de hojas disponibles en el workbook */
 function getSheetNames(buffer: ArrayBuffer): { all: string[]; yearSheets: string[] } {
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
   const all = wb.SheetNames
   const yearSheets = all.filter(n => YEAR_SHEET_RE.test(n.trim()))
   return { all, yearSheets }
@@ -139,7 +165,7 @@ function getSheetNames(buffer: ArrayBuffer): { all: string[]; yearSheets: string
 
 /** Parsea UNA hoja específica y devuelve sus filas */
 function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[]; errors: string[] } {
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: false })
+  const wb = XLSX.read(buffer, { type: 'array', cellDates: true })
   const ws = wb.Sheets[sheetName]
   if (!ws) return { rows: [], errors: [`Hoja "${sheetName}" no encontrada.`] }
 
@@ -192,8 +218,8 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       telefono:       toText(r[col('celular', 'telefono', 'tel')]),
       email:          toText(r[col('correo', 'email', 'correo electronico')]),
       // Póliza
-      fecha_inicio:   excelDateToISO(r[col('inicio de vigencia', 'fecha inicio', 'inicio vigencia', 'inicio')]),
-      fecha_fin:      excelDateToISO(r[col('fin de vigencia', 'fecha fin', 'fin vigencia', 'fin')]),
+      fecha_inicio:   excelDateToISO(r[col('fecha inicio de vigencia', 'inicio de vigencia', 'fecha inicio', 'inicio vigencia', 'inicio')]),
+      fecha_fin:      excelDateToISO(r[col('fecha fin de vigencia', 'fin de vigencia', 'fecha fin', 'fin vigencia', 'vencimiento')]),
       aseguradora:    toText(r[col('aseguradora')]),
       numero_poliza:  toText(r[col('numero de poliza', 'numero poliza', 'no poliza', 'n° poliza', 'nro poliza')]),
       ramo:           toText(r[col('ramo')]),
