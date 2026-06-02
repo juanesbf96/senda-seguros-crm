@@ -7,7 +7,7 @@ import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Search, AlertTriangle, Plus, Pencil, Trash2,
   FileText, ShieldCheck, Paperclip, Users, Archive, RefreshCw,
-  SlidersHorizontal, X, ChevronUp, ChevronDown, ChevronsUpDown,
+  SlidersHorizontal, X, ChevronUp, ChevronDown, ChevronsUpDown, Download,
 } from 'lucide-react'
 import Link from 'next/link'
 import PolizaModal from './PolizaModal'
@@ -749,6 +749,36 @@ function PolizasTable({
 }) {
   const [sortKey, setSortKey] = useState<SortKey>('fecha_fin')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false)
+
+  function toggleSelect(id: string) {
+    setSelected(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+  function toggleAll() {
+    setSelected(prev => prev.size === sorted.length && sorted.length > 0 ? new Set() : new Set(sorted.map(p => p.id)))
+  }
+  async function bulkDelete() {
+    const ids = Array.from(selected)
+    await Promise.all(ids.map(id => onDelete(id)))
+    setSelected(new Set())
+    setConfirmBulkDelete(false)
+  }
+  function exportSelected() {
+    const rows = sorted.filter(p => selected.has(p.id))
+    const headers = ['Cliente','Aseguradora','Ramo','N° Póliza','Prima neta','Comisión agencia','Inicio vigencia','Fin vigencia','Estado']
+    const esc = (v: unknown) => { const s = String(v ?? ''); return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s }
+    const lines = rows.map(p => [
+      p.cliente?.nombre, p.aseguradora, p.ramo, p.numero_poliza,
+      p.prima_neta ?? p.prima, p.comision_agencia,
+      p.fecha_inicio, p.fecha_fin,
+      p.fecha_fin ? (p.fecha_fin >= new Date().toISOString().split('T')[0] ? 'Activa' : 'Vencida') : p.estado,
+    ].map(esc).join(','))
+    const csv = '﻿' + [headers.join(','), ...lines].join('\r\n')
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }))
+    const a = document.createElement('a'); a.href = url; a.download = `polizas_${new Date().toISOString().split('T')[0]}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   function handleSort(key: SortKey) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -781,6 +811,12 @@ function PolizasTable({
       <table className="w-full text-sm">
         <thead className="bg-cream-100 border-b border-ink-200">
           <tr className="text-left text-xs text-ink-400">
+            <th className="px-4 py-3 w-8">
+              <input type="checkbox"
+                checked={selected.size === sorted.length && sorted.length > 0}
+                onChange={toggleAll}
+                className="rounded border-ink-300 text-primary-500 focus:ring-primary-400 cursor-pointer" />
+            </th>
             <Th col="tipo_poliza"   label="Tipo póliza" />
             <Th col="numero_poliza" label="N° Póliza" />
             <Th col="aseguradora"   label="Aseguradora" />
@@ -798,8 +834,13 @@ function PolizasTable({
             const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
             const urgent = esActiva && days !== null && days >= 0 && days <= 30
             const warn   = esActiva && days !== null && days > 30 && days <= 60
+            const isSel  = selected.has(p.id)
             return (
-              <tr key={p.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${urgent ? 'bg-warning-soft/30' : ''}`}>
+              <tr key={p.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${urgent ? 'bg-warning-soft/30' : ''} ${isSel ? 'bg-primary-50' : ''}`}>
+                <td className="px-4 py-3">
+                  <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)}
+                    className="rounded border-ink-300 text-primary-500 focus:ring-primary-400 cursor-pointer" />
+                </td>
                 <td className="px-4 py-3 text-ink-500 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>
                 <td className="px-4 py-3 text-ink-500 font-mono text-xs">{p.numero_poliza || '—'}</td>
                 <td className="px-4 py-3 text-ink-600">{p.aseguradora}</td>
@@ -844,6 +885,36 @@ function PolizasTable({
         <div className="text-center py-12 text-ink-400">
           <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
           <p className="text-sm">No se encontraron pólizas</p>
+        </div>
+      )}
+
+      {/* Barra de acciones masivas */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl">
+          <span className="text-sm font-medium">{selected.size} seleccionada{selected.size !== 1 ? 's' : ''}</span>
+          <div className="w-px h-5 bg-white/20" />
+          <button onClick={exportSelected}
+            className="flex items-center gap-1.5 text-sm hover:text-emerald-400 transition-colors">
+            <Download className="w-4 h-4" /> Exportar
+          </button>
+          <div className="w-px h-5 bg-white/20" />
+          {!confirmBulkDelete ? (
+            <button onClick={() => setConfirmBulkDelete(true)}
+              className="flex items-center gap-1.5 text-sm hover:text-red-400 transition-colors">
+              <Trash2 className="w-4 h-4" /> Eliminar
+            </button>
+          ) : (
+            <>
+              <span className="text-sm text-red-400">¿Eliminar {selected.size} póliza{selected.size !== 1 ? 's' : ''}?</span>
+              <button onClick={bulkDelete} className="text-sm bg-red-500 hover:bg-red-600 px-3 py-1 rounded-lg font-medium">Sí, eliminar</button>
+              <button onClick={() => setConfirmBulkDelete(false)} className="text-sm hover:text-white/70">Cancelar</button>
+            </>
+          )}
+          <div className="w-px h-5 bg-white/20" />
+          <button onClick={() => { setSelected(new Set()); setConfirmBulkDelete(false) }}
+            className="text-white/60 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
     </div>
