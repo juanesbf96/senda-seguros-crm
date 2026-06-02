@@ -23,13 +23,10 @@ const DEPARTAMENTOS = [
   'Valle del Cauca','Vaupés','Vichada',
 ]
 
-const TIPO_LABELS: Record<TipoCliente, string> = {
+const TIPO_LABELS: Partial<Record<TipoCliente, string>> = {
   persona_natural: 'Persona Natural',
   empresa: 'Empresa',
-  consorcio: 'Consorcio',
 }
-
-const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 
 const FIELD_LABELS: Record<string, string> = {
   tipo_cliente:            'Tipo de cliente',
@@ -238,8 +235,8 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
 
           {/* ── Tipo de cliente ── */}
           <Field label="Tipo de cliente *">
-            <div className="grid grid-cols-3 gap-2">
-              {(['persona_natural','empresa','consorcio'] as TipoCliente[]).map(t => (
+            <div className="grid grid-cols-2 gap-2">
+              {(['persona_natural','empresa'] as TipoCliente[]).map(t => (
                 <button key={t} type="button" onClick={() => setTipo(t)}
                   className={[
                     'py-2 px-3 rounded-lg text-xs font-medium border transition-colors',
@@ -285,24 +282,16 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
                     </select>
                   </Field>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Estado civil">
-                    <select value={form.estado_civil} onChange={e => set('estado_civil', e.target.value)} className={cls}>
-                      <option value="">Seleccionar...</option>
-                      <option value="soltero">Soltero/a</option>
-                      <option value="casado">Casado/a</option>
-                      <option value="union_libre">Unión libre</option>
-                      <option value="divorciado">Divorciado/a</option>
-                      <option value="viudo">Viudo/a</option>
-                    </select>
-                  </Field>
-                  <Field label="Categoría">
-                    <select value={form.categoria} onChange={e => set('categoria', e.target.value)} className={cls}>
-                      <option value="">Sin categoría</option>
-                      {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </Field>
-                </div>
+                <Field label="Estado civil">
+                  <select value={form.estado_civil} onChange={e => set('estado_civil', e.target.value)} className={cls}>
+                    <option value="">Seleccionar...</option>
+                    <option value="soltero">Soltero/a</option>
+                    <option value="casado">Casado/a</option>
+                    <option value="union_libre">Unión libre</option>
+                    <option value="divorciado">Divorciado/a</option>
+                    <option value="viudo">Viudo/a</option>
+                  </select>
+                </Field>
               </>
             ) : (
               <>
@@ -320,27 +309,9 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
                       onChange={e => set('fecha_constitucion', e.target.value)} className={cls} />
                   </Field>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <Field label="Categoría">
-                    <select value={form.categoria} onChange={e => set('categoria', e.target.value)} className={cls}>
-                      <option value="">Sin categoría</option>
-                      {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </Field>
-                  <Field label="Sobrenombre / Alias">
-                    <input value={form.sobrenombre} onChange={e => set('sobrenombre', e.target.value)}
-                      placeholder="Apodo o nombre comercial" className={cls} />
-                  </Field>
-                </div>
               </>
             )}
 
-            {tipo === 'persona_natural' && (
-              <Field label="Sobrenombre / Alias">
-                <input value={form.sobrenombre} onChange={e => set('sobrenombre', e.target.value)}
-                  placeholder="Apodo o nombre comercial" className={cls} />
-              </Field>
-            )}
           </Section>
 
           {/* ── Sección: Contacto ── */}
