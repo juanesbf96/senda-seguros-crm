@@ -71,7 +71,20 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
   })
   const [error, setError] = useState('')
   const [dragging, setDragging] = useState(false)
+  const [clienteSearch, setClienteSearch] = useState('')
+  const [showClienteList, setShowClienteList] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const clienteRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (clienteRef.current && !clienteRef.current.contains(e.target as Node)) {
+        setShowClienteList(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   async function load() {
     if (!currentWorkspace) return
@@ -146,6 +159,7 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
     if (dbErr) { setError(dbErr.message); setUploading(false); return }
 
     setUploadForm({ open: false, file: null, descripcion: '', client_id: clienteId || '', poliza_id: '', prospecto_id: '' })
+    setClienteSearch('')
     load()
   }
 
@@ -403,13 +417,52 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
               </div>
 
               {!clienteId && (
-                <div>
+                <div ref={clienteRef} className="relative">
                   <label className="block text-xs font-medium text-ink-500 mb-1">Cliente (opcional)</label>
-                  <select value={uploadForm.client_id} onChange={e => { setUF('client_id', e.target.value); setUF('poliza_id', '') }}
-                    className={cls}>
-                    <option value="">Sin cliente</option>
-                    {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                  </select>
+                  <input
+                    value={clienteSearch}
+                    onChange={e => {
+                      setClienteSearch(e.target.value)
+                      setShowClienteList(true)
+                      if (!e.target.value) { setUF('client_id', ''); setUF('poliza_id', '') }
+                    }}
+                    onFocus={() => setShowClienteList(true)}
+                    placeholder="Buscar cliente..."
+                    className={cls}
+                    autoComplete="off"
+                  />
+                  {uploadForm.client_id && (
+                    <button
+                      type="button"
+                      onClick={() => { setUF('client_id', ''); setUF('poliza_id', ''); setClienteSearch('') }}
+                      className="absolute right-3 top-[2.1rem] text-ink-300 hover:text-ink-500">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                  {showClienteList && (
+                    <div className="absolute z-20 w-full bg-white border border-ink-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                      {clientes
+                        .filter(c => !clienteSearch || c.nombre.toLowerCase().includes(clienteSearch.toLowerCase()))
+                        .slice(0, 20)
+                        .map(c => (
+                          <button key={c.id} type="button"
+                            onMouseDown={() => {
+                              setUF('client_id', c.id)
+                              setUF('poliza_id', '')
+                              setClienteSearch(c.nombre)
+                              setShowClienteList(false)
+                            }}
+                            className={`w-full text-left px-3 py-2 text-sm hover:bg-primary-50 transition-colors ${
+                              uploadForm.client_id === c.id ? 'bg-primary-50 text-primary-700 font-medium' : 'text-ink-700'
+                            }`}>
+                            {c.nombre}
+                          </button>
+                        ))}
+                      {clientes.filter(c => !clienteSearch || c.nombre.toLowerCase().includes(clienteSearch.toLowerCase())).length === 0 && (
+                        <p className="px-3 py-2 text-sm text-ink-400">Sin resultados</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
