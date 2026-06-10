@@ -6,7 +6,35 @@ import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   ArrowLeft, Pencil, AlertTriangle, FileText, Shield,
   Calendar, DollarSign, User, Building2, RefreshCw,
+  Car, Heart, Home, Zap, Truck, Plane, Briefcase,
+  Stethoscope, Sprout, Baby, ShieldAlert, Anchor,
 } from 'lucide-react'
+
+const RAMO_ICONS: Record<string, React.ReactNode> = {
+  'automoviles':            <Car          className="w-6 h-6" />,
+  'todo riesgo vehículo':   <Car          className="w-6 h-6" />,
+  'soat':                   <Car          className="w-6 h-6" />,
+  'vida individual':        <Heart        className="w-6 h-6" />,
+  'vida grupo':             <Heart        className="w-6 h-6" />,
+  'vida deudor':            <Heart        className="w-6 h-6" />,
+  'hogar':                  <Home         className="w-6 h-6" />,
+  'incendio':               <Home         className="w-6 h-6" />,
+  'responsabilidad civil':  <ShieldAlert  className="w-6 h-6" />,
+  'empresarial':            <Briefcase    className="w-6 h-6" />,
+  'salud':                  <Stethoscope  className="w-6 h-6" />,
+  'arl':                    <Stethoscope  className="w-6 h-6" />,
+  'transportes':            <Truck        className="w-6 h-6" />,
+  'agrícola':               <Sprout       className="w-6 h-6" />,
+  'cumplimiento':           <Shield       className="w-6 h-6" />,
+  'fianzas':                <Anchor       className="w-6 h-6" />,
+  'aviación':               <Plane        className="w-6 h-6" />,
+  'energía':                <Zap          className="w-6 h-6" />,
+}
+
+function getRamoIcon(ramo: string | null): React.ReactNode {
+  if (!ramo) return <Shield className="w-6 h-6" />
+  return RAMO_ICONS[ramo.toLowerCase()] ?? <Shield className="w-6 h-6" />
+}
 import Link from 'next/link'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
@@ -103,14 +131,17 @@ export default function PolizaDetalle({ id }: { id: string }) {
       <div className="bg-white rounded-xl border border-ink-200 p-5">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
-              <Shield className="w-6 h-6 text-primary-500" />
+            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0 text-primary-500">
+              {getRamoIcon(poliza.ramo)}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-ink-800">{poliza.aseguradora}</h1>
                 <span className="text-ink-400">·</span>
-                <span className="text-ink-500">{poliza.ramo}</span>
+                <span className="flex items-center gap-1 text-ink-500">
+                  <span className="text-ink-400 [&>svg]:w-3.5 [&>svg]:h-3.5">{getRamoIcon(poliza.ramo)}</span>
+                  {poliza.ramo}
+                </span>
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[estadoKey]}`}>
                   {esActiva ? 'Activa' : poliza.estado === 'cancelada' ? 'Cancelada' : 'Vencida'}
                 </span>
