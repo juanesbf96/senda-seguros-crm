@@ -70,6 +70,7 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
     open: false, file: null, descripcion: '', client_id: clienteId || '', poliza_id: '', prospecto_id: '',
   })
   const [error, setError] = useState('')
+  const [dragging, setDragging] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function load() {
@@ -105,7 +106,15 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
     setUploadForm(f => ({ ...f, [field]: val }))
   }
 
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault()
+    setDragging(false)
+    const file = e.dataTransfer.files?.[0]
+    if (file) setUF('file', file)
+  }
+
   async function handleUpload() {
+    if (!currentWorkspace) { setError('Workspace no cargado. Recarga la página.'); return }
     if (!uploadForm.file) { setError('Selecciona un archivo'); return }
     setUploading(true); setError('')
 
@@ -350,7 +359,17 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
               {/* Drop zone */}
               <div
                 onClick={() => fileRef.current?.click()}
-                className="border-2 border-dashed border-ink-200 rounded-xl p-6 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50/30 transition-colors">
+                onDragOver={e => { e.preventDefault(); setDragging(true) }}
+                onDragEnter={e => { e.preventDefault(); setDragging(true) }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+                className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all ${
+                  dragging
+                    ? 'border-primary-500 bg-primary-50 scale-[1.01]'
+                    : uploadForm.file
+                      ? 'border-primary-300 bg-primary-50/40'
+                      : 'border-ink-200 hover:border-primary-400 hover:bg-primary-50/30'
+                }`}>
                 {uploadForm.file ? (
                   <div>
                     <div className="flex justify-center mb-2">
@@ -358,12 +377,19 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
                     </div>
                     <p className="text-sm font-medium text-ink-600">{uploadForm.file.name}</p>
                     <p className="text-xs text-ink-400">{formatBytes(uploadForm.file.size)}</p>
+                    <p className="text-xs text-primary-500 mt-1 hover:underline">Cambiar archivo</p>
+                  </div>
+                ) : dragging ? (
+                  <div>
+                    <Upload className="w-8 h-8 mx-auto text-primary-500 mb-2 animate-bounce" />
+                    <p className="text-sm font-medium text-primary-600">Suelta el archivo aquí</p>
                   </div>
                 ) : (
                   <div>
                     <Upload className="w-8 h-8 mx-auto text-ink-300 mb-2" />
-                    <p className="text-sm text-ink-400">Haz clic para seleccionar</p>
-                    <p className="text-xs text-ink-400 mt-1">PDF, imágenes, Word, Excel...</p>
+                    <p className="text-sm text-ink-500 font-medium">Arrastra tu archivo aquí</p>
+                    <p className="text-xs text-ink-400 mt-1">o <span className="text-primary-500 font-medium">haz clic para seleccionar</span></p>
+                    <p className="text-xs text-ink-300 mt-1">PDF, imágenes, Word, Excel...</p>
                   </div>
                 )}
                 <input ref={fileRef} type="file" className="hidden"
