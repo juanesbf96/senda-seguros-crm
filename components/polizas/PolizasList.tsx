@@ -842,7 +842,11 @@ function PolizasTable({
                     className="rounded border-ink-300 text-primary-500 focus:ring-primary-400 cursor-pointer" />
                 </td>
                 <td className="px-4 py-3 text-ink-500 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>
-                <td className="px-4 py-3 text-ink-500 font-mono text-xs">{p.numero_poliza || '—'}</td>
+                <td className="px-4 py-3 font-mono text-xs">
+                  {p.numero_poliza
+                    ? <Link href={`/polizas/${p.id}`} className="text-primary-600 hover:underline">{p.numero_poliza}</Link>
+                    : <span className="text-ink-400">—</span>}
+                </td>
                 <td className="px-4 py-3 text-ink-600">{p.aseguradora}</td>
                 <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{p.ramo}</td>
                 <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs max-w-[140px]">
