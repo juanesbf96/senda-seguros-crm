@@ -89,8 +89,10 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
   async function load() {
     if (!currentWorkspace) return
     const wid = currentWorkspace.id
+
+    // Query sin joins FK para evitar fallo si schema cache aún no tiene las relaciones
     let archQ = supabase.from('archivos')
-      .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora), prospecto:prospectos(id,nombre)')
+      .select('*')
       .eq('workspace_id', wid)
       .order('created_at', { ascending: false })
     if (clienteId) archQ = archQ.eq('client_id', clienteId)
@@ -100,7 +102,20 @@ export default function ArchivosView({ clienteId }: { clienteId?: string }) {
       supabase.from('clientes').select('id,nombre').eq('workspace_id', wid).order('nombre'),
       supabase.from('prospectos').select('id,nombre').eq('workspace_id', wid).order('nombre'),
     ])
-    setArchivos((archRes.data || []) as Archivo[])
+
+    if (archRes.error) console.error('[Archivos] load error:', archRes.error)
+
+    // Enriquecer archivos con datos del cliente/póliza/prospecto desde los arrays cargados
+    const clientesMap = Object.fromEntries((clRes.data || []).map(c => [c.id, c]))
+    const proMap      = Object.fromEntries((proRes.data || []).map(p => [p.id, p]))
+
+    const enriched = (archRes.data || []).map((a: Archivo) => ({
+      ...a,
+      cliente:   a.client_id    ? (clientesMap[a.client_id]    ?? null) : null,
+      prospecto: a.prospecto_id ? (proMap[a.prospecto_id]      ?? null) : null,
+    }))
+
+    setArchivos(enriched as Archivo[])
     setClientes(clRes.data || [])
     setProspectos(proRes.data || [])
     setLoading(false)
