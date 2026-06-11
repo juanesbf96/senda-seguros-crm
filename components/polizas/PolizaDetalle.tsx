@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Poliza, Cliente } from '@/types'
+import { Poliza, Cliente, Archivo } from '@/types'
 import AfiliadosTab from '@/components/afiliados/AfiliadosTab'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
@@ -9,7 +9,24 @@ import {
   Calendar, DollarSign, User, Building2, RefreshCw,
   Car, Heart, Home, Zap, Truck, Plane, Briefcase,
   Stethoscope, Sprout, Baby, ShieldAlert, Anchor,
+  Paperclip, Download, File, FileImage, Film, Music,
 } from 'lucide-react'
+
+function FileIcon({ mime }: { mime: string | null }) {
+  if (!mime) return <File className="w-4 h-4 text-ink-400" />
+  if (mime.startsWith('image/'))  return <FileImage className="w-4 h-4 text-info" />
+  if (mime.startsWith('video/'))  return <Film      className="w-4 h-4 text-violet-400" />
+  if (mime.startsWith('audio/'))  return <Music     className="w-4 h-4 text-pink-400" />
+  if (mime.includes('pdf'))       return <FileText  className="w-4 h-4 text-error" />
+  return <File className="w-4 h-4 text-ink-400" />
+}
+
+function formatBytes(b: number | null): string {
+  if (!b) return ''
+  if (b < 1024) return `${b} B`
+  if (b < 1048576) return `${(b/1024).toFixed(1)} KB`
+  return `${(b/1048576).toFixed(1)} MB`
+}
 
 const RAMO_ICONS: Record<string, React.ReactNode> = {
   'automoviles':            <Car          className="w-6 h-6" />,
@@ -79,9 +96,10 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 export default function PolizaDetalle({ id }: { id: string }) {
   const { currentWorkspace } = useWorkspace()
 
-  const [poliza, setPoliza] = useState<PolizaConCliente | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [poliza,   setPoliza]   = useState<PolizaConCliente | null>(null)
+  const [loading,  setLoading]  = useState(true)
   const [showEdit, setShowEdit] = useState(false)
+  const [archivos, setArchivos] = useState<Archivo[]>([])
 
   async function load() {
     if (!currentWorkspace) return
@@ -95,7 +113,18 @@ export default function PolizaDetalle({ id }: { id: string }) {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [id, currentWorkspace])
+  async function loadArchivos() {
+    if (!currentWorkspace) return
+    const { data } = await supabase
+      .from('archivos')
+      .select('*')
+      .eq('poliza_id', id)
+      .eq('workspace_id', currentWorkspace.id)
+      .order('created_at', { ascending: false })
+    setArchivos((data as Archivo[]) || [])
+  }
+
+  useEffect(() => { load(); loadArchivos() }, [id, currentWorkspace])
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -302,6 +331,43 @@ export default function PolizaDetalle({ id }: { id: string }) {
           />
         </div>
       )}
+
+      {/* ── Adjuntos ── */}
+      <div className="bg-white rounded-xl border border-ink-200 p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Paperclip className="w-4 h-4 text-primary-500" />
+          <h3 className="font-semibold text-ink-700 text-sm">Adjuntos</h3>
+          <span className="ml-auto text-xs text-ink-400">{archivos.length} archivo{archivos.length !== 1 ? 's' : ''}</span>
+        </div>
+        {archivos.length === 0 ? (
+          <p className="text-sm text-ink-400 text-center py-4">Sin adjuntos para esta póliza</p>
+        ) : (
+          <div className="divide-y divide-ink-100">
+            {archivos.map(a => {
+              const { data: { publicUrl } } = supabase.storage.from('archivos').getPublicUrl(a.nombre)
+              return (
+                <div key={a.id} className="flex items-center gap-3 py-2.5">
+                  <FileIcon mime={a.tipo_mime} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-ink-700 truncate">{a.nombre_original}</p>
+                    {a.descripcion && <p className="text-xs text-ink-400 truncate">{a.descripcion}</p>}
+                    <p className="text-xs text-ink-300">{formatBytes(a.tamano)} · {new Date(a.created_at).toLocaleDateString('es-CO')}</p>
+                  </div>
+                  <a
+                    href={publicUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-lg hover:bg-ink-100 text-ink-400 hover:text-ink-600 transition-colors"
+                    title="Descargar"
+                  >
+                    <Download className="w-4 h-4" />
+                  </a>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {showEdit && (
         <PolizaModal
