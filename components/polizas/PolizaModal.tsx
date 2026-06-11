@@ -81,8 +81,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     // fechas
     fecha_expedicion: poliza?.fecha_expedicion || '',
     fecha_recepcion:  poliza?.fecha_recepcion  || '',
-    fecha_inicio:     poliza?.fecha_inicio     || '',
-    fecha_fin:        poliza?.fecha_fin        || '',
+    fecha_inicio:     poliza?.fecha_inicio     || (poliza ? '' : new Date().toISOString().slice(0, 10)),
+    fecha_fin:        poliza?.fecha_fin        || (poliza ? '' : (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10) })()),
     // riesgo
     riesgo:          poliza?.riesgo          || '',
     valor_asegurado: poliza?.valor_asegurado?.toString() || '',
@@ -395,7 +395,17 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Vigencia desde">
-                <input type="date" value={form.fecha_inicio} onChange={e => set('fecha_inicio', e.target.value)} className={cls} />
+                <input type="date" value={form.fecha_inicio}
+                  onChange={e => {
+                    const inicio = e.target.value
+                    set('fecha_inicio', inicio)
+                    if (inicio) {
+                      const d = new Date(inicio + 'T00:00:00')
+                      d.setFullYear(d.getFullYear() + 1)
+                      set('fecha_fin', d.toISOString().slice(0, 10))
+                    }
+                  }}
+                  className={cls} />
               </Field>
               <Field label="Vigencia hasta">
                 <input type="date" value={form.fecha_fin} onChange={e => set('fecha_fin', e.target.value)} className={cls} />
