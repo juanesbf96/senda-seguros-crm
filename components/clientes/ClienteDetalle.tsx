@@ -583,10 +583,21 @@ export default function ClienteDetalle({ id }: { id: string }) {
                               </span>
                             )}
                           </div>
-                          {p.numero_poliza && <p className="text-xs text-ink-400 mt-1">Póliza: {p.numero_poliza}</p>}
+                          {p.numero_poliza && (
+                            <p className="text-xs text-ink-400 mt-1">
+                              Póliza:{' '}
+                              <Link href={`/polizas/${p.id}`} className="text-primary-600 hover:underline font-mono">
+                                {p.numero_poliza}
+                              </Link>
+                            </p>
+                          )}
                           {p.nombre_tomador && <p className="text-xs text-ink-400">Tomador: {p.nombre_tomador}</p>}
                         </div>
                         <div className="flex gap-2 ml-3 flex-shrink-0">
+                          <Link href={`/polizas/${p.id}`}
+                            className="text-ink-400 hover:text-primary-600" title="Ver detalle">
+                            <ArrowRight className="w-4 h-4" />
+                          </Link>
                           <button onClick={() => { setEditingPoliza(p); setShowPolizaModal(true) }}
                             className="text-ink-400 hover:text-ink-600">
                             <Pencil className="w-4 h-4" />
