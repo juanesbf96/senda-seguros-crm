@@ -352,23 +352,25 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
             </div>
           </Section>
 
-          {/* ── Sección: Información laboral ── */}
-          <Section title="Información laboral">
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Ocupación">
-                <input value={form.ocupacion} onChange={e => set('ocupacion', e.target.value)}
-                  placeholder="Ej: Médico, Comerciante..." className={cls} />
+          {/* ── Sección: Información laboral (solo persona natural) ── */}
+          {tipo === 'persona_natural' && (
+            <Section title="Información laboral">
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Ocupación">
+                  <input value={form.ocupacion} onChange={e => set('ocupacion', e.target.value)}
+                    placeholder="Ej: Médico, Comerciante..." className={cls} />
+                </Field>
+                <Field label="Empresa donde trabaja">
+                  <input value={form.empresa_trabajo} onChange={e => set('empresa_trabajo', e.target.value)}
+                    placeholder="Nombre de la empresa" className={cls} />
+                </Field>
+              </div>
+              <Field label="Ingresos aproximados (COP/mes)">
+                <input value={form.ingresos_aprox} onChange={e => set('ingresos_aprox', e.target.value)}
+                  placeholder="Ej: 5000000" type="number" min="0" className={cls} />
               </Field>
-              <Field label="Empresa donde trabaja">
-                <input value={form.empresa_trabajo} onChange={e => set('empresa_trabajo', e.target.value)}
-                  placeholder="Nombre de la empresa" className={cls} />
-              </Field>
-            </div>
-            <Field label="Ingresos aproximados (COP/mes)">
-              <input value={form.ingresos_aprox} onChange={e => set('ingresos_aprox', e.target.value)}
-                placeholder="Ej: 5000000" type="number" min="0" className={cls} />
-            </Field>
-          </Section>
+            </Section>
+          )}
 
           {/* ── Sección: Perfil personal ── */}
           {tipo === 'persona_natural' && (

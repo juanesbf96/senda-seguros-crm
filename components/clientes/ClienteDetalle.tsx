@@ -314,12 +314,12 @@ export default function ClienteDetalle({ id }: { id: string }) {
   const totalCobrosPendientes = cobrosPendientes.reduce((s, c) => s + c.valor, 0)
 
   const esColectivo = cliente?.tipo_cliente === 'empresa' || cliente?.tipo_cliente === 'grupo_familiar'
-  const polizaColectiva = polizas.find(p => p.es_colectiva)
+  const tienePolizaColectiva = polizas.some(p => p.es_colectiva)
 
   const TABS: { key: TabKey; label: string; icon: React.ElementType; count?: number }[] = [
     { key: 'datos',       label: 'Datos',        icon: User },
     { key: 'polizas',     label: 'Pólizas',      icon: FileText,      count: polizas.length },
-    ...(esColectivo && polizaColectiva ? [{ key: 'afiliados' as TabKey, label: 'Afiliados', icon: Users }] : []),
+    ...(esColectivo ? [{ key: 'afiliados' as TabKey, label: 'Afiliados', icon: Users }] : []),
     { key: 'actividades', label: 'Actividades',  icon: Clock,         count: actividades.length },
     { key: 'tareas',      label: 'Tareas',       icon: CheckSquare },
     { key: 'archivos',    label: 'Archivos',     icon: Paperclip },
@@ -760,9 +760,9 @@ export default function ClienteDetalle({ id }: { id: string }) {
         )}
 
         {/* ── TAB: AFILIADOS ── */}
-        {activeTab === 'afiliados' && polizaColectiva && currentWorkspace && (
+        {activeTab === 'afiliados' && currentWorkspace && (
           <AfiliadosTab
-            poliza={polizaColectiva}
+            clienteId={id}
             clienteTipo={cliente.tipo_cliente}
             workspaceId={currentWorkspace.id}
           />

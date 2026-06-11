@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, Cliente, Archivo } from '@/types'
 import AfiliadosTab from '@/components/afiliados/AfiliadosTab'
+import AfiliadosPorPlan from '@/components/afiliados/AfiliadosPorPlan'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   ArrowLeft, Pencil, AlertTriangle, FileText, Shield,
@@ -324,11 +325,19 @@ export default function PolizaDetalle({ id }: { id: string }) {
           <div className="px-5 pt-5 pb-0 border-b border-ink-100">
             <h3 className="font-semibold text-ink-700 text-sm pb-4">Afiliados</h3>
           </div>
-          <AfiliadosTab
-            poliza={poliza}
-            clienteTipo={poliza.cliente.tipo_cliente}
-            workspaceId={currentWorkspace.id}
-          />
+          {poliza.ramo?.toLowerCase() === 'vida grupo' ? (
+            <AfiliadosPorPlan
+              poliza={poliza}
+              clienteTipo={poliza.cliente.tipo_cliente}
+              workspaceId={currentWorkspace.id}
+            />
+          ) : (
+            <AfiliadosTab
+              poliza={poliza}
+              clienteTipo={poliza.cliente.tipo_cliente}
+              workspaceId={currentWorkspace.id}
+            />
+          )}
         </div>
       )}
 

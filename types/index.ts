@@ -131,24 +131,51 @@ export interface Poliza {
   cliente?: Cliente
 }
 
+export interface PolizaPlan {
+  id: string
+  workspace_id: string
+  poliza_id: string
+  nombre: string
+  valor_cobertura: number | null
+  prima_plan: number | null         // calculada: SUM(prima_individual activos)
+  created_at: string
+  updated_at: string
+}
+
 export interface PolizaAfiliado {
   id: string
   workspace_id: string
   poliza_id: string
   cliente_id: string | null
+  plan_id: string | null            // solo para pólizas con planes (ej: Vida Grupo)
   nombre_completo: string
+  tipo_documento: string            // CC | CE | TI | NIT | PA | RC | PPT | NUIP
   numero_documento: string
   fecha_nacimiento: string | null   // opcional
   fecha_inicio: string              // obligatorio
   fecha_retiro: string | null
   numero_poliza_individual: string | null
   parentesco: string | null
+  prima_individual: number | null   // prima propia del afiliado
   activo: boolean
   notas: string | null
   created_at: string
   updated_at: string
   // Joins opcionales
   poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo' | 'tipo_poliza'>
+  plan?: Pick<PolizaPlan, 'id' | 'nombre' | 'valor_cobertura'>
+}
+
+export interface AfiliadoCambioPlan {
+  id: string
+  afiliado_id: string
+  plan_anterior_id: string | null
+  plan_nuevo_id: string | null
+  prima_anterior: number | null
+  prima_nueva: number | null
+  fecha_cambio: string
+  notas: string | null
+  created_at: string
 }
 
 export interface PolizaAnexo {

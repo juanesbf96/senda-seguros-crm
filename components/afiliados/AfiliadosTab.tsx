@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { PolizaAfiliado, Poliza, TipoCliente } from '@/types'
-import { formatDate } from '@/lib/utils'
+import { formatCOP, formatDate } from '@/lib/utils'
 import {
   Users, Plus, Upload, Download, Pencil, UserX,
   UserCheck, ChevronDown, ChevronUp,
@@ -12,55 +12,113 @@ import ImportAfiliadosModal from './ImportAfiliadosModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
 
 interface Props {
-  poliza: Poliza
+  /** Modo póliza: muestra afiliados de esta póliza fija */
+  poliza?: Poliza
+  /** Modo cliente: muestra afiliados de todas las pólizas colectivas del cliente */
+  clienteId?: string
   clienteTipo: TipoCliente
   workspaceId: string
 }
 
-async function recalcularPrima(polizaId: string) {
-  const { count } = await supabase
+type AfiliadoConPoliza = PolizaAfiliado & {
+  poliza_info?: { id: string; numero_poliza: string | null; aseguradora: string; ramo: string | null }
+}
+
+async function recalcularPrimaPoliza(polizaId: string) {
+  const { data: afs } = await supabase
     .from('poliza_afiliados')
-    .select('*', { count: 'exact', head: true })
+    .select('prima_individual')
     .eq('poliza_id', polizaId)
     .eq('activo', true)
 
-  const { data: pol } = await supabase
-    .from('polizas')
-    .select('prima_por_afiliado')
-    .eq('id', polizaId)
-    .single()
+  const suma = (afs ?? []).reduce((s, a) => s + (a.prima_individual ?? 0), 0)
 
-  if (pol?.prima_por_afiliado != null && count != null) {
-    await supabase
+  if (suma > 0) {
+    // Primas individuales → suma directa
+    await supabase.from('polizas').update({ prima: suma }).eq('id', polizaId)
+  } else {
+    // Fallback: prima_por_afiliado × count (si la póliza usa ese modelo)
+    const { count } = await supabase
+      .from('poliza_afiliados')
+      .select('*', { count: 'exact', head: true })
+      .eq('poliza_id', polizaId)
+      .eq('activo', true)
+    const { data: pol } = await supabase
       .from('polizas')
-      .update({ prima: pol.prima_por_afiliado * count })
+      .select('prima_por_afiliado')
       .eq('id', polizaId)
+      .single()
+    if (pol?.prima_por_afiliado != null && count != null) {
+      await supabase.from('polizas').update({ prima: pol.prima_por_afiliado * count }).eq('id', polizaId)
+    }
   }
 }
 
-export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props) {
+export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspaceId }: Props) {
   const { can } = usePermissions()
-  const [afiliados, setAfiliados]           = useState<PolizaAfiliado[]>([])
-  const [loading, setLoading]               = useState(true)
-  const [verInactivos, setVerInactivos]     = useState(false)
-  const [selected, setSelected]             = useState<Set<string>>(new Set())
-  const [modalOpen, setModalOpen]           = useState(false)
-  const [importOpen, setImportOpen]         = useState(false)
-  const [editando, setEditando]             = useState<PolizaAfiliado | null>(null)
-  const [inactivando, setInactivando]       = useState(false)
+  const [afiliados, setAfiliados]       = useState<AfiliadoConPoliza[]>([])
+  const [loading, setLoading]           = useState(true)
+  const [verInactivos, setVerInactivos] = useState(false)
+  const [selected, setSelected]         = useState<Set<string>>(new Set())
+  const [modalOpen, setModalOpen]       = useState(false)
+  const [importOpen, setImportOpen]     = useState(false)
+  const [editando, setEditando]         = useState<PolizaAfiliado | null>(null)
+  const [inactivando, setInactivando]   = useState(false)
+
+  // Modo cliente: guardamos las pólizas colectivas del cliente
+  const [polizasCliente, setPolizasCliente] = useState<Poliza[]>([])
+
+  const modoCliente = Boolean(clienteId && !poliza)
 
   async function load() {
     setLoading(true)
-    const { data } = await supabase
-      .from('poliza_afiliados')
-      .select('*')
-      .eq('poliza_id', poliza.id)
-      .order('nombre_completo', { ascending: true })
-    setAfiliados(data ?? [])
+
+    if (poliza) {
+      // Modo póliza fija
+      const { data } = await supabase
+        .from('poliza_afiliados')
+        .select('*')
+        .eq('poliza_id', poliza.id)
+        .order('nombre_completo')
+      setAfiliados((data ?? []) as AfiliadoConPoliza[])
+    } else if (clienteId) {
+      // Modo cliente: todas las pólizas colectivas
+      const { data: pols } = await supabase
+        .from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, tipo_poliza, es_colectiva, prima_por_afiliado, prima, prima_neta, workspace_id, client_id, estado, fecha_fin')
+        .eq('client_id', clienteId)
+        .eq('es_colectiva', true)
+        .eq('workspace_id', workspaceId)
+
+      setPolizasCliente((pols ?? []) as unknown as Poliza[])
+
+      if (!pols || pols.length === 0) {
+        setAfiliados([])
+        setLoading(false)
+        return
+      }
+
+      const polIds = pols.map(p => p.id)
+      const { data: afs } = await supabase
+        .from('poliza_afiliados')
+        .select('*')
+        .in('poliza_id', polIds)
+        .order('nombre_completo')
+
+      // Adjuntar info de póliza a cada afiliado
+      const enriched: AfiliadoConPoliza[] = (afs ?? []).map(a => ({
+        ...a,
+        poliza_info: pols.find(p => p.id === a.poliza_id)
+          ? { id: pols.find(p => p.id === a.poliza_id)!.id, numero_poliza: pols.find(p => p.id === a.poliza_id)!.numero_poliza ?? null, aseguradora: pols.find(p => p.id === a.poliza_id)!.aseguradora, ramo: pols.find(p => p.id === a.poliza_id)!.ramo ?? null }
+          : undefined,
+      }))
+      setAfiliados(enriched)
+    }
+
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [poliza.id])
+  useEffect(() => { load() }, [poliza?.id, clienteId])
 
   const visibles  = afiliados.filter(a => verInactivos ? !a.activo : a.activo)
   const activos   = afiliados.filter(a => a.activo).length
@@ -90,39 +148,68 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
       .from('poliza_afiliados')
       .update({ activo: false, fecha_retiro: hoy })
       .in('id', Array.from(selected))
-    await recalcularPrima(poliza.id)
+
+    // Recalcular primas de cada póliza afectada
+    const polizaIds = [...new Set(visibles.filter(a => selected.has(a.id)).map(a => a.poliza_id))]
+    await Promise.all(polizaIds.map(pid => recalcularPrimaPoliza(pid)))
+
     setSelected(new Set())
     setInactivando(false)
     load()
   }
 
-  async function reactivar(id: string) {
+  async function reactivar(afil: AfiliadoConPoliza) {
     await supabase
       .from('poliza_afiliados')
       .update({ activo: true, fecha_retiro: null })
-      .eq('id', id)
-    await recalcularPrima(poliza.id)
+      .eq('id', afil.id)
+    await recalcularPrimaPoliza(afil.poliza_id)
+    load()
+  }
+
+  async function inactivarUno(afil: AfiliadoConPoliza) {
+    const hoy = new Date().toISOString().split('T')[0]
+    await supabase
+      .from('poliza_afiliados')
+      .update({ activo: false, fecha_retiro: hoy })
+      .eq('id', afil.id)
+    await recalcularPrimaPoliza(afil.poliza_id)
     load()
   }
 
   function exportarCSV() {
-    const cols = ['Nombre', 'Documento', 'Parentesco', 'Fecha inicio', 'Fecha nacimiento', 'N° Póliza individual', 'Fecha retiro', 'Estado']
-    const rows = visibles.map(a => [
-      a.nombre_completo,
-      a.numero_documento,
-      a.parentesco ?? '',
-      a.fecha_inicio,
-      a.fecha_nacimiento ?? '',
-      a.numero_poliza_individual ?? '',
-      a.fecha_retiro ?? '',
-      a.activo ? 'Activo' : 'Inactivo',
-    ])
+    const cols = modoCliente
+      ? ['Póliza', 'Nombre', 'Tipo doc.', 'Documento', 'Parentesco', 'Prima ind.', 'Fecha inicio', 'Fecha nacimiento', 'N° Póliza individual', 'Fecha retiro', 'Estado']
+      : ['Nombre', 'Tipo doc.', 'Documento', 'Parentesco', 'Prima ind.', 'Fecha inicio', 'Fecha nacimiento', 'N° Póliza individual', 'Fecha retiro', 'Estado']
+
+    const rows = visibles.map(a => {
+      const row = [
+        a.nombre_completo,
+        a.tipo_documento,
+        a.numero_documento,
+        a.parentesco ?? '',
+        a.prima_individual != null ? String(a.prima_individual) : '',
+        a.fecha_inicio,
+        a.fecha_nacimiento ?? '',
+        a.numero_poliza_individual ?? '',
+        a.fecha_retiro ?? '',
+        a.activo ? 'Activo' : 'Inactivo',
+      ]
+      if (modoCliente) {
+        const polLabel = a.poliza_info
+          ? `${a.poliza_info.numero_poliza ? `N°${a.poliza_info.numero_poliza} ` : ''}${a.poliza_info.aseguradora}`
+          : a.poliza_id
+        row.unshift(polLabel)
+      }
+      return row
+    })
+
     const csv = [cols, ...rows].map(r => r.map(v => `"${v}"`).join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = `afiliados_${poliza.numero_poliza ?? poliza.id}.csv`
+    a.download = `afiliados_${poliza?.numero_poliza ?? clienteId ?? 'export'}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -132,6 +219,17 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
   if (loading) return (
     <div className="flex items-center justify-center py-16">
       <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500" />
+    </div>
+  )
+
+  // En modo cliente sin pólizas colectivas
+  if (modoCliente && polizasCliente.length === 0) return (
+    <div className="p-6">
+      <div className="bg-white rounded-xl border border-dashed border-ink-300 p-12 text-center text-ink-400">
+        <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+        <p className="text-sm">Este cliente no tiene pólizas colectivas.</p>
+        <p className="text-xs mt-1">Crea una póliza con el toggle "Póliza colectiva" activado.</p>
+      </div>
     </div>
   )
 
@@ -158,12 +256,14 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
 
         {puedoGestionar && (
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setImportOpen(true)}
-              className="flex items-center gap-1.5 text-xs border border-slate-200 text-ink-600 px-3 py-1.5 rounded-lg hover:bg-cream-100 transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5" /> Importar Excel
-            </button>
+            {poliza && (
+              <button
+                onClick={() => setImportOpen(true)}
+                className="flex items-center gap-1.5 text-xs border border-slate-200 text-ink-600 px-3 py-1.5 rounded-lg hover:bg-cream-100 transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5" /> Importar Excel
+              </button>
+            )}
             <button
               onClick={() => { setEditando(null); setModalOpen(true) }}
               className="flex items-center gap-1.5 text-xs bg-primary-500 text-white px-3 py-1.5 rounded-lg hover:bg-primary-600 transition-colors"
@@ -207,8 +307,9 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
                 )}
                 <th className="px-4 py-3 font-medium">Nombre</th>
                 <th className="px-4 py-3 font-medium">Documento</th>
+                {modoCliente && <th className="px-4 py-3 font-medium hidden lg:table-cell">Póliza</th>}
                 <th className="px-4 py-3 font-medium hidden sm:table-cell">Parentesco</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">N° Póliza ind.</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Prima ind.</th>
                 <th className="px-4 py-3 font-medium hidden md:table-cell">Inicio</th>
                 {verInactivos && <th className="px-4 py-3 font-medium hidden md:table-cell">Retiro</th>}
                 <th className="px-4 py-3 font-medium text-right">Acciones</th>
@@ -231,10 +332,19 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
                     </td>
                   )}
                   <td className="px-4 py-3 font-medium text-ink-700">{a.nombre_completo}</td>
-                  <td className="px-4 py-3 text-ink-500 font-mono text-xs">{a.numero_documento}</td>
+                  <td className="px-4 py-3 text-ink-500 font-mono text-xs">
+                    {a.tipo_documento} {a.numero_documento}
+                  </td>
+                  {modoCliente && (
+                    <td className="px-4 py-3 text-ink-400 hidden lg:table-cell text-xs">
+                      {a.poliza_info
+                        ? `${a.poliza_info.aseguradora}${a.poliza_info.numero_poliza ? ` · N°${a.poliza_info.numero_poliza}` : ''}`
+                        : '—'}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-ink-400 hidden sm:table-cell text-xs">{a.parentesco ?? '—'}</td>
-                  <td className="px-4 py-3 text-ink-400 hidden md:table-cell text-xs font-mono">
-                    {a.numero_poliza_individual ?? <span className="italic">global</span>}
+                  <td className="px-4 py-3 text-xs font-semibold text-primary-700 hidden md:table-cell">
+                    {a.prima_individual != null ? formatCOP(a.prima_individual) : '—'}
                   </td>
                   <td className="px-4 py-3 text-ink-400 hidden md:table-cell text-xs">
                     {formatDate(a.fecha_inicio)}
@@ -247,17 +357,26 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-1.5">
                       {puedoGestionar && !verInactivos && (
-                        <button
-                          onClick={() => { setEditando(a); setModalOpen(true) }}
-                          className="p-1.5 text-ink-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
-                          title="Editar"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
+                        <>
+                          <button
+                            onClick={() => { setEditando(a); setModalOpen(true) }}
+                            className="p-1.5 text-ink-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
+                            title="Editar"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => inactivarUno(a)}
+                            className="p-1.5 text-ink-400 hover:text-error rounded-lg transition-colors"
+                            title="Inactivar"
+                          >
+                            <UserX className="w-3.5 h-3.5" />
+                          </button>
+                        </>
                       )}
                       {puedoGestionar && verInactivos && (
                         <button
-                          onClick={() => reactivar(a.id)}
+                          onClick={() => reactivar(a)}
                           className="flex items-center gap-1 text-xs text-primary-600 hover:underline"
                           title="Reactivar"
                         >
@@ -303,7 +422,8 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
       {/* Modales */}
       {modalOpen && (
         <AfiliadoModal
-          poliza={poliza}
+          polizaFija={poliza}
+          clienteId={modoCliente ? clienteId : undefined}
           clienteTipo={clienteTipo}
           workspaceId={workspaceId}
           afiliado={editando}
@@ -312,7 +432,7 @@ export default function AfiliadosTab({ poliza, clienteTipo, workspaceId }: Props
         />
       )}
 
-      {importOpen && (
+      {importOpen && poliza && (
         <ImportAfiliadosModal
           poliza={poliza}
           clienteTipo={clienteTipo}
