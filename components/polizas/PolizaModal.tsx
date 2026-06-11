@@ -123,16 +123,18 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [error,  setError]  = useState('')
 
   /* derived */
-  const esCumplimiento = RAMOS_CUMPLIMIENTO.includes(form.ramo)
-  const primaNeta      = n(form.prima_neta)
-  const pctIva         = n(form.porcentaje_iva)
-  const gastos         = n(form.gastos)
-  const pctAgencia     = n(form.porcentaje_comision_agencia)
-  const iva            = primaNeta * pctIva / 100
-  const comisionAgencia = primaNeta * pctAgencia / 100
-  const totalPrima     = primaNeta + iva + gastos
-  const pctVendedor    = n(form.porcentaje_comision_vendedor)
-  const comisionVendedor = comisionAgencia * pctVendedor / 100
+  const esCumplimiento    = RAMOS_CUMPLIMIENTO.includes(form.ramo)
+  const primaNeta         = n(form.prima_neta)
+  const pctIva            = n(form.porcentaje_iva)
+  const gastos            = n(form.gastos)
+  const pctAgencia        = n(form.porcentaje_comision_agencia)
+  const iva               = primaNeta * pctIva / 100
+  const comisionAgencia   = primaNeta * pctAgencia / 100        // bruta (sobre prima neta)
+  const retencionAgencia  = comisionAgencia * 0.10              // retención fija 10%
+  const comisionAgenciaNeta = comisionAgencia - retencionAgencia // neta a recibir
+  const totalPrima        = primaNeta + iva + gastos
+  const pctVendedor       = n(form.porcentaje_comision_vendedor)
+  const comisionVendedor  = comisionAgencia * pctVendedor / 100
 
   /* click-outside para cerrar dropdown de cliente */
   useEffect(() => {
@@ -507,14 +509,26 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                   <span>IVA ({pctIva}%)</span>
                   <span className="font-medium">$ {fmt(iva)}</span>
                 </div>
-                <div className="flex justify-between text-ink-500">
-                  <span>Comisión agencia ({pctAgencia}%)</span>
-                  <span className="font-medium text-primary-700">$ {fmt(comisionAgencia)}</span>
-                </div>
                 <div className="flex justify-between text-ink-700 font-semibold border-t border-ink-200 pt-1.5 mt-1">
                   <span>Total prima</span>
                   <span>$ {fmt(totalPrima)}</span>
                 </div>
+                {pctAgencia > 0 && (
+                  <div className="border-t border-ink-200 pt-1.5 mt-1 space-y-1">
+                    <div className="flex justify-between text-ink-500">
+                      <span>Comisión bruta agencia ({pctAgencia}%)</span>
+                      <span>$ {fmt(comisionAgencia)}</span>
+                    </div>
+                    <div className="flex justify-between text-ink-400">
+                      <span>Retención en la fuente (10%)</span>
+                      <span>- $ {fmt(retencionAgencia)}</span>
+                    </div>
+                    <div className="flex justify-between text-primary-700 font-semibold">
+                      <span>Comisión neta agencia</span>
+                      <span>$ {fmt(comisionAgenciaNeta)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
