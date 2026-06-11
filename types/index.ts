@@ -27,6 +27,7 @@ export interface Cliente {
   email: string | null
   telefono: string | null
   cedula: string | null
+  tipo_documento: string | null
   ciudad: string | null
   departamento: string | null
   etapa: Etapa

@@ -82,6 +82,7 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
     nombre:                   cliente?.nombre || '',
     email:                    cliente?.email || '',
     telefono:                 cliente?.telefono || '',
+    tipo_documento:           cliente?.tipo_documento || 'cedula',
     cedula:                   cliente?.cedula || '',
     nit:                      cliente?.nit || '',
     razon_social:             cliente?.razon_social || '',
@@ -134,6 +135,7 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
       sobrenombre:              form.sobrenombre.trim() || null,
       email:                    form.email.trim() || null,
       telefono:                 form.telefono.trim() || null,
+      tipo_documento:           tipo === 'persona_natural' ? form.tipo_documento || null : null,
       cedula:                   tipo === 'persona_natural' ? form.cedula.trim() || null : null,
       nit:                      tipo !== 'persona_natural' ? form.nit.trim() || null : null,
       fecha_nacimiento:         tipo === 'persona_natural' && form.fecha_nacimiento ? form.fecha_nacimiento : null,
@@ -259,11 +261,21 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
                     placeholder="Ej: Carlos Mendoza" className={cls} />
                 </Field>
                 <div className="grid grid-cols-2 gap-4">
-                  <Field label="Cédula">
+                  <Field label="Tipo de documento">
+                    <select value={form.tipo_documento} onChange={e => set('tipo_documento', e.target.value)} className={cls}>
+                      <option value="cedula">Cédula</option>
+                      <option value="cedula_extranjeria">Cédula de Extranjería</option>
+                      <option value="pasaporte">Pasaporte</option>
+                      <option value="ppt">PPT</option>
+                    </select>
+                  </Field>
+                  <Field label="Número de documento">
                     <input value={form.cedula} onChange={e => set('cedula', e.target.value)}
                       placeholder="12345678" className={cls} />
                   </Field>
-                  <Field label="Fecha expedición cédula">
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label="Fecha expedición documento">
                     <input type="date" value={form.fecha_expedicion_cedula}
                       onChange={e => set('fecha_expedicion_cedula', e.target.value)} className={cls} />
                   </Field>
