@@ -27,7 +27,8 @@ const ASEGURADORAS = [
 ]
 
 const PERIODICIDADES = ['Anual','Semestral','Trimestral','Mensual','Prima única']
-const FORMAS_PAGO    = ['Contado','Crédito','Cuotas']
+const FORMAS_PAGO    = ['Contado','Financiación','Mensual']
+const FINANCIERAS    = ['Crediseguro','Finesa','Servicrédito']
 const MEDIOS_PAGO    = ['Efectivo','Transferencia','Cheque','PSE','Débito automático','Tarjeta crédito']
 const BANCOS_PAGO    = [
   'Bancolombia','Banco de Bogotá','Davivienda','BBVA','Banco de Occidente',
@@ -107,6 +108,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     periodicidad_pago: poliza?.periodicidad_pago || '',
     prima_mensual:     (poliza as any)?.prima_mensual?.toString() || '',
     forma_pago:        poliza?.forma_pago        || '',
+    financiera:        (poliza as any)?.financiera || '',
+    num_cuotas:        (poliza as any)?.num_cuotas?.toString() || '',
     medio_pago:        poliza?.medio_pago        || '',
     banco_pago:        poliza?.banco_pago        || '',
     // recaudo (legacy cumplimiento)
@@ -229,6 +232,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       periodicidad_pago: form.periodicidad_pago || null,
       prima_mensual:     primaMensual || null,
       forma_pago:        form.forma_pago        || null,
+      financiera:        form.forma_pago === 'Financiación' ? (form.financiera || null) : null,
+      num_cuotas:        form.forma_pago === 'Financiación' ? (form.num_cuotas ? parseInt(form.num_cuotas) : null) : null,
       medio_pago:        form.medio_pago        || null,
       banco_pago:        form.banco_pago        || null,
       // legacy cumplimiento
@@ -644,6 +649,26 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 )}
               </>
             )}
+            {form.forma_pago === 'Financiación' && (
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Financiera">
+                  <select value={form.financiera} onChange={e => set('financiera', e.target.value)} className={cls}>
+                    <option value="">Seleccionar...</option>
+                    {FINANCIERAS.map(f => <option key={f} value={f}>{f}</option>)}
+                  </select>
+                </Field>
+                <Field label="Número de cuotas">
+                  <input
+                    type="number" min="1" max="60" step="1"
+                    value={form.num_cuotas}
+                    onChange={e => set('num_cuotas', e.target.value)}
+                    placeholder="Ej: 12"
+                    className={cls}
+                  />
+                </Field>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
               <Field label="Medio de pago">
                 <select value={form.medio_pago} onChange={e => set('medio_pago', e.target.value)} className={cls}>
