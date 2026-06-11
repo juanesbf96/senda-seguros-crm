@@ -1,6 +1,6 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 11 de junio de 2026  
+> Última actualización: 10 de junio de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
 
 ---
@@ -33,6 +33,7 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 | Informes / Gráficas | ✅ Funcional |
 | Asistente IA (Groq / Llama 3.3) | ✅ Funcional |
 | Notificaciones de renovación (email diario) | ✅ Configurado — pendiente activar cron en prod |
+| Afiliados en pólizas colectivas | ✅ Funcional (Fase 8 + 9) |
 | Email marketing | ⏸ Diferido (se retoma más adelante) |
 | Paginación en Pólizas | ⚠️ Pendiente |
 
@@ -263,6 +264,56 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 
 ---
 
+### Fase 9 — Afiliados en pólizas colectivas (Fase 1 + 2)
+**10 junio 2026**
+
+#### Fase 9.1 — Base de afiliados
+- Nuevo tipo de cliente: **`grupo_familiar`** (junto a `persona_natural`, `empresa`, `consorcio`)
+- Columnas en pólizas: `es_colectiva BOOLEAN` y `prima_por_afiliado NUMERIC`
+- Nueva tabla **`poliza_afiliados`**: afiliados por póliza colectiva con campos `nombre_completo`, `numero_documento`, `fecha_nacimiento`, `fecha_inicio`, `fecha_retiro`, `numero_poliza_individual`, `parentesco`, `activo`, `notas`
+- RLS, índices y trigger `updated_at` en `poliza_afiliados`
+- Campo `afiliado_id` en `siniestros` (referencia opcional al afiliado)
+- Nuevas claves RBAC: `afiliados_ver`, `afiliados_gestionar`, `afiliados_gestionar_propios`
+- **`AfiliadosTab`**: tabla con toggle activos/inactivos, multi-select + barra flotante (exportar CSV, inactivar masivo), CRUD individual
+- **`AfiliadoModal`** (v1): crear/editar afiliado con campos básicos
+- **`ImportAfiliadosModal`**: importación Excel de afiliados con fuzzy column matching, upsert por `(poliza_id, numero_documento)`
+- **`PolizaDetalle`**: sección de afiliados si `es_colectiva`
+- **`ClienteDetalle`**: pestaña "Afiliados" condicional si el cliente es empresa/grupo_familiar y tiene póliza colectiva
+- **`PolizaModal`**: toggle "Póliza colectiva" + campo `prima_por_afiliado`
+- **`ClientesList`**: label y color para `grupo_familiar`
+- Migración aplicada: `migration_afiliados.sql`
+
+#### Fase 9.2 — Planes variables, tipo documento, multi-póliza
+- Nueva tabla **`poliza_planes`**: planes dentro de pólizas Vida Grupo (nombre, valor_cobertura, prima_plan calculada)
+- Columnas en `poliza_afiliados`: `plan_id`, `prima_individual`, `tipo_documento` (TEXT NOT NULL DEFAULT 'CC')
+- Nueva tabla **`afiliado_cambios_plan`**: historial de cambios de plan y prima por afiliado
+- **`AfiliadoModal`** (v2, reescrito):
+  - Dropdown tipos documento: CC, CE, TI, NIT, PA, RC, PPT, NUIP
+  - Selector de póliza colectiva con dropdown cuando abre desde cliente (multi-póliza)
+  - Selector de plan (si la póliza tiene planes definidos)
+  - Campo `prima_individual` por afiliado
+  - Prop `planInicial` para pre-seleccionar plan al agregar desde pestaña de plan específico
+  - Registro automático en `afiliado_cambios_plan` cuando cambia plan o prima en edición
+  - Recalculo en cascada: prima_plan → prima_poliza
+- **`PlanModal`** *(nuevo)*: crear/editar planes (nombre + valor_cobertura opcional; prima_plan es automática)
+- **`AfiliadosPorPlan`** *(nuevo)*: vista con tabs por plan para pólizas Vida Grupo
+  - Tab por cada plan con conteo de afiliados activos
+  - Info del plan: cobertura + prima del plan
+  - CRUD de afiliados por plan, toggle activos/inactivos
+  - Botones crear plan y editar plan desde la barra del plan activo
+  - Afiliados "sin plan asignado" agrupados al final
+- **`AfiliadosTab`** (actualizado):
+  - Modo dual: `poliza` fija (póliza específica) o `clienteId` (todas las colectivas del cliente)
+  - En modo clienteId: carga afiliados de todas las pólizas colectivas del cliente, muestra columna "Póliza"
+  - Columnas: tipo_documento + documento (juntos), prima_individual, parentesco
+  - Recalculo de prima usa suma de `prima_individual` activos (con fallback a `prima_por_afiliado × count`)
+- **`PolizaDetalle`** (actualizado): ramo `vida grupo` → `AfiliadosPorPlan`; otros colectivos → `AfiliadosTab`
+- **`ClienteDetalle`** (actualizado): tab Afiliados visible para cualquier cliente colectivo (no requiere póliza existente); pasa `clienteId` en lugar de `polizaColectiva` → modal muestra dropdown de pólizas disponibles
+- **`ClienteModal`** (actualizado): sección "Información laboral" (Ingresos, Ocupación, Estado civil, Género) oculta para tipos `empresa` y `grupo_familiar`
+- Migración aplicada: `migration_afiliados_v2.sql`
+
+---
+
 ## Migraciones SQL aplicadas en Supabase
 
 | Archivo | Descripción | Estado |
@@ -295,6 +346,8 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 | `migration_prima_mensual.sql` | Campo `prima_mensual` en pólizas | ✅ Aplicado |
 | `migration_financiacion.sql` | Campos `financiera` y `num_cuotas` en pólizas | ✅ Aplicado |
 | `migration_tipo_documento.sql` | Campo `tipo_documento` en clientes | ✅ Aplicado |
+| `migration_afiliados.sql` | Tabla `poliza_afiliados`, tipo `grupo_familiar`, `es_colectiva` en pólizas, RBAC afiliados | ✅ Aplicado |
+| `migration_afiliados_v2.sql` | Tabla `poliza_planes`, `afiliado_cambios_plan`, `plan_id` + `prima_individual` + `tipo_documento` en afiliados | ✅ Aplicado |
 
 ---
 
@@ -376,4 +429,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 11 de junio de 2026. Total de commits en `main`: ~105.*
+*Última actualización: 10 de junio de 2026. Total de commits en `main`: ~107.*
