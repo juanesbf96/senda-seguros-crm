@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, Cliente } from '@/types'
+import AfiliadosTab from '@/components/afiliados/AfiliadosTab'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   ArrowLeft, Pencil, AlertTriangle, FileText, Shield,
@@ -38,6 +39,7 @@ function getRamoIcon(ramo: string | null): React.ReactNode {
 import Link from 'next/link'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
+
 
 type PolizaConCliente = Poliza & { cliente: Cliente | null }
 
@@ -76,6 +78,7 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 
 export default function PolizaDetalle({ id }: { id: string }) {
   const { currentWorkspace } = useWorkspace()
+
   const [poliza, setPoliza] = useState<PolizaConCliente | null>(null)
   const [loading, setLoading] = useState(true)
   const [showEdit, setShowEdit] = useState(false)
@@ -283,6 +286,20 @@ export default function PolizaDetalle({ id }: { id: string }) {
         <div className="bg-white rounded-xl border border-ink-200 p-5">
           <h3 className="font-semibold text-ink-700 text-sm mb-2">Notas</h3>
           <p className="text-sm text-ink-500 whitespace-pre-wrap">{poliza.notas}</p>
+        </div>
+      )}
+
+      {/* ── Afiliados (solo pólizas colectivas) ── */}
+      {poliza.es_colectiva && poliza.cliente && currentWorkspace && (
+        <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
+          <div className="px-5 pt-5 pb-0 border-b border-ink-100">
+            <h3 className="font-semibold text-ink-700 text-sm pb-4">Afiliados</h3>
+          </div>
+          <AfiliadosTab
+            poliza={poliza}
+            clienteTipo={poliza.cliente.tipo_cliente}
+            workspaceId={currentWorkspace.id}
+          />
         </div>
       )}
 

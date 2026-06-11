@@ -27,12 +27,13 @@ const ETAPA_COLORS: Record<Etapa, string> = {
   cerrado: 'bg-primary-100 text-primary-700',
 }
 const TIPO_LABELS: Record<TipoCliente, string> = {
-  persona_natural: 'Persona Natural', empresa: 'Empresa', consorcio: 'Consorcio',
+  persona_natural: 'Persona Natural', empresa: 'Empresa', consorcio: 'Consorcio', grupo_familiar: 'Grupo Familiar',
 }
 const TIPO_COLORS: Record<TipoCliente, string> = {
   persona_natural: 'bg-cream-200 text-ink-500',
-  empresa:  'bg-indigo-100 text-indigo-700',
-  consorcio:'bg-teal-100 text-teal-700',
+  empresa:         'bg-indigo-100 text-indigo-700',
+  consorcio:       'bg-teal-100 text-teal-700',
+  grupo_familiar:  'bg-violet-100 text-violet-700',
 }
 const CATEGORIAS = ['VIP','Preferencial','Estándar','Nuevo','Inactivo']
 const DEPARTAMENTOS = [

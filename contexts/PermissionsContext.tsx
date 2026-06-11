@@ -55,6 +55,10 @@ export type PermissionKey =
   | 'pipeline_mover_todos'
   | 'pipeline_eliminar_propios'
   | 'pipeline_eliminar_todos'
+  // Afiliados
+  | 'afiliados_ver'
+  | 'afiliados_gestionar'
+  | 'afiliados_gestionar_propios'
 
 interface PermissionsContextType {
   can: (key: PermissionKey) => boolean

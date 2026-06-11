@@ -16,7 +16,7 @@ export interface ClienteHistorial {
 }
 export type TipoActividad = 'llamada' | 'email' | 'reunion' | 'nota'
 export type EstadoPoliza = 'activa' | 'vencida' | 'cancelada' | 'pendiente'
-export type TipoCliente = 'persona_natural' | 'empresa' | 'consorcio'
+export type TipoCliente = 'persona_natural' | 'empresa' | 'consorcio' | 'grupo_familiar'
 export type TipoSolicitud = 'cotizacion' | 'expedicion' | 'renovacion' | 'endoso' | 'cancelacion' | 'certificado' | 'siniestro' | 'inclusion' | 'exclusion' | 'otro'
 export type EstadoSolicitud = 'nueva' | 'en_proceso' | 'resuelta' | 'cancelada' | 'inactiva'
 export type PrioridadSolicitud = 'normal' | 'urgente'
@@ -123,8 +123,31 @@ export interface Poliza {
   endoso_enviado: boolean
   cancelada_anterior: boolean
   aseguradora_anterior: string | null
+  // Póliza colectiva
+  es_colectiva: boolean
+  prima_por_afiliado: number | null
   created_at: string
   cliente?: Cliente
+}
+
+export interface PolizaAfiliado {
+  id: string
+  workspace_id: string
+  poliza_id: string
+  cliente_id: string | null
+  nombre_completo: string
+  numero_documento: string
+  fecha_nacimiento: string | null   // opcional
+  fecha_inicio: string              // obligatorio
+  fecha_retiro: string | null
+  numero_poliza_individual: string | null
+  parentesco: string | null
+  activo: boolean
+  notas: string | null
+  created_at: string
+  updated_at: string
+  // Joins opcionales
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo' | 'tipo_poliza'>
 }
 
 export interface PolizaAnexo {

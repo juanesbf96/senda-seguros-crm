@@ -114,6 +114,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     recaudado_aseguradora: poliza?.recaudado_aseguradora?.toString() || '',
     // notas
     notas: poliza?.notas || '',
+    // colectiva
+    es_colectiva:       poliza?.es_colectiva       ?? false,
+    prima_por_afiliado: poliza?.prima_por_afiliado?.toString() ?? '',
   })
 
   const [saving, setSaving] = useState(false)
@@ -226,6 +229,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       recaudado_aseguradora: form.recaudado_aseguradora ? n(form.recaudado_aseguradora) : null,
       // notas
       notas: form.notas || null,
+      // colectiva
+      es_colectiva:       form.es_colectiva,
+      prima_por_afiliado: form.prima_por_afiliado ? n(form.prima_por_afiliado) : null,
       workspace_id: currentWorkspace?.id,
     }
 
@@ -603,7 +609,35 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
             </div>
           </Section>
 
-          {/* ── 8. Notas ── */}
+          {/* ── 8. Póliza colectiva ── */}
+          <Section title="Póliza colectiva">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div
+                onClick={() => setForm(f => ({ ...f, es_colectiva: !f.es_colectiva }))}
+                className={`relative w-10 h-5 rounded-full transition-colors ${form.es_colectiva ? 'bg-primary-500' : 'bg-slate-200'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${form.es_colectiva ? 'translate-x-5' : ''}`} />
+              </div>
+              <span className="text-sm text-ink-600">Esta es una póliza colectiva / grupal</span>
+            </label>
+            {form.es_colectiva && (
+              <div className="mt-3">
+                <label className="block text-xs text-ink-400 mb-1">
+                  Prima por afiliado (COP)
+                  <span className="ml-1 text-ink-300">— La prima total se calcula automáticamente</span>
+                </label>
+                <input
+                  type="number"
+                  value={form.prima_por_afiliado}
+                  onChange={e => setForm(f => ({ ...f, prima_por_afiliado: e.target.value }))}
+                  placeholder="0"
+                  className={cls}
+                />
+              </div>
+            )}
+          </Section>
+
+          {/* ── 9. Notas ── */}
           <Section title="Notas">
             <textarea value={form.notas} onChange={e => set('notas', e.target.value)}
               placeholder="Coberturas adicionales, observaciones..." rows={2} className={cls} />

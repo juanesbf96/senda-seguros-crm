@@ -19,6 +19,8 @@ import ContactosTab from './ContactosTab'
 import ArchivosView from '@/components/archivos/ArchivosView'
 import SolicitudesList from '@/components/solicitudes/SolicitudesList'
 import SiniestrosList from '@/components/siniestros/SiniestrosList'
+import AfiliadosTab from '@/components/afiliados/AfiliadosTab'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 /* ────────────────────────────────── constants ── */
 
@@ -77,7 +79,7 @@ const REMISION_ESTADO_COLORS: Record<string, string> = {
   anulada:   'bg-error-soft text-error',
 }
 
-type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros' | 'cobros' | 'remisiones' | 'historial'
+type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'contactos' | 'solicitudes' | 'siniestros' | 'cobros' | 'remisiones' | 'historial' | 'afiliados'
 
 /* ────────────────────────────────── inline tab components ── */
 
@@ -232,6 +234,7 @@ function ClienteRemisiones({ id }: { id: string }) {
 /* ────────────────────────────────── component ── */
 
 export default function ClienteDetalle({ id }: { id: string }) {
+  const { currentWorkspace } = useWorkspace()
   const [cliente,      setCliente]    = useState<Cliente | null>(null)
   const [polizas,      setPolizas]    = useState<Poliza[]>([])
   const [actividades,  setActividades]= useState<Actividad[]>([])
@@ -310,9 +313,13 @@ export default function ClienteDetalle({ id }: { id: string }) {
 
   const totalCobrosPendientes = cobrosPendientes.reduce((s, c) => s + c.valor, 0)
 
+  const esColectivo = cliente?.tipo_cliente === 'empresa' || cliente?.tipo_cliente === 'grupo_familiar'
+  const polizaColectiva = polizas.find(p => p.es_colectiva)
+
   const TABS: { key: TabKey; label: string; icon: React.ElementType; count?: number }[] = [
     { key: 'datos',       label: 'Datos',        icon: User },
     { key: 'polizas',     label: 'Pólizas',      icon: FileText,      count: polizas.length },
+    ...(esColectivo && polizaColectiva ? [{ key: 'afiliados' as TabKey, label: 'Afiliados', icon: Users }] : []),
     { key: 'actividades', label: 'Actividades',  icon: Clock,         count: actividades.length },
     { key: 'tareas',      label: 'Tareas',       icon: CheckSquare },
     { key: 'archivos',    label: 'Archivos',     icon: Paperclip },
@@ -339,6 +346,8 @@ export default function ClienteDetalle({ id }: { id: string }) {
             <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center flex-shrink-0">
               {cliente.tipo_cliente === 'persona_natural'
                 ? <User className="w-6 h-6 text-primary-500" />
+                : cliente.tipo_cliente === 'grupo_familiar'
+                ? <Users className="w-6 h-6 text-violet-500" />
                 : <Building2 className="w-6 h-6 text-primary-500" />
               }
             </div>
@@ -448,7 +457,8 @@ export default function ClienteDetalle({ id }: { id: string }) {
               <DataGrid>
                 <DataItem label="Tipo" value={
                   cliente.tipo_cliente === 'persona_natural' ? 'Persona Natural'
-                  : cliente.tipo_cliente === 'empresa' ? 'Empresa' : 'Consorcio'
+                  : cliente.tipo_cliente === 'empresa' ? 'Empresa'
+                  : cliente.tipo_cliente === 'grupo_familiar' ? 'Grupo Familiar' : 'Consorcio'
                 } />
                 {cliente.cedula    && <DataItem label="Cédula" value={cliente.cedula} />}
                 {cliente.nit       && <DataItem label="NIT" value={cliente.nit} />}
@@ -736,6 +746,15 @@ export default function ClienteDetalle({ id }: { id: string }) {
         {/* ── TAB: HISTORIAL ── */}
         {activeTab === 'historial' && (
           <HistorialTab historial={historial} clienteCreatedAt={cliente.created_at} />
+        )}
+
+        {/* ── TAB: AFILIADOS ── */}
+        {activeTab === 'afiliados' && polizaColectiva && currentWorkspace && (
+          <AfiliadosTab
+            poliza={polizaColectiva}
+            clienteTipo={cliente.tipo_cliente}
+            workspaceId={currentWorkspace.id}
+          />
         )}
       </div>
 
