@@ -21,9 +21,9 @@ const TIPOS_CUMPLIMIENTO = [
   'Seriedad de oferta','Otro',
 ]
 
-const ASEGURADORAS = [
+const ASEGURADORAS_DEFAULT = [
   'Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria',
-  'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado','Otro',
+  'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado',
 ]
 
 const PERIODICIDADES = ['Anual','Semestral','Trimestral','Mensual','Prima única']
@@ -58,16 +58,16 @@ interface Props {
 
 export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose, onSaved }: Props) {
   const { currentWorkspace } = useWorkspace()
-  const [clientes,  setClientes]  = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
-  const [vendedores, setVendedores] = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
+  const [clientes,     setClientes]     = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
+  const [vendedores,   setVendedores]   = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
+  const [aseguradoras, setAseguradoras] = useState<string[]>(ASEGURADORAS_DEFAULT)
   const [clienteSearch,   setClienteSearch]   = useState('')
   const [showClienteList, setShowClienteList] = useState(false)
   const clienteRef = useRef<HTMLDivElement>(null)
 
   const defaultRamo = isCumplimiento ? 'Fianzas' : ''
-  const knownAseguradoras = ASEGURADORAS.filter(a => a !== 'Otro')
   const [aseguradoraOtro, setAseguradoraOtro] = useState(
-    !!poliza?.aseguradora && !ASEGURADORAS.includes(poliza.aseguradora)
+    !!poliza?.aseguradora && !ASEGURADORAS_DEFAULT.includes(poliza.aseguradora)
   )
 
   const [form, setForm] = useState({
@@ -169,7 +169,24 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     }
     supabase.from('vendedores').select('id, nombre, comisiones_por_anio').eq('activo', true).order('nombre')
       .then(({ data }) => setVendedores((data || []) as Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]))
-  }, [clientId])
+
+    if (currentWorkspace) {
+      supabase.from('configuracion')
+        .select('valor')
+        .eq('workspace_id', currentWorkspace.id)
+        .eq('clave', 'aseguradoras_lista')
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.valor) {
+            const lista = data.valor.split(',').map((s: string) => s.trim()).filter(Boolean)
+            if (lista.length > 0) {
+              setAseguradoras(lista)
+              if (poliza?.aseguradora) setAseguradoraOtro(!lista.includes(poliza.aseguradora))
+            }
+          }
+        })
+    }
+  }, [clientId, currentWorkspace])
 
   /* auto-fill vendedor % when selected */
   function onVendedorChange(id: string) {
@@ -352,7 +369,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                   }}
                   className={cls}>
                   <option value="">Seleccionar...</option>
-                  {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
+                  {aseguradoras.map(a => <option key={a} value={a}>{a}</option>)}
+                  <option value="Otro">Otro</option>
                 </select>
                 {aseguradoraOtro && (
                   <input
