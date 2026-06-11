@@ -1,6 +1,6 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 8 de junio de 2026  
+> Última actualización: 11 de junio de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
 
 ---
@@ -21,23 +21,20 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 |------|--------|
 | Autenticación / Workspaces | ✅ Funcional |
 | Clientes (CRUD + importación Excel) | ✅ Funcional |
-| Clientes — Empresa / Grupo Familiar con afiliados | ✅ Funcional |
-| Pólizas (CRUD + multi-select + importación) | ✅ Funcional (fecha_fin pendiente debug) |
-| Pólizas colectivas con afiliados | ✅ Funcional |
+| Pólizas (CRUD + multi-select + importación) | ✅ Funcional |
 | Solicitudes (12 tipos + tabs) | ✅ Funcional |
 | Tareas | ✅ Funcional |
 | Pipeline / Prospectos | ✅ Funcional |
 | Cobros / Caja | ✅ Funcional |
 | Facturas | ✅ Funcional |
 | Liquidaciones de vendedores | ✅ Funcional |
-| Agenda | ✅ Funcional |
-| Archivos (Supabase Storage) | ✅ Funcional |
+| Agenda | ✅ Funcional (solo eventos, tareas, cobros, prospectos) |
+| Archivos (Supabase Storage) | ✅ Funcional (adjuntos visibles en detalle de póliza) |
 | Informes / Gráficas | ✅ Funcional |
 | Asistente IA (Groq / Llama 3.3) | ✅ Funcional |
 | Notificaciones de renovación (email diario) | ✅ Configurado — pendiente activar cron en prod |
 | Email marketing | ⏸ Diferido (se retoma más adelante) |
 | Paginación en Pólizas | ⚠️ Pendiente |
-| fecha_fin en importación Excel | ⚠️ En debug |
 
 ---
 
@@ -229,54 +226,40 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 
 ---
 
-### Fase 8 — Afiliados en pólizas colectivas (empresas y grupos familiares)
-**10 junio 2026**
+### Fase 8 — Mejoras UX en pólizas y formularios
+**10–11 junio 2026**
 
-**Nuevo tipo de cliente — Grupo Familiar:**
-- Se agrega `grupo_familiar` como valor válido de `tipo_cliente` (junto a `persona_natural`, `empresa`, `consorcio`)
-- Chip violeta (`bg-violet-100 text-violet-700`) en tablas de clientes
-- Ícono `Users` en el avatar del detalle del cliente
-- Diferencia clave con `empresa`: en grupo familiar el campo `parentesco` es obligatorio al agregar afiliados
+**Detalle de póliza:**
+- N° Póliza en la tabla de pólizas es ahora un enlace clickeable hacia `/polizas/[id]`
+- Página de detalle de póliza con iconos por ramo (Car, Heart, Home, Shield, etc.)
+- Adjuntos visibles en el detalle de póliza: lista de archivos con descarga directa
+- Enlace al detalle de póliza desde la pestaña Pólizas del cliente (número clickeable + botón →)
 
-**Nueva tabla `poliza_afiliados`** (`migration_afiliados.sql`):
-- Campos: `nombre_completo`, `numero_documento`, `fecha_inicio` (obligatorio), `fecha_nacimiento` (opcional), `fecha_retiro`, `numero_poliza_individual`, `parentesco`, `activo`, `notas`
-- Relaciones: `poliza_id` → póliza madre; `cliente_id` → opcional si el afiliado existe como cliente
-- RLS con 4 políticas (select / insert / update / delete) usando `is_workspace_member`
-- Trigger `updated_at` automático
-- Índices en `poliza_id`, `workspace_id`, `numero_documento`, `activo`, `cliente_id`
+**Formulario de póliza (PolizaModal):**
+- Campo "Cliente" reemplazado por combobox buscable (autocomplete, sin scroll largo)
+- Vigencia hasta se calcula automáticamente como vigencia desde + 1 año
+- Campos de Banco y Medio de pago eliminados
+- Checkbox "En remisión" eliminado
+- Forma de pago cambiada a: Contado / Financiación / Mensual
+  - Si "Financiación": aparecen campos **Financiera** (Crediseguro, Finesa, Servicrédito) y **Número de cuotas**
+  - Si periodicidad = "Mensual": aparece campo **Prima mensual antes de IVA** con resumen de comisión neta mensual
+- Comisión agencia muestra desglose: bruta → retención 10% → **comisión neta** (siempre descontada la retención en la fuente)
+- Lista de aseguradoras cargada dinámicamente desde **Configuración → Listas** (no hardcodeada)
 
-**Cambios en tabla `polizas`:**
-- `es_colectiva BOOLEAN DEFAULT false` — marca si la póliza es grupal
-- `prima_por_afiliado NUMERIC(14,2)` — prima unitaria; `prima` total = `prima_por_afiliado × afiliados activos`
+**Agenda:**
+- Eliminados los vencimientos de pólizas de la agenda (ahora solo en módulo Renovaciones)
+- Leyenda actualizada: Mis eventos · Tareas · Cobros · Prospectos
 
-**Cambio en tabla `siniestros`:**
-- `afiliado_id UUID` opcional → FK a `poliza_afiliados` (permite vincular un siniestro a un afiliado específico)
+**Ficha de cliente:**
+- Nuevo campo **Tipo de documento**: Cédula / Cédula de Extranjería / Pasaporte / PPT
 
-**Nuevos permisos RBAC:**
-| Clave | Admin | Supervisor | Agente |
-|-------|-------|-----------|--------|
-| `afiliados_ver` | ✅ | ✅ | ✅ |
-| `afiliados_gestionar` | ✅ | ✅ | ❌ |
-| `afiliados_gestionar_propios` | ✅ | ✅ | ✅ |
+**Módulo Remisiones:**
+- Eliminado del sidebar (ya no es necesario como módulo independiente)
 
-**Componentes nuevos** (`components/afiliados/`):
-- `AfiliadoModal.tsx` — formulario crear/editar afiliado con validación condicional de parentesco
-- `AfiliadosTab.tsx` — lista con toggle activos/inactivos, multi-select con barra flotante (export CSV, inactivar masivo), recálculo automático de prima
-- `ImportAfiliadosModal.tsx` — importación Excel con fuzzy match de columnas, upsert por `(poliza_id, numero_documento)`, reporte de errores por fila
-
-**Modificaciones a componentes existentes:**
-- `ClienteDetalle.tsx` — tab "Afiliados" condicional (solo visible para `empresa` y `grupo_familiar` que tengan una póliza colectiva)
-- `PolizaDetalle.tsx` — sección "Afiliados" al final, visible solo si `es_colectiva = true`
-- `PolizaModal.tsx` — sección "Póliza colectiva" con toggle `es_colectiva` y campo `prima_por_afiliado`
-- `ClientesList.tsx` — etiqueta y chip para `grupo_familiar`
-- `PermissionsContext.tsx` — 3 nuevas claves en `PermissionKey`
-- `types/index.ts` — interface `PolizaAfiliado`, `grupo_familiar` en `TipoCliente`, campos `es_colectiva` y `prima_por_afiliado` en `Poliza`
-
-**Lógica de negocio implementada:**
-- Recálculo automático de `prima` cada vez que se agrega, edita o inactiva un afiliado
-- Al inactivar: se registra `fecha_retiro = hoy` y el afiliado pasa a la vista de inactivos (no se borra)
-- Los afiliados inactivos son visibles con toggle — historial conservado
-- Un mismo `numero_documento` puede aparecer en múltiples pólizas (una fila por póliza)
+**Migraciones aplicadas en esta fase:**
+- `migration_prima_mensual.sql` — columna `prima_mensual` en pólizas
+- `migration_financiacion.sql` — columnas `financiera` y `num_cuotas` en pólizas
+- `migration_tipo_documento.sql` — columna `tipo_documento` en clientes
 
 ---
 
@@ -308,8 +291,10 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 | `migration_tareas_fix.sql` / `_fix2.sql` | Fixes schema tareas | ✅ Aplicado |
 | `fix_data_migration.sql` | Fix datos corruptos post-merge | ✅ Aplicado |
 | `reset_clientes_polizas.sql` | Borrado masivo para reimportación | ✅ Aplicado |
-| `migration_fix_archivos_rls.sql` | Fix RLS en módulo de archivos | ✅ Aplicado |
-| `migration_afiliados.sql` | Tabla poliza_afiliados + grupo_familiar + permisos RBAC | ✅ Aplicado |
+| `migration_fix_archivos_rls.sql` | Fix RLS en tabla archivos y Storage bucket | ✅ Aplicado |
+| `migration_prima_mensual.sql` | Campo `prima_mensual` en pólizas | ✅ Aplicado |
+| `migration_financiacion.sql` | Campos `financiera` y `num_cuotas` en pólizas | ✅ Aplicado |
+| `migration_tipo_documento.sql` | Campo `tipo_documento` en clientes | ✅ Aplicado |
 
 ---
 
@@ -341,12 +326,8 @@ GROQ_API_KEY=...                    ← asistente IA
 
 ## Pendientes y próximos pasos
 
-### 🔴 En debug activo
-- **`fecha_fin` vacía en importación Excel**: El importador crea las pólizas pero la fecha fin llega vacía. Se agregaron logs de debug (`[Import] Headers detectados`, `[Import] Índice columna fecha_fin`). Posibles causas: nombre exacto de columna en el Excel no coincide, o celdas vacías en esa columna. Próximo paso: revisar consola del navegador durante una importación y comparar con el nombre exacto de la columna en el archivo.
-
 ### 🟡 Mejoras pendientes
 - **Paginación en tabla de Pólizas** (ya implementada en Clientes y Cobros, falta aquí)
-- **Certificados PDF de afiliados** — pendiente implementar endpoint `/api/certificados` para generar PDF por empresa y por afiliado individual
 - **Email marketing a clientes** (explícitamente diferido): cuando se retome, Resend está configurado con 100 emails/día → ~500 clientes en 5 días
 
 ### 🟢 Ideas futuras (no priorizadas)
@@ -395,4 +376,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 10 de junio de 2026. Total de commits en `main`: ~95.*
+*Última actualización: 11 de junio de 2026. Total de commits en `main`: ~105.*
