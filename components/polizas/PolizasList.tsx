@@ -36,7 +36,10 @@ const RAMOS_SEGUROS = [
 ]
 
 type Tab = 'polizas' | 'anexos' | 'vinculados' | 'eliminadas' | 'cumplimiento'
-type PolizaConCliente = Poliza & { cliente: { id: string; nombre: string } | null }
+type PolizaConCliente = Poliza & {
+  cliente: { id: string; nombre: string } | null
+  vendedor: { id: string; nombre: string } | null
+}
 
 interface ExtraFilters {
   aseguradora: string
@@ -88,7 +91,7 @@ export default function PolizasList() {
   async function loadPolizas() {
     const { data } = await supabase
       .from('polizas')
-      .select('*, cliente:clientes(id, nombre)')
+      .select('*, cliente:clientes(id, nombre), vendedor:vendedores(id, nombre)')
       .eq('eliminada', false)
       .eq('workspace_id', currentWorkspace?.id || '')
       .order('fecha_fin', { ascending: true, nullsFirst: false })
@@ -98,7 +101,7 @@ export default function PolizasList() {
   async function loadEliminadas() {
     const { data } = await supabase
       .from('polizas')
-      .select('*, cliente:clientes(id, nombre)')
+      .select('*, cliente:clientes(id, nombre), vendedor:vendedores(id, nombre)')
       .eq('eliminada', true)
       .eq('workspace_id', currentWorkspace?.id || '')
       .order('created_at', { ascending: false })
@@ -716,7 +719,7 @@ function FiltroSelect({ label, value, onChange, children }: {
 }
 
 // ── Shared pólizas table ────────────────────────────────────────────────────
-type SortKey = 'tipo_poliza' | 'numero_poliza' | 'aseguradora' | 'ramo' | 'cliente' | 'fecha_fin' | 'estado'
+type SortKey = 'numero_poliza' | 'aseguradora' | 'ramo' | 'cliente' | 'vendedor' | 'fecha_fin' | 'estado'
 
 function sortList(list: PolizaConCliente[], key: SortKey, dir: 'asc' | 'desc') {
   return [...list].sort((a, b) => {
@@ -725,6 +728,9 @@ function sortList(list: PolizaConCliente[], key: SortKey, dir: 'asc' | 'desc') {
     if (key === 'cliente') {
       va = a.cliente?.nombre?.toLowerCase() ?? ''
       vb = b.cliente?.nombre?.toLowerCase() ?? ''
+    } else if (key === 'vendedor') {
+      va = a.vendedor?.nombre?.toLowerCase() ?? ''
+      vb = b.vendedor?.nombre?.toLowerCase() ?? ''
     } else if (key === 'fecha_fin') {
       va = a.fecha_fin ?? ''
       vb = b.fecha_fin ?? ''
@@ -817,12 +823,11 @@ function PolizasTable({
                 onChange={toggleAll}
                 className="rounded border-ink-300 text-primary-500 focus:ring-primary-400 cursor-pointer" />
             </th>
-            <Th col="tipo_poliza"   label="Tipo póliza" />
             <Th col="numero_poliza" label="N° Póliza" />
             <Th col="aseguradora"   label="Aseguradora" />
             <Th col="ramo"          label="Ramo"        className="hidden md:table-cell" />
-            <th className="px-4 py-3 font-medium hidden md:table-cell">Riesgo</th>
             <Th col="cliente"       label="Cliente" />
+            <Th col="vendedor"      label="Vendedor"    className="hidden lg:table-cell" />
             <Th col="fecha_fin"     label="Vencimiento"  className="hidden md:table-cell" />
             <th className="px-4 py-3 font-medium text-right">Acciones</th>
           </tr>
@@ -841,7 +846,6 @@ function PolizasTable({
                   <input type="checkbox" checked={isSel} onChange={() => toggleSelect(p.id)}
                     className="rounded border-ink-300 text-primary-500 focus:ring-primary-400 cursor-pointer" />
                 </td>
-                <td className="px-4 py-3 text-ink-500 text-xs">{p.tipo_poliza || p.ramo || '—'}</td>
                 <td className="px-4 py-3 font-mono text-xs">
                   {p.numero_poliza
                     ? <Link href={`/polizas/${p.id}`} className="text-primary-600 hover:underline">{p.numero_poliza}</Link>
@@ -849,13 +853,13 @@ function PolizasTable({
                 </td>
                 <td className="px-4 py-3 text-ink-600">{p.aseguradora}</td>
                 <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{p.ramo}</td>
-                <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs max-w-[140px]">
-                  <span className="line-clamp-2">{p.riesgo || '—'}</span>
-                </td>
                 <td className="px-4 py-3">
                   {p.client_id
                     ? <Link href={`/clientes/${p.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{p.cliente?.nombre || '—'}</Link>
                     : <span className="text-ink-400">—</span>}
+                </td>
+                <td className="px-4 py-3 hidden lg:table-cell text-ink-400 text-xs">
+                  {p.vendedor?.nombre || '—'}
                 </td>
                 <td className="px-4 py-3 hidden md:table-cell">
                   <div className="flex items-center gap-1.5">

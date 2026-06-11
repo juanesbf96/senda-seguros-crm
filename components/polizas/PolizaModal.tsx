@@ -100,6 +100,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     porcentaje_iva:             (poliza?.porcentaje_iva ?? 19).toString(),
     gastos:                     (poliza?.gastos ?? 0).toString(),
     porcentaje_comision_agencia:poliza?.porcentaje_comision_agencia?.toString() || '',
+    // intermediario
+    intermediario:    poliza?.intermediario    || '',
+    pct_comision_int: poliza?.pct_comision_int?.toString() || '',
     // vendedor
     vendedor_id:                poliza?.vendedor_id                    || '',
     porcentaje_comision_vendedor:poliza?.porcentaje_comision_vendedor?.toString() || '',
@@ -137,6 +140,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const retencionAgencia    = comisionAgencia * 0.10              // retención fija 10%
   const comisionAgenciaNeta = comisionAgencia - retencionAgencia  // neta a recibir
   const totalPrima          = primaNeta + iva + gastos
+  const pctIntermedario     = n(form.pct_comision_int)
+  const comisionIntermedario = comisionAgencia * pctIntermedario / 100
   const pctVendedor         = n(form.porcentaje_comision_vendedor)
   const comisionVendedor    = comisionAgencia * pctVendedor / 100
   // mensual
@@ -240,6 +245,10 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       porcentaje_comision_agencia:  pctAgencia || null,
       comision_agencia:             comisionAgencia || null,
       total_prima:                  totalPrima || null,
+      // intermediario
+      intermediario:         form.intermediario.trim() || null,
+      pct_comision_int:      pctIntermedario || null,
+      comision_intermediario: comisionIntermedario || null,
       // vendedor
       vendedor_id:                  form.vendedor_id || null,
       porcentaje_comision_vendedor: pctVendedor || null,
@@ -571,7 +580,36 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
             )}
           </Section>
 
-          {/* ── 6. Vendedor ── */}
+          {/* ── 6. Intermediario ── */}
+          <Section title="Intermediario">
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="Nombre del intermediario">
+                <input value={form.intermediario} onChange={e => set('intermediario', e.target.value)}
+                  placeholder="Ej: Juan García" className={cls} />
+              </Field>
+              <Field label="% Comisión intermediario">
+                <div className="relative">
+                  <input value={form.pct_comision_int} onChange={e => set('pct_comision_int', e.target.value)}
+                    type="number" min="0" max="100" step="0.01" placeholder="Ej: 20" className={cls + ' pr-7'} />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
+                </div>
+              </Field>
+            </div>
+            {form.intermediario && comisionAgencia > 0 && pctIntermedario > 0 && (
+              <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-sm">
+                <div className="flex justify-between text-amber-700">
+                  <span>Comisión intermediario ({pctIntermedario}% de $ {fmt(comisionAgencia)})</span>
+                  <span className="font-semibold">$ {fmt(comisionIntermedario)}</span>
+                </div>
+                <div className="flex justify-between text-amber-700 font-semibold border-t border-amber-200 pt-1.5 mt-1">
+                  <span>Comisión agencia restante</span>
+                  <span>$ {fmt(comisionAgencia - comisionIntermedario)}</span>
+                </div>
+              </div>
+            )}
+          </Section>
+
+          {/* ── 7. Vendedor ── */}
           <Section title="Vendedor">
             <Field label="Vendedor">
               <select value={form.vendedor_id} onChange={e => onVendedorChange(e.target.value)} className={cls}>
@@ -615,7 +653,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
             )}
           </Section>
 
-          {/* ── 7. Pagos ── */}
+          {/* ── 8. Pagos ── */}
           <Section title="Forma de pago">
             <div className="grid grid-cols-2 gap-4">
               <Field label="Periodicidad">
