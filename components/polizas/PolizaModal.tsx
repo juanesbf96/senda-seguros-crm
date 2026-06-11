@@ -669,20 +669,6 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <Field label="Medio de pago">
-                <select value={form.medio_pago} onChange={e => set('medio_pago', e.target.value)} className={cls}>
-                  <option value="">Seleccionar...</option>
-                  {MEDIOS_PAGO.map(m => <option key={m} value={m}>{m}</option>)}
-                </select>
-              </Field>
-              <Field label="Banco">
-                <select value={form.banco_pago} onChange={e => set('banco_pago', e.target.value)} className={cls}>
-                  <option value="">Seleccionar...</option>
-                  {BANCOS_PAGO.map(b => <option key={b} value={b}>{b}</option>)}
-                </select>
-              </Field>
-            </div>
           </Section>
 
           {/* ── 8. Póliza colectiva ── */}
