@@ -105,6 +105,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     retencion_vendedor:         (poliza?.retencion_vendedor ?? 10).toString(),
     // pagos
     periodicidad_pago: poliza?.periodicidad_pago || '',
+    prima_mensual:     (poliza as any)?.prima_mensual?.toString() || '',
     forma_pago:        poliza?.forma_pago        || '',
     medio_pago:        poliza?.medio_pago        || '',
     banco_pago:        poliza?.banco_pago        || '',
@@ -129,12 +130,16 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const gastos            = n(form.gastos)
   const pctAgencia        = n(form.porcentaje_comision_agencia)
   const iva               = primaNeta * pctIva / 100
-  const comisionAgencia   = primaNeta * pctAgencia / 100        // bruta (sobre prima neta)
-  const retencionAgencia  = comisionAgencia * 0.10              // retención fija 10%
-  const comisionAgenciaNeta = comisionAgencia - retencionAgencia // neta a recibir
-  const totalPrima        = primaNeta + iva + gastos
-  const pctVendedor       = n(form.porcentaje_comision_vendedor)
-  const comisionVendedor  = comisionAgencia * pctVendedor / 100
+  const comisionAgencia     = primaNeta * pctAgencia / 100        // bruta (sobre prima neta)
+  const retencionAgencia    = comisionAgencia * 0.10              // retención fija 10%
+  const comisionAgenciaNeta = comisionAgencia - retencionAgencia  // neta a recibir
+  const totalPrima          = primaNeta + iva + gastos
+  const pctVendedor         = n(form.porcentaje_comision_vendedor)
+  const comisionVendedor    = comisionAgencia * pctVendedor / 100
+  // mensual
+  const primaMensual        = n(form.prima_mensual)
+  const comisionMensualBruta = primaMensual * pctAgencia / 100
+  const comisionMensualNeta  = comisionMensualBruta * 0.90
 
   /* click-outside para cerrar dropdown de cliente */
   useEffect(() => {
@@ -222,6 +227,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       comision_vendedor:            comisionVendedor || null,
       // pagos
       periodicidad_pago: form.periodicidad_pago || null,
+      prima_mensual:     primaMensual || null,
       forma_pago:        form.forma_pago        || null,
       medio_pago:        form.medio_pago        || null,
       banco_pago:        form.banco_pago        || null,
@@ -607,6 +613,37 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 </select>
               </Field>
             </div>
+
+            {form.periodicidad_pago === 'Mensual' && (
+              <>
+                <Field label="Prima mensual antes de IVA (COP)">
+                  <input
+                    type="number" min="0" step="1"
+                    value={form.prima_mensual}
+                    onChange={e => set('prima_mensual', e.target.value)}
+                    placeholder="Ej: 52.367"
+                    className={cls}
+                  />
+                </Field>
+                {primaMensual > 0 && pctAgencia > 0 && (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm space-y-1">
+                    <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1.5">Comisión mensual estimada</p>
+                    <div className="flex justify-between text-ink-500">
+                      <span>Comisión bruta ({pctAgencia}% de $ {fmt(primaMensual)})</span>
+                      <span>$ {fmt(comisionMensualBruta)}</span>
+                    </div>
+                    <div className="flex justify-between text-ink-400">
+                      <span>Retención en la fuente (10%)</span>
+                      <span>- $ {fmt(comisionMensualBruta * 0.10)}</span>
+                    </div>
+                    <div className="flex justify-between text-emerald-700 font-semibold border-t border-emerald-200 pt-1.5 mt-1">
+                      <span>Comisión neta mensual</span>
+                      <span>$ {fmt(comisionMensualNeta)}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <Field label="Medio de pago">
                 <select value={form.medio_pago} onChange={e => set('medio_pago', e.target.value)} className={cls}>
