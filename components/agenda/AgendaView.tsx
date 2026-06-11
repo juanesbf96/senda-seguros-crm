@@ -58,7 +58,7 @@ export default function AgendaView() {
     const rangeStart = subMonths(startOfMonth(date), 1)
     const rangeEnd   = addMonths(endOfMonth(date), 1)
 
-    const [propiosRes, tareasRes, polizasRes, cobrosRes, prospectosRes] = await Promise.all([
+    const [propiosRes, tareasRes, cobrosRes, prospectosRes] = await Promise.all([
       supabase.from('agenda_eventos')
         .select('*, cliente:clientes(id,nombre), poliza:polizas(id,numero_poliza,aseguradora), prospecto:prospectos(id,nombre)')
         .eq('workspace_id', wid)
@@ -72,14 +72,6 @@ export default function AgendaView() {
         .not('fecha_vencimiento', 'is', null)
         .gte('fecha_vencimiento', rangeStart.toISOString().slice(0,10))
         .lte('fecha_vencimiento', rangeEnd.toISOString().slice(0,10)),
-
-      supabase.from('polizas')
-        .select('id, numero_poliza, aseguradora, ramo, fecha_fin')
-        .eq('workspace_id', wid)
-        .eq('eliminada', false)
-        .not('fecha_fin', 'is', null)
-        .gte('fecha_fin', rangeStart.toISOString().slice(0,10))
-        .lte('fecha_fin', rangeEnd.toISOString().slice(0,10)),
 
       supabase.from('cobros')
         .select('id, concepto, valor, fecha_vencimiento, estado')
@@ -118,17 +110,6 @@ export default function AgendaView() {
         title: `✓ ${t.titulo}`,
         start: d, end: d, allDay: true,
         resource: { ...CRM_COLORS.tarea, tipo: 'tarea', origen: 'tarea', link: '/tareas' },
-      })
-    })
-
-    // Vencimientos de pólizas
-    ;(polizasRes.data || []).forEach((p: any) => {
-      const d = new Date(p.fecha_fin)
-      calEvents.push({
-        id: `poliza-${p.id}`,
-        title: `⚠ ${p.aseguradora} · ${p.ramo}`,
-        start: d, end: d, allDay: true,
-        resource: { ...CRM_COLORS.renovacion, tipo: 'renovacion', origen: 'renovacion', link: '/polizas' },
       })
     })
 
@@ -219,7 +200,6 @@ export default function AgendaView() {
             {[
               { label: 'Mis eventos', color: '#10b981' },
               { label: 'Tareas',      color: CRM_COLORS.tarea.color },
-              { label: 'Venc. pólizas', color: CRM_COLORS.renovacion.color },
               { label: 'Cobros',      color: CRM_COLORS.cobro.color },
               { label: 'Prospectos',  color: CRM_COLORS.prospecto.color },
             ].map(l => (

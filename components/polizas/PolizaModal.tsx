@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, EstadoPoliza, Cliente, Vendedor } from '@/types'
 import { X, Calculator } from 'lucide-react'
@@ -59,6 +59,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const { currentWorkspace } = useWorkspace()
   const [clientes,  setClientes]  = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [vendedores, setVendedores] = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
+  const [clienteSearch,   setClienteSearch]   = useState('')
+  const [showClienteList, setShowClienteList] = useState(false)
+  const clienteRef = useRef<HTMLDivElement>(null)
 
   const defaultRamo = isCumplimiento ? 'Fianzas' : ''
   const knownAseguradoras = ASEGURADORAS.filter(a => a !== 'Otro')
@@ -128,11 +131,28 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const pctVendedor    = n(form.porcentaje_comision_vendedor)
   const comisionVendedor = comisionAgencia * pctVendedor / 100
 
+  /* click-outside para cerrar dropdown de cliente */
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (clienteRef.current && !clienteRef.current.contains(e.target as Node)) {
+        setShowClienteList(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
   /* load */
   useEffect(() => {
     if (!clientId) {
       supabase.from('clientes').select('id, nombre').order('nombre')
-        .then(({ data }) => setClientes(data || []))
+        .then(({ data }) => {
+          setClientes(data || [])
+          if (poliza?.client_id) {
+            const found = (data || []).find(c => c.id === poliza.client_id)
+            if (found) setClienteSearch(found.nombre)
+          }
+        })
     }
     supabase.from('vendedores').select('id, nombre, comisiones_por_anio').eq('activo', true).order('nombre')
       .then(({ data }) => setVendedores((data || []) as Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]))
@@ -238,10 +258,47 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
           <Section title="Información básica">
             {!clientId && (
               <Field label="Cliente *">
-                <select value={form.client_id} onChange={e => set('client_id', e.target.value)} className={cls}>
-                  <option value="">Seleccionar cliente...</option>
-                  {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-                </select>
+                <div ref={clienteRef} className="relative">
+                  <div className="relative">
+                    <input
+                      value={clienteSearch}
+                      onChange={e => { setClienteSearch(e.target.value); setShowClienteList(true) }}
+                      onFocus={() => setShowClienteList(true)}
+                      placeholder="Buscar cliente..."
+                      className={cls}
+                    />
+                    {clienteSearch && (
+                      <button
+                        type="button"
+                        onMouseDown={e => { e.preventDefault(); setClienteSearch(''); set('client_id', ''); setShowClienteList(false) }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-ink-400 hover:text-ink-600"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {showClienteList && (
+                    <div className="absolute z-20 w-full bg-white border border-ink-200 rounded-lg shadow-lg mt-1 max-h-48 overflow-y-auto">
+                      {clientes
+                        .filter(c => c.nombre.toLowerCase().includes(clienteSearch.toLowerCase()))
+                        .slice(0, 20)
+                        .map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onMouseDown={() => { set('client_id', c.id); setClienteSearch(c.nombre); setShowClienteList(false) }}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                          >
+                            {c.nombre}
+                          </button>
+                        ))
+                      }
+                      {clientes.filter(c => c.nombre.toLowerCase().includes(clienteSearch.toLowerCase())).length === 0 && (
+                        <p className="px-3 py-2 text-sm text-ink-400">Sin resultados</p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </Field>
             )}
 
