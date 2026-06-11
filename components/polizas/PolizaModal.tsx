@@ -476,11 +476,6 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 onChange={v => set('beneficiario_oneroso', v)}
                 label="Endoso oneroso"
               />
-              <CheckToggle
-                checked={form.beneficiario_en_remision}
-                onChange={v => set('beneficiario_en_remision', v)}
-                label="En remisión"
-              />
             </div>
           </Section>
 

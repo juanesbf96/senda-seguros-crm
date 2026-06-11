@@ -38,7 +38,6 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/polizas',      label: 'Pólizas',      icon: FileText,      perm: 'polizas_ver' },
       { href: '/solicitudes',  label: 'Solicitudes',  icon: ClipboardList, perm: 'solicitudes_ver' },
-      { href: '/remisiones',   label: 'Remisiones',   icon: Send },
       { href: '/renovaciones', label: 'Renovaciones', icon: Bell,          perm: 'polizas_ver' },
     ],
   },
