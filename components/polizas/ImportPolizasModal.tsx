@@ -287,6 +287,33 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
 async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResult> {
   const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [] }
 
+  // 0. Pre-cargar vendedores del workspace → cache nombre normalizado → { id, pct }
+  type VendedorCache = { id: string; pct: number | null }
+  const vendedoresMap = new Map<string, VendedorCache>()
+  const { data: vData } = await supabase
+    .from('vendedores')
+    .select('id, nombre, comisiones_por_anio')
+    .eq('activo', true)
+  if (vData) {
+    for (const v of vData) {
+      const key = norm(v.nombre ?? '')
+      const pct = (v.comisiones_por_anio as { porcentaje?: number }[] | null)?.[0]?.porcentaje ?? null
+      vendedoresMap.set(key, { id: v.id, pct })
+    }
+  }
+
+  function matchVendedor(asesorNombre: string): VendedorCache | null {
+    if (!asesorNombre) return null
+    const k = norm(asesorNombre)
+    // 1. Coincidencia exacta
+    if (vendedoresMap.has(k)) return vendedoresMap.get(k)!
+    // 2. El nombre del Excel contiene el nombre del vendedor o viceversa
+    for (const [key, v] of vendedoresMap) {
+      if (k.includes(key) || key.includes(k)) return v
+    }
+    return null
+  }
+
   // Cache de cedula → cliente_id para no re-buscar
   const clienteCache = new Map<string, string>()
 
@@ -356,6 +383,21 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
       if (r.fecha_fin && r.fecha_fin < hoy) estadoPoliza = 'vencida'
       else if (!r.fecha_inicio && !r.fecha_fin) estadoPoliza = 'pendiente'
 
+      // Resolver vendedor por nombre
+      const vendedorMatch = matchVendedor(r.asesor)
+      const vendedorId    = vendedorMatch?.id ?? null
+      const pctVendedor   = r.pct_comision_asesor ?? vendedorMatch?.pct ?? null
+
+      // Auto-calcular comisión agencia si no viene del Excel
+      const primaNeta      = r.prima_neta ?? 0
+      const pctAgencia     = r.pct_comision_negocio ?? null
+      const comisionAgencia = r.comision_agencia
+        ?? (primaNeta && pctAgencia ? Math.round(primaNeta * pctAgencia / 100 * 100) / 100 : null)
+
+      // Auto-calcular comisión vendedor si no viene del Excel
+      const comisionVendedor = r.comision_asesor
+        ?? (comisionAgencia && pctVendedor ? Math.round(comisionAgencia * pctVendedor / 100 * 100) / 100 : null)
+
       const polizaData: Record<string, unknown> = {
         workspace_id:               wsId,
         client_id:                  clienteId,
@@ -377,19 +419,21 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
         aseguradora_anterior:       r.aseguradora_anterior || null,
         // Financiero
         prima_neta:                 r.prima_neta,
+        prima:                      r.prima_neta,
         prima_periodica:            r.prima_periodica,
-        porcentaje_comision_agencia: r.pct_comision_negocio,
-        comision_agencia:           r.comision_agencia,
+        porcentaje_comision_agencia: pctAgencia,
+        comision_agencia:           comisionAgencia,
         comision_periodica:         r.comision_periodica,
         retencion_agencia:          r.retencion_agencia,
         // Intermediario
         intermediario:              r.intermediario || null,
         pct_comision_int:           r.pct_comision_int,
         comision_intermediario:     r.comision_intermediario,
-        // Asesor
-        porcentaje_comision_vendedor: r.pct_comision_asesor,
-        retencion_vendedor:         r.retencion_asesor,
-        comision_vendedor:          r.comision_asesor,
+        // Vendedor (resuelto por nombre)
+        vendedor_id:                vendedorId,
+        porcentaje_comision_vendedor: pctVendedor,
+        retencion_vendedor:         r.retencion_asesor ?? 10,
+        comision_vendedor:          comisionVendedor,
         // Referido
         referido:                   r.referido || null,
         pct_comision_referido:      r.pct_comision_referido,
