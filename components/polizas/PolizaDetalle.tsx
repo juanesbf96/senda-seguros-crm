@@ -59,10 +59,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
 
 
-type PolizaConCliente = Poliza & {
-  cliente: Cliente | null
-  vendedor: { id: string; nombre: string } | null
-}
+type PolizaConCliente = Poliza & { cliente: Cliente | null }
 
 const ESTADO_COLORS = {
   activa:    'bg-primary-100 text-primary-700',
@@ -100,21 +97,27 @@ function Section({ title, icon, children }: { title: string; icon: React.ReactNo
 export default function PolizaDetalle({ id }: { id: string }) {
   const { currentWorkspace } = useWorkspace()
 
-  const [poliza,   setPoliza]   = useState<PolizaConCliente | null>(null)
-  const [loading,  setLoading]  = useState(true)
-  const [showEdit, setShowEdit] = useState(false)
-  const [archivos, setArchivos] = useState<Archivo[]>([])
+  const [poliza,        setPoliza]        = useState<PolizaConCliente | null>(null)
+  const [loading,       setLoading]       = useState(true)
+  const [showEdit,      setShowEdit]      = useState(false)
+  const [archivos,      setArchivos]      = useState<Archivo[]>([])
+  const [vendedorNombre, setVendedorNombre] = useState<string | null>(null)
 
   async function load() {
     if (!currentWorkspace) return
     const { data } = await supabase
       .from('polizas')
-      .select('*, cliente:clientes(*), vendedor:vendedores(id, nombre)')
+      .select('*, cliente:clientes(*)')
       .eq('id', id)
       .eq('workspace_id', currentWorkspace.id)
       .maybeSingle()
-    setPoliza(data as PolizaConCliente | null)
+    const p = data as PolizaConCliente | null
+    setPoliza(p)
     setLoading(false)
+    if (p?.vendedor_id) {
+      supabase.from('vendedores').select('nombre').eq('id', p.vendedor_id).maybeSingle()
+        .then(({ data: v }) => setVendedorNombre(v?.nombre ?? null))
+    }
   }
 
   async function loadArchivos() {
@@ -261,7 +264,7 @@ export default function PolizaDetalle({ id }: { id: string }) {
       </Section>
 
       {/* ── Vendedor ── */}
-      {(poliza.vendedor || poliza.vendedor_id || poliza.comision_vendedor) && (
+      {(poliza.vendedor_id || poliza.comision_vendedor) && (
         <div className="bg-white rounded-xl border border-ink-200 p-5">
           <div className="flex items-center gap-2 mb-4">
             <span className="text-primary-500"><User className="w-4 h-4" /></span>
@@ -270,7 +273,7 @@ export default function PolizaDetalle({ id }: { id: string }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <p className="text-xs text-ink-400 mb-0.5">Vendedor</p>
-              <p className="text-sm font-medium text-ink-700">{poliza.vendedor?.nombre || '—'}</p>
+              <p className="text-sm font-medium text-ink-700">{vendedorNombre || '—'}</p>
             </div>
             <Field label="% Comisión"        value={poliza.porcentaje_comision_vendedor != null ? `${poliza.porcentaje_comision_vendedor}%` : null} />
             <Field label="Comisión bruta"    value={poliza.comision_vendedor} accent />
