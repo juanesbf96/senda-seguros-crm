@@ -287,7 +287,7 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
 async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResult> {
   const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [] }
 
-  // 0. Pre-cargar vendedores del workspace → cache nombre normalizado → { id, pct }
+  // 0a. Pre-cargar vendedores del workspace → cache nombre normalizado → { id, pct }
   type VendedorCache = { id: string; pct: number | null }
   const vendedoresMap = new Map<string, VendedorCache>()
   const { data: vData } = await supabase
@@ -300,6 +300,32 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
       const pct = (v.comisiones_por_anio as { porcentaje?: number }[] | null)?.[0]?.porcentaje ?? null
       vendedoresMap.set(key, { id: v.id, pct })
     }
+  }
+
+  // 0b. Pre-cargar tarifas de comisión desde configuracion
+  interface TarifaRow { id: string; codigo: string; ramo: string; aseguradora: string; porcentaje: number }
+  const tarifasComision: TarifaRow[] = []
+  const { data: cfgData } = await supabase
+    .from('configuracion')
+    .select('valor')
+    .eq('workspace_id', wsId)
+    .eq('clave', 'comisiones_tarifas')
+    .maybeSingle()
+  if (cfgData?.valor) {
+    try {
+      const parsed: TarifaRow[] = JSON.parse(cfgData.valor)
+      tarifasComision.push(...parsed.filter(t => typeof t.porcentaje === 'number'))
+    } catch { /* ignore */ }
+  }
+
+  function matchTarifa(ramo: string, aseguradora: string): number | null {
+    // Coincidencia exacta ramo + aseguradora
+    const exact = tarifasComision.find(t => t.ramo === ramo && t.aseguradora === aseguradora)
+    if (exact) return exact.porcentaje
+    // Coincidencia solo por ramo
+    const byRamo = tarifasComision.find(t => t.ramo === ramo)
+    if (byRamo) return byRamo.porcentaje
+    return null
   }
 
   function matchVendedor(asesorNombre: string): VendedorCache | null {
@@ -388,9 +414,9 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
       const vendedorId    = vendedorMatch?.id ?? null
       const pctVendedor   = r.pct_comision_asesor ?? vendedorMatch?.pct ?? null
 
-      // Auto-calcular comisión agencia si no viene del Excel
+      // Auto-calcular comisión agencia si no viene del Excel — fallback a tarifas configuradas
       const primaNeta      = r.prima_neta ?? 0
-      const pctAgencia     = r.pct_comision_negocio ?? null
+      const pctAgencia     = r.pct_comision_negocio ?? matchTarifa(r.ramo, r.aseguradora) ?? null
       const comisionAgencia = r.comision_agencia
         ?? (primaNeta && pctAgencia ? Math.round(primaNeta * pctAgencia / 100 * 100) / 100 : null)
 

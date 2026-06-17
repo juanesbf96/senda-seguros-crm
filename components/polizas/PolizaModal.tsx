@@ -39,6 +39,14 @@ const BANCOS_PAGO    = [
 /*  Types / helpers                                           */
 /* ────────────────────────────────────────────────────────── */
 
+interface TarifaComision {
+  id: string
+  codigo: string
+  ramo: string
+  aseguradora: string
+  porcentaje: number
+}
+
 type TipoModalidad = 'individual' | 'colectiva' | 'agrupadora'
 
 function n(v: string) { return v ? parseFloat(v.replace(/[^0-9.-]/g, '')) || 0 : 0 }
@@ -58,9 +66,14 @@ interface Props {
 
 export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose, onSaved }: Props) {
   const { currentWorkspace } = useWorkspace()
-  const [clientes,     setClientes]     = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
-  const [vendedores,   setVendedores]   = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
-  const [aseguradoras, setAseguradoras] = useState<string[]>(ASEGURADORAS_DEFAULT)
+  const [clientes,        setClientes]        = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
+  const [vendedores,      setVendedores]      = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
+  const [aseguradoras,    setAseguradoras]    = useState<string[]>(ASEGURADORAS_DEFAULT)
+  const [tarifas,         setTarifas]         = useState<TarifaComision[]>([])
+  const [showNuevaTarifa, setShowNuevaTarifa] = useState(false)
+  const [nuevaTarifaForm, setNuevaTarifaForm] = useState<Omit<TarifaComision,'id'>>({ codigo:'', ramo:'', aseguradora:'', porcentaje:0 })
+  const [nuevaTarifaErr,  setNuevaTarifaErr]  = useState('')
+  const [savingTarifa,    setSavingTarifa]    = useState(false)
   const [clienteSearch,   setClienteSearch]   = useState('')
   const [showClienteList, setShowClienteList] = useState(false)
   const clienteRef = useRef<HTMLDivElement>(null)
@@ -100,6 +113,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     porcentaje_iva:             (poliza?.porcentaje_iva ?? 19).toString(),
     gastos:                     (poliza?.gastos ?? 0).toString(),
     porcentaje_comision_agencia:poliza?.porcentaje_comision_agencia?.toString() || '',
+    tarifa_codigo:              '',
     // intermediario
     intermediario:    poliza?.intermediario    || '',
     pct_comision_int: poliza?.pct_comision_int?.toString() || '',
@@ -177,16 +191,21 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
     if (currentWorkspace) {
       supabase.from('configuracion')
-        .select('valor')
+        .select('clave, valor')
         .eq('workspace_id', currentWorkspace.id)
-        .eq('clave', 'aseguradoras_lista')
-        .maybeSingle()
+        .in('clave', ['aseguradoras_lista', 'comisiones_tarifas'])
         .then(({ data }) => {
-          if (data?.valor) {
-            const lista = data.valor.split(',').map((s: string) => s.trim()).filter(Boolean)
-            if (lista.length > 0) {
-              setAseguradoras(lista)
-              if (poliza?.aseguradora) setAseguradoraOtro(!lista.includes(poliza.aseguradora))
+          if (!data) return
+          for (const row of data) {
+            if (row.clave === 'aseguradoras_lista' && row.valor) {
+              const lista = row.valor.split(',').map((s: string) => s.trim()).filter(Boolean)
+              if (lista.length > 0) {
+                setAseguradoras(lista)
+                if (poliza?.aseguradora) setAseguradoraOtro(!lista.includes(poliza.aseguradora))
+              }
+            }
+            if (row.clave === 'comisiones_tarifas' && row.valor) {
+              try { setTarifas(JSON.parse(row.valor)) } catch { /* ignore */ }
             }
           }
         })
@@ -200,6 +219,56 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       const pct = v?.comisiones_por_anio?.[0]?.porcentaje?.toString() || ''
       return { ...f, vendedor_id: id, porcentaje_comision_vendedor: pct }
     })
+  }
+
+  /* auto-select tarifa when ramo changes (primera coincidencia por ramo) */
+  function onRamoChange(ramo: string) {
+    setForm(f => {
+      const match = tarifas.find(t => t.ramo === ramo)
+      return {
+        ...f,
+        ramo,
+        tarifa_codigo: match?.codigo || '',
+        porcentaje_comision_agencia: match ? match.porcentaje.toString() : f.porcentaje_comision_agencia,
+      }
+    })
+  }
+
+  /* seleccionar tarifa por código → rellena % */
+  function onTarifaChange(codigo: string) {
+    const tarifa = tarifas.find(t => t.codigo === codigo)
+    setForm(f => ({
+      ...f,
+      tarifa_codigo: codigo,
+      porcentaje_comision_agencia: tarifa ? tarifa.porcentaje.toString() : f.porcentaje_comision_agencia,
+    }))
+  }
+
+  /* guardar nueva tarifa desde el modal inline */
+  async function saveNuevaTarifa() {
+    const { codigo, ramo, aseguradora, porcentaje } = nuevaTarifaForm
+    if (!codigo.trim() || !ramo || !aseguradora) { setNuevaTarifaErr('Completa todos los campos'); return }
+    if (codigo.length > 9) { setNuevaTarifaErr('El código no puede tener más de 9 caracteres'); return }
+    if (tarifas.some(t => t.codigo === codigo.trim().toUpperCase())) { setNuevaTarifaErr('Ya existe una tarifa con ese código'); return }
+    if (!currentWorkspace) return
+
+    setSavingTarifa(true)
+    const nueva: TarifaComision = { id: crypto.randomUUID(), codigo: codigo.trim().toUpperCase(), ramo, aseguradora, porcentaje }
+    const updated = [...tarifas, nueva]
+
+    await supabase.from('configuracion').upsert({
+      clave: 'comisiones_tarifas',
+      valor: JSON.stringify(updated),
+      workspace_id: currentWorkspace.id,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'clave' })
+
+    setTarifas(updated)
+    setForm(f => ({ ...f, tarifa_codigo: nueva.codigo, porcentaje_comision_agencia: nueva.porcentaje.toString() }))
+    setShowNuevaTarifa(false)
+    setNuevaTarifaForm({ codigo:'', ramo:'', aseguradora:'', porcentaje:0 })
+    setNuevaTarifaErr('')
+    setSavingTarifa(false)
   }
 
   function set(field: string, val: string | boolean) {
@@ -392,7 +461,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 )}
               </Field>
               <Field label="Ramo *">
-                <select value={form.ramo} onChange={e => set('ramo', e.target.value)} className={cls}>
+                <select value={form.ramo} onChange={e => onRamoChange(e.target.value)} className={cls}>
                   <option value="">Seleccionar...</option>
                   <optgroup label="Seguros">
                     {RAMOS_SEGUROS.map(r => <option key={r} value={r}>{r}</option>)}
@@ -534,6 +603,36 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 </div>
               </Field>
             </div>
+
+            {/* Tarifa de comisión */}
+            <Field label="Tarifa de comisión">
+              <div className="flex gap-2">
+                <select
+                  value={form.tarifa_codigo}
+                  onChange={e => onTarifaChange(e.target.value)}
+                  className={cls + ' flex-1'}
+                >
+                  <option value="">— Sin tarifa / ingresar % manual —</option>
+                  {tarifas.map(t => (
+                    <option key={t.id} value={t.codigo}>
+                      {t.codigo} · {t.ramo} · {t.aseguradora} · {t.porcentaje}%
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => { setShowNuevaTarifa(true); setNuevaTarifaErr('') }}
+                  className="flex-shrink-0 px-3 py-2 text-xs font-medium border border-primary-300 text-primary-600 bg-primary-50 hover:bg-primary-100 rounded-lg transition-colors whitespace-nowrap"
+                >
+                  + Crear tarifa
+                </button>
+              </div>
+              {form.tarifa_codigo && (
+                <p className="text-xs text-emerald-600 mt-1">
+                  Tarifa <span className="font-mono font-bold">{form.tarifa_codigo}</span> — % auto-aplicado
+                </p>
+              )}
+            </Field>
 
             {/* auto-calc summary */}
             {primaNeta > 0 && (
@@ -770,6 +869,82 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
           </button>
         </div>
       </div>
+
+      {/* ── Mini-modal crear tarifa ── */}
+      {showNuevaTarifa && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
+            <h3 className="text-base font-semibold text-ink-700 mb-4">Nueva tarifa de comisión</h3>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-ink-500 mb-1">Código <span className="text-error">*</span></label>
+                  <input
+                    value={nuevaTarifaForm.codigo}
+                    onChange={e => setNuevaTarifaForm(f => ({ ...f, codigo: e.target.value.slice(0,9).toUpperCase() }))}
+                    placeholder="Ej: SURA-VIDA"
+                    maxLength={9}
+                    className={cls}
+                  />
+                  <p className="text-xs text-ink-400 mt-0.5">{nuevaTarifaForm.codigo.length}/9 chars</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ink-500 mb-1">% Comisión <span className="text-error">*</span></label>
+                  <div className="relative">
+                    <input
+                      type="number" min="0" max="100" step="0.5"
+                      value={nuevaTarifaForm.porcentaje || ''}
+                      onChange={e => setNuevaTarifaForm(f => ({ ...f, porcentaje: parseFloat(e.target.value) || 0 }))}
+                      placeholder="12.5"
+                      className={cls + ' pr-6'}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-ink-500 mb-1">Ramo <span className="text-error">*</span></label>
+                <select
+                  value={nuevaTarifaForm.ramo}
+                  onChange={e => setNuevaTarifaForm(f => ({ ...f, ramo: e.target.value }))}
+                  className={cls}
+                >
+                  <option value="">Seleccionar ramo...</option>
+                  {[...RAMOS_SEGUROS, ...RAMOS_CUMPLIMIENTO].map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-ink-500 mb-1">Aseguradora <span className="text-error">*</span></label>
+                <select
+                  value={nuevaTarifaForm.aseguradora}
+                  onChange={e => setNuevaTarifaForm(f => ({ ...f, aseguradora: e.target.value }))}
+                  className={cls}
+                >
+                  <option value="">Seleccionar aseguradora...</option>
+                  {aseguradoras.map(a => <option key={a} value={a}>{a}</option>)}
+                  {!aseguradoras.includes('Otra') && <option value="Otra">Otra</option>}
+                </select>
+              </div>
+              {nuevaTarifaErr && <p className="text-xs text-error">{nuevaTarifaErr}</p>}
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => { setShowNuevaTarifa(false); setNuevaTarifaErr('') }}
+                className="flex-1 px-4 py-2 text-sm border border-ink-200 text-ink-500 rounded-lg hover:bg-cream-100"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveNuevaTarifa}
+                disabled={savingTarifa || !nuevaTarifaForm.codigo || !nuevaTarifaForm.ramo || !nuevaTarifaForm.aseguradora}
+                className="flex-1 px-4 py-2 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 font-medium"
+              >
+                {savingTarifa ? 'Guardando...' : 'Crear y seleccionar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

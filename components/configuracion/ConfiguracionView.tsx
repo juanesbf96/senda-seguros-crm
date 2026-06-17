@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users, ShieldCheck, Lock } from 'lucide-react'
+import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users, ShieldCheck, Lock, Percent } from 'lucide-react'
 import { ConfigItem } from '@/types'
 import WorkspaceMembersView from '@/components/workspace/WorkspaceMembersView'
 import PermisosRolesView from '@/components/configuracion/PermisosRolesView'
@@ -272,6 +272,246 @@ function CategoriasEditor({ value, onChange }: { value: string; onChange: (v: st
   )
 }
 
+/* ── Tarifas de comisión ────────────────────────────────── */
+interface TarifaComision {
+  id: string
+  codigo: string       // máx 9 caracteres
+  ramo: string
+  aseguradora: string
+  porcentaje: number
+}
+
+const RAMOS_TARIFAS = [
+  'Vida Individual','Vida Grupo','SOAT','Todo Riesgo Vehículo','Responsabilidad Civil',
+  'Hogar','Incendio','Empresarial','Salud','ARL','Transportes','Agrícola','Otros',
+  'Fianzas','Cumplimiento',
+]
+const ASEGURADORAS_TARIFAS = [
+  'Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria',
+  'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado',
+]
+
+const TARIFA_BLANK: Omit<TarifaComision, 'id'> = { codigo: '', ramo: '', aseguradora: '', porcentaje: 0 }
+
+function TarifasEditor({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [tarifas, setTarifas] = useState<TarifaComision[]>([])
+  const [editId,  setEditId]  = useState<string | null>(null)
+  const [editData, setEditData] = useState<Omit<TarifaComision, 'id'>>(TARIFA_BLANK)
+  const [newForm,  setNewForm]  = useState<Omit<TarifaComision, 'id'>>(TARIFA_BLANK)
+  const [adding,   setAdding]   = useState(false)
+  const [codigoError, setCodigoError] = useState('')
+
+  useEffect(() => {
+    try { setTarifas(JSON.parse(value || '[]')) } catch { setTarifas([]) }
+  }, [value])
+
+  function sync(next: TarifaComision[]) {
+    setTarifas(next)
+    onChange(JSON.stringify(next))
+  }
+
+  function validateCodigo(codigo: string, excludeId?: string): string {
+    if (!codigo.trim()) return 'El código es obligatorio'
+    if (codigo.length > 9) return 'Máximo 9 caracteres'
+    if (tarifas.some(t => t.codigo === codigo.trim() && t.id !== excludeId))
+      return 'Ya existe una tarifa con ese código'
+    return ''
+  }
+
+  function addTarifa() {
+    const err = validateCodigo(newForm.codigo)
+    if (err) { setCodigoError(err); return }
+    if (!newForm.ramo || !newForm.aseguradora) return
+    const tarifa: TarifaComision = { id: crypto.randomUUID(), ...newForm, codigo: newForm.codigo.trim().toUpperCase() }
+    sync([...tarifas, tarifa])
+    setNewForm(TARIFA_BLANK)
+    setAdding(false)
+    setCodigoError('')
+  }
+
+  function startEdit(t: TarifaComision) {
+    setEditId(t.id)
+    setEditData({ codigo: t.codigo, ramo: t.ramo, aseguradora: t.aseguradora, porcentaje: t.porcentaje })
+    setCodigoError('')
+  }
+
+  function saveEdit() {
+    const err = validateCodigo(editData.codigo, editId!)
+    if (err) { setCodigoError(err); return }
+    if (!editData.ramo || !editData.aseguradora || !editId) return
+    sync(tarifas.map(t => t.id === editId
+      ? { ...t, ...editData, codigo: editData.codigo.trim().toUpperCase() }
+      : t
+    ))
+    setEditId(null)
+    setCodigoError('')
+  }
+
+  function removeTarifa(id: string) {
+    if (!confirm('¿Eliminar esta tarifa? Las pólizas existentes no se verán afectadas.')) return
+    sync(tarifas.filter(t => t.id !== id))
+  }
+
+  const fieldCls = "w-full border border-ink-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 bg-white"
+
+  function TarifaForm({ data, setData, onSave, onCancel, saveLabel }: {
+    data: Omit<TarifaComision, 'id'>
+    setData: (d: Omit<TarifaComision, 'id'>) => void
+    onSave: () => void
+    onCancel: () => void
+    saveLabel: string
+  }) {
+    return (
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Código <span className="text-error">*</span></label>
+            <input
+              value={data.codigo}
+              onChange={e => { setData({ ...data, codigo: e.target.value.slice(0, 9) }); setCodigoError('') }}
+              placeholder="Ej: SURA-VIDA"
+              maxLength={9}
+              className={fieldCls + (codigoError ? ' border-error' : '')}
+            />
+            {codigoError && <p className="text-xs text-error mt-1">{codigoError}</p>}
+            <p className="text-xs text-ink-400 mt-1">{data.codigo.length}/9 caracteres</p>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink-500 mb-1">% Comisión <span className="text-error">*</span></label>
+            <div className="relative">
+              <input
+                type="number" min="0" max="100" step="0.5"
+                value={data.porcentaje || ''}
+                onChange={e => setData({ ...data, porcentaje: parseFloat(e.target.value) || 0 })}
+                placeholder="Ej: 12.5"
+                className={fieldCls + ' pr-6'}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-ink-400">%</span>
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Ramo <span className="text-error">*</span></label>
+            <select value={data.ramo} onChange={e => setData({ ...data, ramo: e.target.value })} className={fieldCls}>
+              <option value="">Seleccionar ramo...</option>
+              {RAMOS_TARIFAS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-ink-500 mb-1">Aseguradora <span className="text-error">*</span></label>
+            <select value={data.aseguradora} onChange={e => setData({ ...data, aseguradora: e.target.value })} className={fieldCls}>
+              <option value="">Seleccionar aseguradora...</option>
+              {ASEGURADORAS_TARIFAS.map(a => <option key={a} value={a}>{a}</option>)}
+              <option value="Otra">Otra</option>
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-2 justify-end pt-1">
+          <button onClick={onCancel}
+            className="px-3 py-1.5 text-sm border border-ink-200 text-ink-500 rounded-lg hover:bg-cream-100">
+            Cancelar
+          </button>
+          <button onClick={onSave} disabled={!data.ramo || !data.aseguradora || !data.codigo.trim()}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50">
+            <Check className="w-3.5 h-3.5" /> {saveLabel}
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-ink-400">{tarifas.length} tarifa{tarifas.length !== 1 ? 's' : ''} configurada{tarifas.length !== 1 ? 's' : ''}</p>
+        {!adding && (
+          <button onClick={() => { setAdding(true); setNewForm(TARIFA_BLANK); setCodigoError('') }}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-500 text-white rounded-lg hover:bg-primary-700">
+            <Plus className="w-3.5 h-3.5" /> Nueva tarifa
+          </button>
+        )}
+      </div>
+
+      {/* New form */}
+      {adding && (
+        <div className="bg-primary-50 border border-primary-200 rounded-xl p-4">
+          <p className="text-sm font-semibold text-primary-800 mb-3">Nueva tarifa</p>
+          <TarifaForm
+            data={newForm} setData={setNewForm}
+            onSave={addTarifa} onCancel={() => { setAdding(false); setCodigoError('') }}
+            saveLabel="Crear tarifa"
+          />
+        </div>
+      )}
+
+      {/* Table */}
+      {tarifas.length > 0 && (
+        <div className="bg-white border border-ink-200 rounded-xl overflow-hidden">
+          {/* Header row */}
+          <div className="grid grid-cols-[110px_1fr_1fr_72px_72px] gap-3 px-4 py-2.5 bg-cream-100 border-b border-ink-200">
+            <span className="text-xs font-semibold text-ink-500 uppercase tracking-wide">Código</span>
+            <span className="text-xs font-semibold text-ink-500 uppercase tracking-wide">Ramo</span>
+            <span className="text-xs font-semibold text-ink-500 uppercase tracking-wide">Aseguradora</span>
+            <span className="text-xs font-semibold text-ink-500 uppercase tracking-wide text-right">%</span>
+            <span />
+          </div>
+
+          {tarifas.map(t => (
+            <div key={t.id} className="border-b border-ink-100 last:border-0">
+              {editId === t.id ? (
+                <div className="p-4 bg-amber-50 border-l-4 border-amber-400">
+                  <TarifaForm
+                    data={editData} setData={setEditData}
+                    onSave={saveEdit} onCancel={() => { setEditId(null); setCodigoError('') }}
+                    saveLabel="Guardar"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-[110px_1fr_1fr_72px_72px] gap-3 items-center px-4 py-3 group hover:bg-cream-50">
+                  <span className="inline-flex">
+                    <span className="bg-primary-100 text-primary-700 text-xs font-bold px-2 py-0.5 rounded-md font-mono tracking-wide">
+                      {t.codigo}
+                    </span>
+                  </span>
+                  <span className="text-sm text-ink-700 truncate">{t.ramo}</span>
+                  <span className="text-sm text-ink-600 truncate">{t.aseguradora}</span>
+                  <span className="text-sm font-semibold text-emerald-600 text-right">{t.porcentaje}%</span>
+                  <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => startEdit(t)}
+                      className="p-1.5 text-ink-400 hover:text-ink-600 hover:bg-cream-200 rounded-lg">
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={() => removeTarifa(t.id)}
+                      className="p-1.5 text-ink-400 hover:text-error hover:bg-error-soft rounded-lg">
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {tarifas.length === 0 && !adding && (
+        <div className="text-center py-10 bg-cream-100 rounded-xl border border-dashed border-ink-200">
+          <Percent className="w-8 h-8 mx-auto mb-2 text-ink-300" />
+          <p className="text-sm text-ink-400">No hay tarifas configuradas</p>
+          <p className="text-xs text-ink-400 mt-1">Crea tarifas para aplicarlas automáticamente al registrar pólizas</p>
+        </div>
+      )}
+
+      <div className="bg-info/10 border border-info/30 rounded-xl p-4 text-sm text-info">
+        <strong>Cómo funciona:</strong> Al crear una póliza puedes seleccionar una tarifa por su código —
+        el sistema rellena automáticamente el % de comisión. Al importar desde Excel, se aplica la tarifa
+        que coincida con el ramo y la aseguradora de cada fila.
+      </div>
+    </div>
+  )
+}
+
 /* ── Módulos configurables ──────────────────────────── */
 interface ModuloConfig {
   key: string
@@ -358,7 +598,7 @@ function ModulosEditor({ config, onToggle }: {
 }
 
 /* ── Main Component ─────────────────────────────────── */
-type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'workspace' | 'permisos'
+type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'comisiones' | 'workspace' | 'permisos'
 
 export default function ConfiguracionView() {
   const { currentWorkspace, isAdmin } = useWorkspace()
@@ -415,6 +655,7 @@ export default function ConfiguracionView() {
     { key: 'listas',     label: 'Listados del sistema',   icon: List },
     { key: 'categorias', label: 'Categorías de clientes', icon: Tag },
     { key: 'modulos',    label: 'Módulos',                icon: ToggleRight },
+    { key: 'comisiones', label: 'Comisiones',             icon: Percent, adminOnly: true },
     { key: 'permisos',   label: 'Permisos de roles',      icon: ShieldCheck, adminOnly: true },
     { key: 'workspace',  label: 'Workspace & Miembros',   icon: Users },
   ]
@@ -589,6 +830,31 @@ export default function ConfiguracionView() {
 
           <div className="bg-info/10 border border-info/30 rounded-xl p-4 text-sm text-info">
             <strong>Tip:</strong> Las categorías creadas aquí estarán disponibles en el formulario de clientes y en los filtros avanzados de la lista de clientes. Recuerda guardar los cambios con el botón superior.
+          </div>
+        </div>
+      )}
+
+      {/* ── Comisiones tab ── */}
+      {tab === 'comisiones' && isAdmin && (
+        <div className="space-y-5">
+          <div className="bg-white rounded-xl border border-ink-200 p-6">
+            <div className="flex items-start gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                <Percent className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-ink-700">Comisiones por ramo</h3>
+                <p className="text-sm text-ink-400 mt-0.5">
+                  Define el porcentaje de comisión agencia por defecto para cada ramo.
+                  Se aplica automáticamente al crear pólizas o importar desde Excel cuando no hay un % especificado.
+                </p>
+              </div>
+            </div>
+
+            <TarifasEditor
+              value={config.comisiones_tarifas || '[]'}
+              onChange={v => set('comisiones_tarifas', v)}
+            />
           </div>
         </div>
       )}
