@@ -59,7 +59,10 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
 
 
-type PolizaConCliente = Poliza & { cliente: Cliente | null }
+type PolizaConCliente = Poliza & {
+  cliente: Cliente | null
+  vendedor: { id: string; nombre: string } | null
+}
 
 const ESTADO_COLORS = {
   activa:    'bg-primary-100 text-primary-700',
@@ -106,7 +109,7 @@ export default function PolizaDetalle({ id }: { id: string }) {
     if (!currentWorkspace) return
     const { data } = await supabase
       .from('polizas')
-      .select('*, cliente:clientes(*)')
+      .select('*, cliente:clientes(*), vendedor:vendedores(id, nombre)')
       .eq('id', id)
       .eq('workspace_id', currentWorkspace.id)
       .maybeSingle()
@@ -257,22 +260,85 @@ export default function PolizaDetalle({ id }: { id: string }) {
         <Field label="Fecha pago ABC"        value={poliza.fecha_pago_abc ? formatDate(poliza.fecha_pago_abc) : null} />
       </Section>
 
-      {/* ── Vendedor / asesor ── */}
-      {(poliza.comision_vendedor || poliza.comision_asesor_pagada || poliza.intermediario || poliza.referido) && (
-        <Section title="Vendedor / Intermediario / Referido" icon={<User className="w-4 h-4" />}>
-          <Field label="% Comisión vendedor"  value={poliza.porcentaje_comision_vendedor != null ? `${poliza.porcentaje_comision_vendedor}%` : null} />
-          <Field label="Retención vendedor"   value={poliza.retencion_vendedor} />
-          <Field label="Comisión vendedor"    value={poliza.comision_vendedor} accent />
-          <Field label="Com. asesor pagada"   value={poliza.comision_asesor_pagada} />
-          <Field label="Fecha pago asesor"    value={poliza.fecha_pago_asesor ? formatDate(poliza.fecha_pago_asesor) : null} />
-          <Field label="Intermediario"        value={poliza.intermediario} />
-          <Field label="% Com. intermediario" value={poliza.pct_comision_int != null ? `${poliza.pct_comision_int}%` : null} />
-          <Field label="Com. intermediario"   value={poliza.comision_intermediario} />
-          <Field label="Referido"             value={poliza.referido} />
-          <Field label="% Com. referido"      value={poliza.pct_comision_referido != null ? `${poliza.pct_comision_referido}%` : null} />
-          <Field label="Retención referido"   value={poliza.retencion_referido} />
-          <Field label="Comisión referido"    value={poliza.comision_referido} />
-        </Section>
+      {/* ── Vendedor ── */}
+      {(poliza.vendedor || poliza.vendedor_id || poliza.comision_vendedor) && (
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-primary-500"><User className="w-4 h-4" /></span>
+            <h3 className="font-semibold text-ink-700 text-sm">Vendedor</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-ink-400 mb-0.5">Vendedor</p>
+              <p className="text-sm font-medium text-ink-700">{poliza.vendedor?.nombre || '—'}</p>
+            </div>
+            <Field label="% Comisión"        value={poliza.porcentaje_comision_vendedor != null ? `${poliza.porcentaje_comision_vendedor}%` : null} />
+            <Field label="Comisión bruta"    value={poliza.comision_vendedor} accent />
+            <div>
+              <p className="text-xs text-ink-400 mb-0.5">Retención (10%)</p>
+              <p className="text-sm font-medium text-ink-700">
+                {poliza.comision_vendedor
+                  ? formatCOP(poliza.comision_vendedor * (poliza.retencion_vendedor ?? 10) / 100)
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-ink-400 mb-0.5">Comisión neta</p>
+              <p className="text-sm font-semibold text-primary-700">
+                {poliza.comision_vendedor
+                  ? formatCOP(poliza.comision_vendedor * (1 - (poliza.retencion_vendedor ?? 10) / 100))
+                  : '—'}
+              </p>
+            </div>
+            <Field label="Com. pagada"       value={poliza.comision_asesor_pagada} />
+            <Field label="Fecha pago"        value={poliza.fecha_pago_asesor ? formatDate(poliza.fecha_pago_asesor) : null} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Intermediario ── */}
+      {poliza.intermediario && (
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-amber-500"><Building2 className="w-4 h-4" /></span>
+            <h3 className="font-semibold text-ink-700 text-sm">Intermediario</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-ink-400 mb-0.5">Nombre</p>
+              <p className="text-sm font-medium text-ink-700">{poliza.intermediario}</p>
+            </div>
+            <Field label="% Comisión"        value={poliza.pct_comision_int != null ? `${poliza.pct_comision_int}%` : null} />
+            <Field label="Comisión"          value={poliza.comision_intermediario} accent />
+            <div>
+              <p className="text-xs text-ink-400 mb-0.5">Comisión agencia restante</p>
+              <p className="text-sm font-semibold text-primary-700">
+                {poliza.comision_agencia != null && poliza.comision_intermediario != null
+                  ? formatCOP(poliza.comision_agencia - poliza.comision_intermediario)
+                  : poliza.comision_agencia != null ? formatCOP(poliza.comision_agencia) : '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Referido ── */}
+      {poliza.referido && (
+        <div className="bg-white rounded-xl border border-ink-200 p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-violet-500"><User className="w-4 h-4" /></span>
+            <h3 className="font-semibold text-ink-700 text-sm">Referido</h3>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div>
+              <p className="text-xs text-ink-400 mb-0.5">Nombre</p>
+              <p className="text-sm font-medium text-ink-700">{poliza.referido}</p>
+            </div>
+            <Field label="% Comisión"        value={poliza.pct_comision_referido != null ? `${poliza.pct_comision_referido}%` : null} />
+            <Field label="Retención"         value={poliza.retencion_referido} />
+            <Field label="Comisión"          value={poliza.comision_referido} accent />
+          </div>
+        </div>
       )}
 
       {/* ── Tomador / Asegurado ── */}
