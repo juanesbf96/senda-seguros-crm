@@ -132,6 +132,8 @@ END;
 $$;
 
 -- 7. RPC: estado de cuenta por vendedor
+-- FIX: usa CTEs para evitar que comision_abc_periodica se sume N veces
+--      cuando una póliza aparece en N líneas de colilla dentro del mismo grupo.
 CREATE OR REPLACE FUNCTION get_estado_cuenta_vendedor(
   p_workspace_id uuid,
   p_vendedor_id  uuid DEFAULT NULL,
@@ -154,34 +156,69 @@ SET search_path = public
 AS $$
 BEGIN
   RETURN QUERY
+  WITH
+  -- 1. Solo líneas válidas de colillas confirmadas
+  lineas_validas AS (
+    SELECT
+      cl.poliza_id,
+      cl.valor_comision,
+      ci.periodo,
+      ci.aseguradora
+    FROM colilla_lineas cl
+    JOIN colillas_importacion ci ON ci.id = cl.colilla_id
+    WHERE ci.workspace_id           = p_workspace_id
+      AND ci.estado                 = 'confirmada'
+      AND cl.estado_conciliacion    IN ('conciliada', 'corregida_manual')
+      AND cl.poliza_id              IS NOT NULL
+      AND (p_periodo IS NULL OR ci.periodo = p_periodo)
+  ),
+  -- 2. Comisión recibida por grupo (poliza × periodo × aseguradora)
+  recibido_por_grupo AS (
+    SELECT
+      lv.poliza_id,
+      lv.periodo,
+      lv.aseguradora,
+      SUM(lv.valor_comision)  AS total_recibido
+    FROM lineas_validas lv
+    GROUP BY lv.poliza_id, lv.periodo, lv.aseguradora
+  ),
+  -- 3. Comisión esperada por póliza — DISTINCT para no multiplicar
+  esperado_por_poliza AS (
+    SELECT DISTINCT ON (p.id, rg.periodo, rg.aseguradora)
+      p.id            AS poliza_id,
+      p.vendedor_id,
+      p.comision_abc_periodica,
+      rg.periodo,
+      rg.aseguradora
+    FROM recibido_por_grupo rg
+    JOIN polizas p ON p.id = rg.poliza_id
+    WHERE (p_vendedor_id IS NULL OR p.vendedor_id = p_vendedor_id)
+  )
   SELECT
-    p.vendedor_id,
-    v.nombre                                              AS vendedor_nombre,
-    ci.periodo,
-    ci.aseguradora,
-    COALESCE(SUM(p.comision_abc_periodica), 0)           AS comision_esperada,
-    COALESCE(SUM(cl.valor_comision), 0)                  AS comision_recibida,
-    COALESCE(SUM(p.comision_abc_periodica), 0)
-      - COALESCE(SUM(cl.valor_comision), 0)              AS saldo_pendiente,
-    -- Estado de pago al asesor (moda del período)
+    ep.vendedor_id,
+    v.nombre                                             AS vendedor_nombre,
+    ep.periodo,
+    ep.aseguradora,
+    COALESCE(SUM(ep.comision_abc_periodica), 0)          AS comision_esperada,
+    COALESCE(SUM(rg.total_recibido),         0)          AS comision_recibida,
+    COALESCE(SUM(ep.comision_abc_periodica), 0)
+      - COALESCE(SUM(rg.total_recibido),     0)          AS saldo_pendiente,
+    -- Estado de pago al asesor más frecuente del grupo
     (SELECT p2.asesor_pago_estado
      FROM polizas p2
-     WHERE p2.vendedor_id = p.vendedor_id
-       AND p2.workspace_id = p_workspace_id
+     WHERE p2.vendedor_id   = ep.vendedor_id
+       AND p2.workspace_id  = p_workspace_id
      GROUP BY p2.asesor_pago_estado
      ORDER BY COUNT(*) DESC
      LIMIT 1)                                             AS asesor_pago_estado,
-    COUNT(DISTINCT p.id)::int                            AS num_polizas
-  FROM colilla_lineas cl
-  JOIN colillas_importacion ci ON ci.id = cl.colilla_id
-  JOIN polizas p               ON p.id  = cl.poliza_id
-  LEFT JOIN vendedores v       ON v.id  = p.vendedor_id
-  WHERE ci.workspace_id = p_workspace_id
-    AND ci.estado       = 'confirmada'
-    AND cl.estado_conciliacion IN ('conciliada', 'corregida_manual')
-    AND (p_vendedor_id IS NULL OR p.vendedor_id = p_vendedor_id)
-    AND (p_periodo     IS NULL OR ci.periodo    = p_periodo)
-  GROUP BY p.vendedor_id, v.nombre, ci.periodo, ci.aseguradora
-  ORDER BY ci.periodo DESC, v.nombre;
+    COUNT(DISTINCT ep.poliza_id)::int                    AS num_polizas
+  FROM esperado_por_poliza ep
+  JOIN recibido_por_grupo rg
+    ON  rg.poliza_id   = ep.poliza_id
+    AND rg.periodo     = ep.periodo
+    AND rg.aseguradora = ep.aseguradora
+  LEFT JOIN vendedores v ON v.id = ep.vendedor_id
+  GROUP BY ep.vendedor_id, v.nombre, ep.periodo, ep.aseguradora
+  ORDER BY ep.periodo DESC, v.nombre;
 END;
 $$;
