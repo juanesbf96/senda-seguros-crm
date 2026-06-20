@@ -71,13 +71,11 @@ export default function ColillasView() {
     return (
       <ColillaDetalle
         colillaId={detalleId}
-        onVolver={() => setDetalleId(null)}
-        onEliminada={() => { setDetalleId(null); cargar() }}
+        onVolver={() => setDetalle(null)}
+        onEliminada={() => { setDetalle(null); cargar() }}
       />
     )
   }
-
-  const setDetalleId = (id: string | null) => setDetalle(id)
 
   return (
     <div className="p-6 space-y-6">
@@ -181,7 +179,7 @@ export default function ColillasView() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {colillas.map(c => (
-                    <tr key={c.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setDetalleId(c.id)}>
+                    <tr key={c.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => setDetalle(c.id)}>
                       <td className="px-4 py-3 font-medium text-slate-700">{c.aseguradora}</td>
                       <td className="px-4 py-3 text-slate-600">{c.periodo}</td>
                       <td className="px-4 py-3 text-center text-emerald-600 font-medium">{c.conciliadas}</td>
