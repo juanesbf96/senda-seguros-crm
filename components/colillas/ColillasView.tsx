@@ -3,10 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase }             from '@/lib/supabase/client'
 import { useWorkspace }         from '@/contexts/WorkspaceContext'
-import { usePermissions }       from '@/contexts/PermissionsContext'
 import {
   Upload, CheckCircle2, AlertTriangle, Clock,
-  ChevronDown, ChevronRight, Loader2, Filter,
+  ChevronRight, Loader2,
 } from 'lucide-react'
 import ImportColillasModal     from './ImportColillasModal'
 import ColillaDetalle          from './ColillaDetalle'
@@ -23,8 +22,7 @@ function formatDate(d: string) {
 }
 
 export default function ColillasView() {
-  const { currentWorkspace }      = useWorkspace()
-  const { can }                   = usePermissions()
+  const { currentWorkspace, isAdmin, isSupervisor } = useWorkspace()
 
   const [tab, setTab]             = useState<TabKey>('historial')
   const [colillas, setColillas]   = useState<ColillaImportacion[]>([])
@@ -37,7 +35,7 @@ export default function ColillasView() {
   const [filtroPer, setFiltroPer]      = useState('')
   const [filtroEst, setFiltroEst]      = useState<'todos' | 'borrador' | 'confirmada'>('todos')
 
-  const puedeImportar = can('configuracion_editar_agencia')
+  const puedeImportar = isAdmin || isSupervisor
 
   const cargar = useCallback(async () => {
     if (!currentWorkspace) return
