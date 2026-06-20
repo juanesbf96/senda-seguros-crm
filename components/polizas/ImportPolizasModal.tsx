@@ -531,7 +531,12 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
           .maybeSingle()
 
         if (existente) {
-          const { error } = await supabase.from('polizas').update(polizaData).eq('id', existente.id)
+          // En UPDATE: no pisar aseguradora/ramo si el Excel trae null o un valor inválido
+          const BAD_VALUES = new Set(['cancelada', 'sin asignar', 'sin ramo', ''])
+          const updateData = { ...polizaData }
+          if (!r.aseguradora || BAD_VALUES.has(r.aseguradora.toLowerCase().trim())) delete updateData.aseguradora
+          if (!r.ramo      || BAD_VALUES.has(r.ramo.toLowerCase().trim()))      delete updateData.ramo
+          const { error } = await supabase.from('polizas').update(updateData).eq('id', existente.id)
           errPoliza = error
         } else {
           const { error } = await supabase.from('polizas').insert(polizaData)
