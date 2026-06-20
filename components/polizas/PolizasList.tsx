@@ -75,6 +75,7 @@ export default function PolizasList() {
   const [editingVinculado, setEditingVinculado]         = useState<PolizaVinculado | undefined>()
   const [showImportModal, setShowImportModal]           = useState(false)
   const [aseguradorasDB, setAseguradorasDB]             = useState<string[]>([])
+  const [ramosDB, setRamosDB]                           = useState<string[]>([])
 
   async function loadAseguradoras() {
     const { data } = await supabase
@@ -85,6 +86,18 @@ export default function PolizasList() {
     if (data) {
       const unique = [...new Set(data.map(r => r.aseguradora).filter(Boolean))].sort()
       setAseguradorasDB(unique)
+    }
+  }
+
+  async function loadRamos() {
+    const { data } = await supabase
+      .from('polizas')
+      .select('ramo')
+      .eq('workspace_id', currentWorkspace?.id || '')
+      .eq('eliminada', false)
+    if (data) {
+      const unique = [...new Set(data.map((r: { ramo: string }) => r.ramo).filter(Boolean))].sort() as string[]
+      setRamosDB(unique)
     }
   }
 
@@ -128,7 +141,7 @@ export default function PolizasList() {
 
   async function load() {
     setLoading(true)
-    await Promise.all([loadPolizas(), loadEliminadas(), loadAnexos(), loadVinculados(), loadAseguradoras()])
+    await Promise.all([loadPolizas(), loadEliminadas(), loadAnexos(), loadVinculados(), loadAseguradoras(), loadRamos()])
     setLoading(false)
   }
 
@@ -339,12 +352,9 @@ export default function PolizasList() {
           </FiltroSelect>
           <FiltroSelect label="Ramo" value={extra.ramo} onChange={v => setExtra(e => ({ ...e, ramo: v }))}>
             <option value="">Todos</option>
-            <optgroup label="Seguros">
-              {RAMOS_SEGUROS.map(r => <option key={r} value={r}>{r}</option>)}
-            </optgroup>
-            <optgroup label="Cumplimiento">
-              {RAMOS_CUMPLIMIENTO.map(r => <option key={r} value={r}>{r}</option>)}
-            </optgroup>
+            {(ramosDB.length > 0 ? ramosDB : [...RAMOS_SEGUROS, ...RAMOS_CUMPLIMIENTO]).map(r => (
+              <option key={r} value={r}>{r}</option>
+            ))}
           </FiltroSelect>
           <FiltroSelect label="Modalidad" value={extra.modalidad} onChange={v => setExtra(e => ({ ...e, modalidad: v }))}>
             <option value="">Todas</option>
