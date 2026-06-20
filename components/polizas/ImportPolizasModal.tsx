@@ -137,6 +137,17 @@ function toNum(val: unknown): number | null {
   return isNaN(n) ? null : n
 }
 
+/**
+ * Lee un porcentaje de Excel. Excel almacena "10%" como 0.1 internamente.
+ * Si el valor leído es < 1 (y > 0) lo convierte a porcentaje real (* 100).
+ * Valores >= 1 se asumen ya en porcentaje (ej: 10, 12.5).
+ */
+function toPct(val: unknown): number | null {
+  const n = toNum(val)
+  if (n === null) return null
+  return n > 0 && n < 1 ? Math.round(n * 100 * 1000) / 1000 : n
+}
+
 /** Normaliza flag booleano (Sí, SI, sí, YES, X, mes-año → true) */
 function toBool(val: unknown): boolean {
   if (!val || val === '-' || val === 'NA' || val === '') return false
@@ -243,7 +254,7 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       ramo:           toText(r[col('ramo')]),
       periodicidad:   toText(r[col('periodicidad')]),
       // Financiero — columnas exactas del formato Senda
-      pct_comision_negocio:  toNum(r[col('porcentaje comision del negocio', 'comision del negocio', '% comision negocio')]),
+      pct_comision_negocio:  toPct(r[col('porcentaje comision del negocio', 'comision del negocio', '% comision negocio')]),
       prima_neta:            toNum(r[col('prima anual antes de iva', 'prima anual', 'prima neta')]),
       prima_periodica:       toNum(r[col('prima periodica pagada', 'prima periodica')]),
       comision_agencia:      toNum(r[col('comision anual negocio', 'comision anual')]),
@@ -251,21 +262,21 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       retencion_agencia:     toNum(r[col('retencion 10', 'retencion')]),
       // Intermediario
       intermediario:         toText(r[col('intermediario inicial', 'intermediario')]),
-      pct_comision_int:      toNum(r[col('porcentaje comision intermediario', '% comision intermediario')]),
+      pct_comision_int:      toPct(r[col('porcentaje comision intermediario', '% comision intermediario')]),
       comision_intermediario: toNum(r[col('comision intermediario inicial', 'comision intermediario')]),
       // Asesor
       asesor:               toText(r[col('asesor', 'concesionario', 'vendedor')]),
-      pct_comision_asesor:  toNum(r[col('% comision asesor', 'porcentaje comision asesor')]),
+      pct_comision_asesor:  toPct(r[col('% comision asesor', 'porcentaje comision asesor')]),
       retencion_asesor:     toNum(r[col('retencion asesor')]),
       comision_asesor:      toNum(r[col('comision asesor')]),
       // Referido
       referido:              toText(r[col('referido')]),
-      pct_comision_referido: toNum(r[col('porcentaje comision referido', '% comision referido')]),
+      pct_comision_referido: toPct(r[col('porcentaje comision referido', '% comision referido')]),
       retencion_referido:    toNum(r[col('retencion referido')]),
       comision_referido:     toNum(r[col('comision referido')]),
       // ABC / Agencia
       comision_abc_periodica: toNum(r[col('comision abc periodica')]),
-      pct_comision_abc:       toNum(r[col('% comision abc seguros', '% comision abc', 'porcentaje comision abc')]),
+      pct_comision_abc:       toPct(r[col('% comision abc seguros', '% comision abc', 'porcentaje comision abc')]),
       retencion_abc:          toNum(r[col('retencion asumida por abc', 'retencion asumida', 'retencion abc')]),
       comision_abc_anual:     toNum(r[col('comision abc anual')]),
       comision_abc_recibida:  toNum(r[col('comision abc recibida', 'abc recibida')]),
