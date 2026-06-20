@@ -11,6 +11,7 @@ import {
   Car, Heart, Home, Zap, Truck, Plane, Briefcase,
   Stethoscope, Sprout, Baby, ShieldAlert, Anchor,
   Paperclip, Download, File, FileImage, Film, Music,
+  CheckCircle2, Clock,
 } from 'lucide-react'
 
 function FileIcon({ mime }: { mime: string | null }) {
@@ -260,8 +261,19 @@ export default function PolizaDetalle({ id }: { id: string }) {
         <Field label="Retención agencia"     value={poliza.retencion_agencia} />
         <Field label="Com. ABC periódica"    value={poliza.comision_abc_periodica} />
         <Field label="Com. ABC anual"        value={poliza.comision_abc_anual} />
-        <Field label="Com. ABC recibida"     value={poliza.comision_abc_recibida} />
-        <Field label="Fecha pago ABC"        value={poliza.fecha_pago_abc ? formatDate(poliza.fecha_pago_abc) : null} />
+        <div className="col-span-2">
+          <p className="text-xs text-ink-400 mb-1">Comisión de aseguradora</p>
+          {poliza.comision_recibida
+            ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-700">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Recibida{poliza.fecha_pago_abc ? ` · ${formatDate(poliza.fecha_pago_abc)}` : ''}
+              </span>
+            : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning-soft text-ink-700">
+                <Clock className="w-3.5 h-3.5" />
+                Pendiente de aseguradora
+              </span>
+          }
+        </div>
       </Section>
 
       {/* ── Vendedor ── */}
@@ -303,12 +315,24 @@ export default function PolizaDetalle({ id }: { id: string }) {
                 : '—'}
             </p>
           </div>
-          {poliza.comision_asesor_pagada != null && (
-            <div>
-              <p className="text-xs text-ink-400 mb-0.5">Com. pagada</p>
-              <p className="text-sm font-medium text-ink-700">{formatCOP(poliza.comision_asesor_pagada)}</p>
-            </div>
-          )}
+          <div className="col-span-2">
+            <p className="text-xs text-ink-400 mb-1">Estado pago vendedor</p>
+            {poliza.asesor_pago_estado === 'no_aplica' || (!poliza.vendedor_id && !poliza.asesor_pago_estado)
+              ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-cream-200 text-ink-500">
+                  <Building2 className="w-3.5 h-3.5" />
+                  Comisión de agencia
+                </span>
+              : poliza.asesor_pago_estado === 'pagada'
+              ? <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-primary-100 text-primary-700">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  Liquidado{poliza.fecha_pago_asesor ? ` · ${formatDate(poliza.fecha_pago_asesor)}` : ''}
+                </span>
+              : <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-warning-soft text-ink-700">
+                  <Clock className="w-3.5 h-3.5" />
+                  Pendiente de liquidar
+                </span>
+            }
+          </div>
         </div>
       </div>
 

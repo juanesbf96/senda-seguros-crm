@@ -56,10 +56,10 @@ interface ExcelRow {
   pct_comision_abc: number | null
   retencion_abc: number | null
   comision_abc_anual: number | null
-  comision_abc_recibida: number | null
-  fecha_pago_abc: string
-  comision_asesor_pagada: number | null
-  fecha_pago_asesor: string
+  comision_recibida: boolean          // ¿La aseguradora ya pagó la comisión? (Sí/null)
+  fecha_pago_abc: string              // Fecha en que recibimos la comisión
+  asesor_pago_estado: 'pagada' | 'pendiente' | 'no_aplica'  // Estado pago al asesor
+  fecha_pago_asesor: string           // Fecha en que pagamos al asesor
 }
 
 interface ImportResult {
@@ -153,6 +153,15 @@ function toBool(val: unknown): boolean {
   if (!val || val === '-' || val === 'NA' || val === '') return false
   const s = String(val).toLowerCase().trim()
   return ['si', 'sí', 'yes', 'x', '1', 'true'].includes(s) || /^[a-z]{3}-\d{2}$/.test(s)
+}
+
+/** Estado de pago al asesor: Sí→'pagada', '-'→'no_aplica', vacío/null→'pendiente' */
+function toAsesorEstado(val: unknown): 'pagada' | 'pendiente' | 'no_aplica' {
+  if (!val || val === '' || val === null || val === undefined) return 'pendiente'
+  const s = String(val).trim()
+  if (s === '-') return 'no_aplica'
+  if (s.toLowerCase() === 'sí' || s.toLowerCase() === 'si') return 'pagada'
+  return 'pendiente'
 }
 
 /** Normaliza texto, convierte NA/- a '' */
@@ -279,9 +288,9 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       pct_comision_abc:       toPct(r[col('% comision abc seguros', '% comision abc', 'porcentaje comision abc')]),
       retencion_abc:          toNum(r[col('retencion asumida por abc', 'retencion asumida', 'retencion abc')]),
       comision_abc_anual:     toNum(r[col('comision abc anual')]),
-      comision_abc_recibida:  toNum(r[col('comision abc recibida', 'abc recibida')]),
+      comision_recibida:      toBool(r[col('comision abc recibida', 'abc recibida', 'comision recibida')]),
       fecha_pago_abc:         excelDateToISO(r[col('fecha pago abc')]),
-      comision_asesor_pagada: toNum(r[col('pago comision asesor')]),
+      asesor_pago_estado:     toAsesorEstado(r[col('pago comision asesor')]),
       fecha_pago_asesor:      excelDateToISO(r[col('fecha pago asesor')]),
     })
   }
@@ -313,7 +322,30 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
     }
   }
 
-  // 0b. Pre-cargar tarifas de comisión desde configuracion
+  // 0b. Crear vendedores nuevos del Excel que no existan en el workspace
+  const asesoresUnicos = new Set(rows.map(r => r.asesor).filter(Boolean))
+  for (const nombre of asesoresUnicos) {
+    const existe = (() => {
+      const k = norm(nombre)
+      if (vendedoresMap.has(k)) return true
+      for (const key of vendedoresMap.keys()) {
+        if (k.includes(key) || key.includes(k)) return true
+      }
+      return false
+    })()
+    if (!existe) {
+      const { data: nuevo } = await supabase
+        .from('vendedores')
+        .insert({ nombre, workspace_id: wsId, activo: true })
+        .select('id')
+        .single()
+      if (nuevo) {
+        vendedoresMap.set(norm(nombre), { id: nuevo.id, pct: null })
+      }
+    }
+  }
+
+  // 0c. Pre-cargar tarifas de comisión desde configuracion
   interface TarifaRow { id: string; codigo: string; ramo: string; aseguradora: string; porcentaje: number }
   const tarifasComision: TarifaRow[] = []
   const { data: cfgData } = await supabase
@@ -481,9 +513,9 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
         pct_comision_abc:           r.pct_comision_abc,
         retencion_abc:              r.retencion_abc,
         comision_abc_anual:         r.comision_abc_anual,
-        comision_abc_recibida:      r.comision_abc_recibida,
+        comision_recibida:          r.comision_recibida,
         fecha_pago_abc:             r.fecha_pago_abc || null,
-        comision_asesor_pagada:     r.comision_asesor_pagada,
+        asesor_pago_estado:         r.asesor_pago_estado,
         fecha_pago_asesor:          r.fecha_pago_asesor || null,
       }
 

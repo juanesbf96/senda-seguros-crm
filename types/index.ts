@@ -110,6 +110,7 @@ export interface Poliza {
   comision_abc_anual: number | null
   comision_abc_recibida: number | null
   fecha_pago_abc: string | null
+  comision_recibida: boolean | null
   intermediario: string | null
   pct_comision_int: number | null
   comision_intermediario: number | null
@@ -119,6 +120,7 @@ export interface Poliza {
   comision_referido: number | null
   comision_asesor_pagada: number | null
   fecha_pago_asesor: string | null
+  asesor_pago_estado: 'pagada' | 'pendiente' | 'no_aplica' | null
   es_renovacion: boolean
   mes_emision: string | null
   endoso_enviado: boolean
