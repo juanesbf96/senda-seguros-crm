@@ -30,6 +30,7 @@ function formatBytes(b: number | null): string {
 }
 
 const RAMO_ICONS: Record<string, React.ReactNode> = {
+  'automóviles':            <Car          className="w-6 h-6" />,
   'automoviles':            <Car          className="w-6 h-6" />,
   'todo riesgo vehículo':   <Car          className="w-6 h-6" />,
   'soat':                   <Car          className="w-6 h-6" />,
