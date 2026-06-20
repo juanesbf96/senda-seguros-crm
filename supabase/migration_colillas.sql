@@ -55,6 +55,10 @@ CREATE INDEX IF NOT EXISTS idx_lineas_workspace   ON colilla_lineas(workspace_id
 ALTER TABLE colillas_importacion ENABLE ROW LEVEL SECURITY;
 ALTER TABLE colilla_lineas       ENABLE ROW LEVEL SECURITY;
 
+-- Idempotente: drop primero para permitir re-ejecución segura
+DROP POLICY IF EXISTS "colillas_importacion_workspace_member" ON colillas_importacion;
+DROP POLICY IF EXISTS "colilla_lineas_workspace_member"       ON colilla_lineas;
+
 CREATE POLICY "colillas_importacion_workspace_member"
   ON colillas_importacion FOR ALL
   USING     (is_workspace_member(workspace_id, auth.uid()))
