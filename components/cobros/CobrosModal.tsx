@@ -24,15 +24,16 @@ const TIPO_LABELS: Record<TipoCobro, string> = {
   comision_recibida:   'Comisión recibida',
 }
 
-const ASEGURADORAS = [
+const ASEGURADORAS_DEFAULT = [
   'Sura','Bolívar','Allianz','Colseguros','Liberty Mutual','AXA Colpatria',
   'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado','Otro',
 ]
 
 export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSaved }: Props) {
   const { currentWorkspace } = useWorkspace()
-  const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
-  const [polizas, setPolizas]   = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
+  const [clientes, setClientes]         = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
+  const [polizas, setPolizas]           = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
+  const [aseguradoras, setAseguradoras] = useState<string[]>([])
 
   const [form, setForm] = useState({
     client_id:           cobro?.client_id          || clienteId || '',
@@ -55,6 +56,18 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
   function set(field: string, val: string) { setForm(f => ({ ...f, [field]: val })) }
 
   const isAseguradoraTab = form.tipo === 'por_pagar' || form.tipo === 'comision_por_cobrar' || form.tipo === 'comision_recibida'
+
+  useEffect(() => {
+    if (!currentWorkspace) return
+    supabase.from('configuracion')
+      .select('valor')
+      .eq('workspace_id', currentWorkspace.id)
+      .eq('clave', 'aseguradoras_lista')
+      .single()
+      .then(({ data }) => {
+        if (data?.valor) setAseguradoras(data.valor.split(',').map((s: string) => s.trim()).filter(Boolean))
+      })
+  }, [currentWorkspace?.id])
 
   useEffect(() => {
     if (!clienteId && currentWorkspace)
@@ -129,7 +142,7 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
               <Field label="Aseguradora">
                 <select value={form.aseguradora} onChange={e => set('aseguradora', e.target.value)} className={cls}>
                   <option value="">Seleccionar...</option>
-                  {ASEGURADORAS.map(a => <option key={a} value={a}>{a}</option>)}
+                  {(aseguradoras.length > 0 ? aseguradoras : ASEGURADORAS_DEFAULT).map(a => <option key={a} value={a}>{a}</option>)}
                 </select>
               </Field>
               <Field label="Ramo">
