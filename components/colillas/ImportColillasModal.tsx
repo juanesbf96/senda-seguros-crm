@@ -220,7 +220,17 @@ function PasoRevisar({
 }) {
   const sinMatch = lineas.filter(l => l.estado_conciliacion !== 'conciliada')
   const [busquedas, setBusquedas] = useState<Record<number, string>>({})
-  const [resultados, setResultados] = useState<Record<number, { id: string; numero_poliza: string | null; aseguradora: string }[]>>({})
+  type PolizaResultado = {
+    id: string
+    numero_poliza: string | null
+    aseguradora: string
+    ramo: string | null
+    nombre_tomador: string | null
+    fecha_inicio: string | null
+    fecha_fin: string | null
+    cliente: { nombre: string } | null
+  }
+  const [resultados, setResultados] = useState<Record<number, PolizaResultado[]>>({})
   const [notas, setNotas] = useState<Record<number, string>>({})
 
   const buscar = useCallback(async (idx: number, query: string) => {
@@ -228,11 +238,11 @@ function PasoRevisar({
     if (query.length < 3) { setResultados(prev => ({ ...prev, [idx]: [] })); return }
     const { data } = await supabase
       .from('polizas')
-      .select('id, numero_poliza, aseguradora')
+      .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_inicio, fecha_fin, cliente:clientes(nombre)')
       .eq('workspace_id', workspaceId)
       .ilike('numero_poliza', `%${query}%`)
       .limit(8)
-    setResultados(prev => ({ ...prev, [idx]: data ?? [] }))
+    setResultados(prev => ({ ...prev, [idx]: (data ?? []) as unknown as PolizaResultado[] }))
   }, [supabase, workspaceId])
 
   const vincular = (lineaIdx: number, polizaId: string, numeroPoliza: string) => {
@@ -319,17 +329,36 @@ function PasoRevisar({
                   />
                 </div>
                 {(resultados[idx]?.length ?? 0) > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-40 overflow-y-auto">
-                    {resultados[idx].map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => vincular(idx, p.id, p.numero_poliza ?? '')}
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-slate-50 flex items-center justify-between"
-                      >
-                        <span className="font-mono">{p.numero_poliza}</span>
-                        <span className="text-slate-400">{p.aseguradora}</span>
-                      </button>
-                    ))}
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
+                    {resultados[idx].map(p => {
+                      const cliente = (p.cliente as { nombre: string } | null)
+                      const tomador = p.nombre_tomador || cliente?.nombre
+                      const vigencia = p.fecha_fin
+                        ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+                        : null
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => vincular(idx, p.id, p.numero_poliza ?? '')}
+                          className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition-colors"
+                        >
+                          {/* Fila 1: número + aseguradora */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-semibold text-slate-800">{p.numero_poliza}</span>
+                            <span className="text-[10px] font-medium text-slate-400 shrink-0">{p.aseguradora}</span>
+                          </div>
+                          {/* Fila 2: tomador + ramo */}
+                          <div className="flex items-center justify-between gap-2 mt-0.5">
+                            <span className="text-[11px] text-slate-600 truncate">{tomador ?? '—'}</span>
+                            {p.ramo && <span className="text-[10px] text-slate-400 shrink-0 truncate max-w-[80px]">{p.ramo}</span>}
+                          </div>
+                          {/* Fila 3: vigencia */}
+                          {vigencia && (
+                            <p className="text-[10px] text-slate-400 mt-0.5">Vence: {vigencia}</p>
+                          )}
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
               </div>

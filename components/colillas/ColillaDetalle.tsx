@@ -5,8 +5,9 @@ import { supabase }          from '@/lib/supabase/client'
 import { useWorkspace }      from '@/contexts/WorkspaceContext'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Edit3, Loader2,
-  Search, X, Trash2, Link2,
+  Search, X, Trash2, Pencil,
 } from 'lucide-react'
+import PolizaQuickView from '@/components/polizas/PolizaQuickView'
 import type { ColillaImportacion, ColillaLinea } from '@/types'
 
 function formatCOP(n: number | null) {
@@ -138,13 +139,15 @@ function CeldaVincular({
     )
   }
 
-  // Botón para abrir búsqueda
+  // Número raw en amarillo + lápiz para abrir búsqueda
   return (
     <button
       onClick={() => setAbierto(true)}
-      className="flex items-center gap-1 text-xs text-amber-600 hover:text-emerald-600 font-medium"
+      title="Vincular a póliza CRM"
+      className="group flex items-center gap-1.5 text-xs font-mono text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md transition-colors"
     >
-      <Link2 className="w-3 h-3" /> Vincular
+      <span>{linea.numero_poliza_raw}</span>
+      <Pencil className="w-3 h-3 text-amber-400 group-hover:text-amber-600 shrink-0" />
     </button>
   )
 }
@@ -152,11 +155,12 @@ function CeldaVincular({
 // ── Componente principal ──────────────────────────────────────────────────────
 export default function ColillaDetalle({ colillaId, onVolver, onEliminada }: Props) {
   const { currentWorkspace, isAdmin, isSupervisor } = useWorkspace()
-  const [colilla, setColilla] = useState<ColillaImportacion | null>(null)
-  const [lineas, setLineas]   = useState<ColillaLinea[]>([])
-  const [loading, setLoading] = useState(true)
+  const [colilla, setColilla]     = useState<ColillaImportacion | null>(null)
+  const [lineas, setLineas]       = useState<ColillaLinea[]>([])
+  const [loading, setLoading]     = useState(true)
   const [eliminando, setEliminando] = useState(false)
-  const [filtro, setFiltro]   = useState<'todas' | 'conciliada' | 'no_encontrada' | 'corregida_manual'>('todas')
+  const [filtro, setFiltro]       = useState<'todas' | 'conciliada' | 'no_encontrada' | 'corregida_manual'>('todas')
+  const [quickViewId, setQuickViewId] = useState<string | null>(null)
 
   const puedeEditar = isAdmin || isSupervisor
 
@@ -321,14 +325,24 @@ export default function ColillaDetalle({ colillaId, onVolver, onEliminada }: Pro
                   <td className="px-4 py-3 text-right font-medium text-slate-700">{formatCOP(l.valor_comision)}</td>
                   <td className="px-4 py-3 text-xs text-slate-500">{formatDate(l.fecha_pago)}</td>
                   <td className="px-4 py-3 text-xs">
-                    {l.estado_conciliacion === 'no_encontrada' && puedeEditar && currentWorkspace
-                      ? <CeldaVincular linea={l} workspaceId={currentWorkspace.id} onActualizada={handleActualizada} />
-                      : l.poliza
-                        ? <span className={`font-mono ${l.estado_conciliacion === 'corregida_manual' ? 'text-blue-700' : 'text-emerald-700'}`}>
-                            {(l.poliza as { numero_poliza: string | null }).numero_poliza}
-                          </span>
-                        : <span className="text-slate-300">—</span>
-                    }
+                    {l.estado_conciliacion === 'no_encontrada' && puedeEditar && currentWorkspace ? (
+                      /* Sin match — número raw en amarillo + lápiz para vincular */
+                      <CeldaVincular linea={l} workspaceId={currentWorkspace.id} onActualizada={handleActualizada} />
+                    ) : l.poliza_id && l.poliza ? (
+                      /* Vinculada — clickeable para abrir QuickView */
+                      <button
+                        onClick={() => setQuickViewId(l.poliza_id)}
+                        className={`font-mono hover:underline underline-offset-2 transition-colors ${
+                          l.estado_conciliacion === 'corregida_manual'
+                            ? 'text-blue-600 hover:text-blue-800'
+                            : 'text-emerald-600 hover:text-emerald-800'
+                        }`}
+                      >
+                        {(l.poliza as { numero_poliza: string | null }).numero_poliza}
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {l.estado_conciliacion === 'conciliada'      && <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto" />}
@@ -344,6 +358,13 @@ export default function ColillaDetalle({ colillaId, onVolver, onEliminada }: Pro
           )}
         </div>
       </div>
+
+      {quickViewId && (
+        <PolizaQuickView
+          polizaId={quickViewId}
+          onClose={() => setQuickViewId(null)}
+        />
+      )}
     </div>
   )
 }
