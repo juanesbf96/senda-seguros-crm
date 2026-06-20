@@ -10,6 +10,7 @@ import {
 import Link from 'next/link'
 import CobrosModal from './CobrosModal'
 import ImportColillasModal from '@/components/colillas/ImportColillasModal'
+import PolizaQuickView from '@/components/polizas/PolizaQuickView'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoCobro, string> = {
@@ -40,7 +41,8 @@ export default function CobrosList() {
   const [activeTab, setActiveTab]   = useState<Tab>('por_cobrar')
   const [showModal, setShowModal]   = useState(false)
   const [editing, setEditing]       = useState<Cobro | undefined>()
-  const [importModal, setImportModal] = useState(false)
+  const [importModal, setImportModal]       = useState(false)
+  const [quickViewId, setQuickViewId]       = useState<string | null>(null)
 
   const puedeImportar = isAdmin || isSupervisor
 
@@ -242,8 +244,19 @@ export default function CobrosList() {
                       {c.porcentaje_comision ? `${c.porcentaje_comision}%` : '—'}
                     </td>
                   )}
-                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs font-mono">
-                    {c.numero_poliza || c.poliza?.numero_poliza || '—'}
+                  <td className="px-4 py-3 hidden md:table-cell text-xs font-mono">
+                    {c.poliza?.id
+                      ? (
+                        <button
+                          onClick={e => { e.stopPropagation(); setQuickViewId(c.poliza!.id) }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline underline-offset-2 transition-colors"
+                          title="Ver póliza"
+                        >
+                          {c.numero_poliza || c.poliza.numero_poliza || '—'}
+                        </button>
+                      )
+                      : <span className="text-ink-400">{c.numero_poliza || '—'}</span>
+                    }
                   </td>
                   <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.valor)}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
@@ -322,6 +335,13 @@ export default function CobrosList() {
         <ImportColillasModal
           onClose={() => setImportModal(false)}
           onConfirmada={() => setImportModal(false)}
+        />
+      )}
+
+      {quickViewId && (
+        <PolizaQuickView
+          polizaId={quickViewId}
+          onClose={() => setQuickViewId(null)}
         />
       )}
     </div>
