@@ -48,7 +48,7 @@ const NAV_GROUPS: NavGroup[] = [
       { href: '/cobros',        label: 'Cobros',        icon: DollarSign,  perm: 'finanzas_cobros_ver' },
       { href: '/caja',          label: 'Caja',          icon: Receipt,     perm: ['finanzas_caja_ver_propias', 'finanzas_caja_ver_todas'] },
       { href: '/liquidaciones', label: 'Liquidaciones', icon: Calculator,  perm: 'finanzas_liquidaciones_ver' },
-      { href: '/colillas',      label: 'Colillas',      icon: FileDown,    perm: 'configuracion_editar_agencia' },
+      { href: '/colillas',      label: 'Colillas',      icon: FileDown },
     ],
   },
   {
