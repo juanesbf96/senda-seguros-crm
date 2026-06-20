@@ -464,8 +464,8 @@ async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResu
       const comisionAgencia = r.comision_agencia
         ?? (primaNeta && pctAgencia ? Math.round(primaNeta * pctAgencia / 100 * 100) / 100 : null)
 
-      // Auto-calcular comisión vendedor si no viene del Excel
-      const comisionVendedor = r.comision_asesor
+      // Auto-calcular comisión vendedor si no viene del Excel (tratar 0 como null para forzar el cálculo)
+      const comisionVendedor = (r.comision_asesor || null)
         ?? (comisionAgencia && pctVendedor ? Math.round(comisionAgencia * pctVendedor / 100 * 100) / 100 : null)
 
       const polizaData: Record<string, unknown> = {
