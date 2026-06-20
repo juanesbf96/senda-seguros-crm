@@ -61,13 +61,13 @@ DROP POLICY IF EXISTS "colilla_lineas_workspace_member"       ON colilla_lineas;
 
 CREATE POLICY "colillas_importacion_workspace_member"
   ON colillas_importacion FOR ALL
-  USING     (is_workspace_member(workspace_id, auth.uid()))
-  WITH CHECK (is_workspace_member(workspace_id, auth.uid()));
+  USING     (is_workspace_member(workspace_id))
+  WITH CHECK (is_workspace_member(workspace_id));
 
 CREATE POLICY "colilla_lineas_workspace_member"
   ON colilla_lineas FOR ALL
-  USING     (is_workspace_member(workspace_id, auth.uid()))
-  WITH CHECK (is_workspace_member(workspace_id, auth.uid()));
+  USING     (is_workspace_member(workspace_id))
+  WITH CHECK (is_workspace_member(workspace_id));
 
 -- 6. RPC: confirmar colilla (atómico, SECURITY DEFINER)
 CREATE OR REPLACE FUNCTION confirmar_colilla(
