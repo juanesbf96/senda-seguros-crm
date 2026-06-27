@@ -74,7 +74,10 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [nuevaTarifaForm, setNuevaTarifaForm] = useState<Omit<TarifaComision,'id'>>({ codigo:'', ramo:'', aseguradora:'', porcentaje:0 })
   const [nuevaTarifaErr,  setNuevaTarifaErr]  = useState('')
   const [savingTarifa,    setSavingTarifa]    = useState(false)
-  const [clienteSearch,   setClienteSearch]   = useState('')
+  // Pre-poblar búsqueda con nombre_tomador cuando se crea desde colilla (sin client_id aún)
+  const [clienteSearch,   setClienteSearch]   = useState(
+    !poliza?.id && !poliza?.client_id && poliza?.nombre_tomador ? poliza.nombre_tomador : ''
+  )
   const [showClienteList, setShowClienteList] = useState(false)
   const clienteRef = useRef<HTMLDivElement>(null)
 
@@ -371,7 +374,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
           {/* ── 1. Info básica ── */}
           <Section title="Información básica">
             {!clientId && (
-              <Field label="Cliente *">
+              <Field label="Cliente CRM *">
                 <div ref={clienteRef} className="relative">
                   <div className="relative">
                     <input
@@ -497,9 +500,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
               </Field>
             </div>
 
-            <Field label="Nombre del tomador">
+            <Field label="Nombre del tomador (en la póliza)">
               <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
-                placeholder="Nombre del tomador de la póliza" className={cls} />
+                placeholder="Nombre exacto como aparece en la póliza de la aseguradora" className={cls} />
             </Field>
           </Section>
 
