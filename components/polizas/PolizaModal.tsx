@@ -95,8 +95,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     // fechas
     fecha_expedicion: poliza?.fecha_expedicion || '',
     fecha_recepcion:  poliza?.fecha_recepcion  || '',
-    fecha_inicio:     poliza?.fecha_inicio     || (poliza ? '' : new Date().toISOString().slice(0, 10)),
-    fecha_fin:        poliza?.fecha_fin        || (poliza ? '' : (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10) })()),
+    fecha_inicio:     poliza?.fecha_inicio     || (poliza?.id ? '' : new Date().toISOString().slice(0, 10)),
+    fecha_fin:        poliza?.fecha_fin        || (poliza?.id ? '' : (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10) })()),
     // riesgo
     riesgo:          poliza?.riesgo          || '',
     valor_asegurado: poliza?.valor_asegurado?.toString() || '',
@@ -360,7 +360,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
         {/* header */}
         <div className="flex items-center justify-between p-5 border-b border-ink-200">
-          <h2 className="font-semibold text-ink-700">{poliza ? 'Editar póliza' : 'Nueva póliza'}</h2>
+          <h2 className="font-semibold text-ink-700">{poliza?.id ? 'Editar póliza' : 'Nueva póliza'}</h2>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-500">
             <X className="w-5 h-5" />
           </button>

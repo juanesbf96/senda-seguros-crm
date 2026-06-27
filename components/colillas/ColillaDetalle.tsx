@@ -55,10 +55,11 @@ function Hl({ text, q }: { text: string | null; q: string }) {
 
 // ── Celda editable para líneas sin match ─────────────────────────────────────
 function CeldaVincular({
-  linea, workspaceId, onActualizada,
+  linea, workspaceId, aseguradora, onActualizada,
 }: {
   linea: ColillaLinea
   workspaceId: string
+  aseguradora: string
   onActualizada: (lineaId: string, polizaId: string | null, estado: string) => void
 }) {
   const [abierto,     setAbierto]     = useState(false)
@@ -175,10 +176,11 @@ function CeldaVincular({
 
   // Modo búsqueda abierto
   if (abierto) {
-    // Prefill para PolizaModal en modo crear
+    // Prefill para PolizaModal en modo crear (sin id → insert)
     const preRelleno = {
-      numero_poliza: linea.numero_poliza_raw,
+      numero_poliza:  linea.numero_poliza_raw,
       nombre_tomador: linea.nombre_tomador ?? '',
+      aseguradora:    aseguradora,
     } as unknown as Poliza
 
     return (
@@ -449,7 +451,7 @@ export default function ColillaDetalle({ colillaId, onVolver, onEliminada }: Pro
                   <td className="px-4 py-3 text-xs">
                     {l.estado_conciliacion === 'no_encontrada' && puedeEditar && currentWorkspace ? (
                       /* Sin match — número raw en amarillo + lápiz para vincular */
-                      <CeldaVincular linea={l} workspaceId={currentWorkspace.id} onActualizada={handleActualizada} />
+                      <CeldaVincular linea={l} workspaceId={currentWorkspace.id} aseguradora={colilla.aseguradora} onActualizada={handleActualizada} />
                     ) : l.poliza_id && l.poliza ? (
                       /* Vinculada — clickeable para abrir QuickView */
                       <button
