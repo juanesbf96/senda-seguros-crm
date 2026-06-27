@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase }        from '@/lib/supabase/client'
 import { useWorkspace }    from '@/contexts/WorkspaceContext'
 import {
@@ -261,6 +262,8 @@ function PasoRevisar({
   const [pendiente,      setPendiente]      = useState<Record<number, PolizaResultado>>({})
   // Índice de línea para el que se quiere crear póliza nueva
   const [crearPolizaIdx, setCrearPolizaIdx] = useState<number | null>(null)
+  // Refs para calcular posición del dropdown via portal
+  const inputContainerRefs = useRef<Record<number, HTMLDivElement | null>>({})
 
   // Grupos por estado (índice global)
   const grupos = {
@@ -377,12 +380,16 @@ function PasoRevisar({
   const pendientesCount = Object.keys(pendiente).length
   const es48Horas = aseguradora === '48 HORAS'
 
-  // ── Helper: dropdown de resultados de búsqueda ────────────────────
+  // ── Helper: dropdown de resultados de búsqueda (portal para evitar overflow clip) ──
   function DropdownResultados({ idx }: { idx: number }) {
     const q = busquedas[idx] ?? ''
     if ((resultados[idx]?.length ?? 0) === 0) return null
-    return (
-      <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+    const anchor = inputContainerRefs.current[idx]
+    if (!anchor) return null
+    const rect = anchor.getBoundingClientRect()
+    return createPortal(
+      <div style={{ position: 'fixed', top: rect.bottom + 4, left: rect.left, width: rect.width, zIndex: 9999 }}
+        className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
         {resultados[idx].map(p => {
           const c = p.cliente as { nombre: string; telefono: string | null; email: string | null } | null
           const tomador = p.nombre_tomador || c?.nombre
@@ -409,7 +416,8 @@ function PasoRevisar({
             </button>
           )
         })}
-      </div>
+      </div>,
+      document.body
     )
   }
 
@@ -527,7 +535,7 @@ function PasoRevisar({
                     <p className="font-semibold text-slate-700 shrink-0">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
                   </div>
                   {/* Buscador + opción crear */}
-                  <div className="relative">
+                  <div className="relative" ref={el => { inputContainerRefs.current[i] = el }}>
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
                     <input type="text"
                       value={busquedas[i] ?? ''}
@@ -535,7 +543,7 @@ function PasoRevisar({
                       placeholder="Buscar por N° póliza, nombre, teléfono o email..."
                       className="w-full border border-slate-200 rounded-lg pl-6 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                     />
-                    {/* Dropdown resultados */}
+                    {/* Dropdown resultados via portal */}
                     {(resultados[i]?.length ?? 0) > 0 && <DropdownResultados idx={i} />}
                   </div>
                   {/* Botón crear póliza nueva */}
