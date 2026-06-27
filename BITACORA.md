@@ -1,6 +1,6 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 10 de junio de 2026  
+> Última actualización: 27 de junio de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
 
 ---
@@ -34,6 +34,7 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 | Asistente IA (Groq / Llama 3.3) | ✅ Funcional |
 | Notificaciones de renovación (email diario) | ✅ Configurado — pendiente activar cron en prod |
 | Afiliados en pólizas colectivas | ✅ Funcional (Fase 8 + 9) |
+| Colillas de comisiones (importación + conciliación) | ✅ Funcional (Fase 10) |
 | Email marketing | ⏸ Diferido (se retoma más adelante) |
 | Paginación en Pólizas | ⚠️ Pendiente |
 
@@ -314,6 +315,93 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 
 ---
 
+### Fase 10 — Colillas de comisiones
+**11–27 junio 2026**
+
+#### Preparación (11–18 junio)
+
+**Mejoras al importador de pólizas:**
+- Resolución automática de `vendedor_id` por nombre al importar Excel
+- Normalización de porcentajes: convierte decimales de Excel (0.10) a porcentaje real (10%)
+- Auto-creación de vendedores nuevos encontrados en el Excel
+- Tarifas de comisión configurables: tabla por ramo + aseguradora con % (desde Configuración → Listas)
+- Ramos e aseguradoras en filtros cargados dinámicamente desde la BD (no hardcodeados)
+- Cobros: lista de aseguradoras cargada desde `configuracion` en lugar de lista fija
+
+**Mejoras a pólizas:**
+- Separación en tarjetas independientes: Vendedor, Intermediario y Referido
+- Módulo de detalle elimina columnas Tipo/Riesgo; agrega Vendedor e Intermediario
+- Panel de vista rápida de póliza desde el módulo de Cobros (quick peek lateral)
+
+#### Fase 10.1 — Módulo Colillas de Comisiones (base)
+
+**Modelo de datos:**
+- Nueva tabla `colillas_importacion`: cabecera por colilla (aseguradora, periodo, estado, conteos)
+- Nueva tabla `colilla_lineas`: líneas individuales con `poliza_id`, `numero_poliza_raw`, `nombre_tomador`, `valor_prima`, `valor_comision`, `estado_conciliacion`
+- Estados de conciliación: `conciliada` | `corregida_manual` | `no_encontrada` (+ `probable` client-side only)
+- RLS con `is_workspace_member()` en ambas tablas
+- Migración: `migration_colillas.sql`
+
+**Parsers por aseguradora** (`lib/colillas/parsers/`):
+- SURA (CSV), Seguros Bolívar (XLSX), Solidaria (CSV), 48 Horas (XLSX — usa VOUCHER en vez de N° póliza)
+- Parser base con tipos `ColillaLineaRaw` y `AseguradoraKey`
+
+**Reconciliación server-side** (`lib/colillas/reconciliar.ts`):
+- Paso 1: match exacto por `numero_poliza`
+- Paso 2: match probable por nombre del tomador (≥2 palabras coincidentes de ≥4 chars)
+- `calcularStats()`: conteo de conciliadas/probables/sin-match y total comisión (excluye no_encontradas)
+
+**API Routes:**
+- `POST /api/colillas/parsear` — sube el archivo, detecta parser, reconcilia y devuelve líneas + stats
+- `POST /api/colillas/crear` — guarda colilla en borrador + líneas; actualiza `numero_poliza` en CRM si se solicitó; resuelve `probable` → `corregida_manual` server-side
+- `POST /api/colillas/[id]/confirmar` — RPC atómica que activa la colilla
+- `PATCH /api/colillas/[id]/linea/[lineaId]` — actualiza vinculación de una línea individual
+
+**UI — ImportColillasModal (3 pasos):**
+- **Paso 1 Subir**: selector de aseguradora, período y archivo con drag & drop
+- **Paso 2 Preview**: tabla resumen con stats (conciliadas, sin match, total comisión); aviso especial para 48 Horas
+- **Paso 3 Revisar**: 5 secciones ordenadas por prioridad:
+  1. **Por completar** (azul) — candidato seleccionado pendiente de confirmar; tarjeta de preview con [Cancelar][Crear nueva][✓ Confirmar]
+  2. **Sin match** (ámbar) — buscador multi-campo + link "Crear póliza nueva"
+  3. **Vinculadas manualmente** (verde colapsable) — con botón × para desvincular
+  4. **Posibles coincidencias por nombre** (azul) — checkboxes pre-marcados; desmarcar → sin match
+  5. **Conciliadas automáticamente** (verde colapsable)
+  - Aviso antes de confirmar si hay selecciones pendientes de confirmar
+  - Checkbox "Actualizar N° póliza en CRM" por vinculación manual
+
+**UI — ColillaDetalle:**
+- Tabla de líneas con chips de estado (color por conciliación)
+- `CeldaVincular`: buscador multi-campo inline para vincular manualmente; incluye "Crear póliza nueva" con PolizaModal pre-relleno
+- Botón volver corregido
+
+**UI — ColillasView:**
+- Lista de colillas del workspace con estado, período y aseguradora
+- Botón importar restringido a admin/supervisor
+- Acceso desde sidebar (guard por rol)
+
+#### Fase 10.2 — Mejoras UX y correcciones (post-testing)
+
+**PolizaModal:**
+- Detección de modo crear/editar cambiada de `poliza ?` a `poliza?.id ?` — permite pasar objeto pre-relleno sin ID sin activar modo edición
+- `nombre_tomador` movido a sección 1 "Información básica" (visible sin scrollear)
+- `clienteSearch` pre-poblado con `nombre_tomador` cuando se abre desde colilla en modo crear
+- Etiquetas mejoradas: "Cliente CRM *" vs "Nombre del tomador (en la póliza)"
+
+**Buscador de pólizas (multi-campo):**
+- Busca en paralelo: `numero_poliza`, `nombre_tomador`, `asegurado_nombre` y clientes por nombre/teléfono/email → sus pólizas
+- Eliminado join `clientes()` en la query de pólizas (fallaba si PostgREST no detecta la FK); reemplazado por `clienteMap` construido en pasos separados
+- Dropdown renderizado vía `createPortal` en `document.body` con `position: fixed` (soluciona recorte por `overflow-y-auto` del modal)
+- Muestra spinner "Buscando..." y mensaje "Sin resultados para X" cuando no hay coincidencias
+- Errores de Supabase logeados por consola por query
+
+**Bug investigado (no corregido en código — es un problema de datos):**
+- Algunas pólizas muestran un número de teléfono en el campo `aseguradora`
+- Causa: importación previa desde Excel donde la columna de aseguradora contenía el teléfono del cliente en esas filas, o detección incorrecta de columna
+- Registros duplicados del mismo cliente con los mismos datos (misma fecha) sugieren importación repetida
+- Pendiente: limpiar registros corruptos con query SQL en Supabase
+
+---
+
 ## Migraciones SQL aplicadas en Supabase
 
 | Archivo | Descripción | Estado |
@@ -348,6 +436,7 @@ Herramienta de gestión para la agencia de seguros **Senda Seguros**, construida
 | `migration_tipo_documento.sql` | Campo `tipo_documento` en clientes | ✅ Aplicado |
 | `migration_afiliados.sql` | Tabla `poliza_afiliados`, tipo `grupo_familiar`, `es_colectiva` en pólizas, RBAC afiliados | ✅ Aplicado |
 | `migration_afiliados_v2.sql` | Tabla `poliza_planes`, `afiliado_cambios_plan`, `plan_id` + `prima_individual` + `tipo_documento` en afiliados | ✅ Aplicado |
+| `migration_colillas.sql` | Tablas `colillas_importacion` + `colilla_lineas`, RLS, índices | ✅ Aplicado |
 
 ---
 
@@ -379,8 +468,13 @@ GROQ_API_KEY=...                    ← asistente IA
 
 ## Pendientes y próximos pasos
 
+### 🔴 Bugs conocidos
+- **Pólizas con número de teléfono en campo aseguradora**: datos corruptos de importación Excel previa. Pendiente limpiar con query SQL en Supabase (borrar registros donde `aseguradora` solo contiene dígitos y `numero_poliza` es NULL).
+
 ### 🟡 Mejoras pendientes
 - **Paginación en tabla de Pólizas** (ya implementada en Clientes y Cobros, falta aquí)
+- **Buscador de pólizas en colillas**: campo `nombre_tomador` a veces es NULL y el nombre real está en `asegurado_nombre` — ya corregido en ImportColillasModal, pendiente verificar en ColillaDetalle
+- **Validación al importar pólizas**: rechazar filas donde `aseguradora` contenga solo dígitos para evitar que teléfonos queden en ese campo
 - **Email marketing a clientes** (explícitamente diferido): cuando se retome, Resend está configurado con 100 emails/día → ~500 clientes en 5 días
 
 ### 🟢 Ideas futuras (no priorizadas)
@@ -388,6 +482,7 @@ GROQ_API_KEY=...                    ← asistente IA
 - Integración WhatsApp para notificaciones
 - Reportes exportables a PDF
 - Portal de autogestión para clientes
+- Historial de comisiones por vendedor (a partir de colillas confirmadas)
 
 ---
 
@@ -429,4 +524,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 10 de junio de 2026. Total de commits en `main`: ~107.*
+*Última actualización: 27 de junio de 2026. Total de commits en `main`: ~140+.*
