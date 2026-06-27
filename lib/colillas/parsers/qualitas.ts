@@ -14,9 +14,8 @@ function parseNum(raw: string): number {
 export async function parseQualitas(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const mod = require('pdf-parse')
-    const pdfParse: (b: Buffer) => Promise<{ text: string }> = mod.default ?? mod
-    const { text } = await pdfParse(Buffer.from(buffer))
+    const { PDFParse } = require('pdf-parse')
+    const { text } = await new PDFParse({ data: Buffer.from(buffer) }).getText()
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
