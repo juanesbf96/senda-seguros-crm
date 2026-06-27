@@ -246,7 +246,7 @@ function PasoRevisar({
 }) {
   type PolizaResultado = {
     id: string; numero_poliza: string | null; aseguradora: string
-    ramo: string | null; nombre_tomador: string | null
+    ramo: string | null; nombre_tomador: string | null; asegurado_nombre: string | null
     fecha_fin: string | null; cliente: { nombre: string; telefono: string | null; email: string | null } | null
   }
 
@@ -289,17 +289,19 @@ function PasoRevisar({
     try {
       const q = query.trim()
 
-      // Buscar pólizas por número y por nombre_tomador (sin join)
-      const [{ data: byPol, error: e1 }, { data: byTom, error: e2 }] = await Promise.all([
-        supabase.from('polizas')
-          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, client_id')
+      // Buscar pólizas por número, nombre_tomador y asegurado_nombre (sin join)
+      const BASE_SELECT = 'id, numero_poliza, aseguradora, ramo, nombre_tomador, asegurado_nombre, fecha_fin, client_id'
+      const [{ data: byPol, error: e1 }, { data: byTom, error: e2 }, { data: byAseg, error: e3a }] = await Promise.all([
+        supabase.from('polizas').select(BASE_SELECT)
           .eq('workspace_id', workspaceId).ilike('numero_poliza', `%${q}%`).limit(5),
-        supabase.from('polizas')
-          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, client_id')
+        supabase.from('polizas').select(BASE_SELECT)
           .eq('workspace_id', workspaceId).ilike('nombre_tomador', `%${q}%`).limit(5),
+        supabase.from('polizas').select(BASE_SELECT)
+          .eq('workspace_id', workspaceId).ilike('asegurado_nombre', `%${q}%`).limit(5),
       ])
-      if (e1) console.error('[buscar byPol]', e1)
-      if (e2) console.error('[buscar byTom]', e2)
+      if (e1)  console.error('[buscar byPol]', e1)
+      if (e2)  console.error('[buscar byTom]', e2)
+      if (e3a) console.error('[buscar byAseg]', e3a)
 
       // Buscar clientes por nombre/teléfono/email → luego sus pólizas
       const { data: clientesData, error: e3 } = await supabase.from('clientes')
@@ -325,15 +327,16 @@ function PasoRevisar({
       }
 
       // Combinar y adjuntar datos del cliente si existen
-      type RawRow = { id: string; numero_poliza: string | null; aseguradora: string; ramo: string | null; nombre_tomador: string | null; fecha_fin: string | null; client_id: string | null }
+      type RawRow = { id: string; numero_poliza: string | null; aseguradora: string; ramo: string | null; nombre_tomador: string | null; asegurado_nombre: string | null; fecha_fin: string | null; client_id: string | null }
       const toResultado = (r: RawRow): PolizaResultado => {
         const c = r.client_id ? clienteMap.get(r.client_id) ?? null : null
-        return { id: r.id, numero_poliza: r.numero_poliza, aseguradora: r.aseguradora, ramo: r.ramo, nombre_tomador: r.nombre_tomador, fecha_fin: r.fecha_fin, cliente: c ? { nombre: c.nombre, telefono: c.telefono, email: c.email } : null }
+        return { id: r.id, numero_poliza: r.numero_poliza, aseguradora: r.aseguradora, ramo: r.ramo, nombre_tomador: r.nombre_tomador, asegurado_nombre: r.asegurado_nombre ?? null, fecha_fin: r.fecha_fin, cliente: c ? { nombre: c.nombre, telefono: c.telefono, email: c.email } : null }
       }
 
       const all: PolizaResultado[] = [
-        ...(byPol ?? []).map(r => toResultado(r as RawRow)),
-        ...(byTom ?? []).map(r => toResultado(r as RawRow)),
+        ...(byPol  ?? []).map(r => toResultado(r as RawRow)),
+        ...(byTom  ?? []).map(r => toResultado(r as RawRow)),
+        ...(byAseg ?? []).map(r => toResultado(r as RawRow)),
         ...byCliente.map(r => toResultado(r as RawRow)),
       ]
       const seen = new Set<string>()
@@ -444,7 +447,7 @@ function PasoRevisar({
         )}
         {!estaBuscando && resultados[idx]?.map(p => {
           const c = p.cliente as { nombre: string; telefono: string | null; email: string | null } | null
-          const tomador = p.nombre_tomador || c?.nombre
+          const tomador = p.nombre_tomador || p.asegurado_nombre || c?.nombre
           const vigencia = p.fecha_fin
             ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
             : null
