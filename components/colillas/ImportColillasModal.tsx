@@ -5,7 +5,7 @@ import { supabase }        from '@/lib/supabase/client'
 import { useWorkspace }    from '@/contexts/WorkspaceContext'
 import {
   X, Upload, CheckCircle2, AlertTriangle, Loader2,
-  ChevronRight, ChevronLeft, Search, FileText,
+  ChevronRight, ChevronLeft, Search, FileText, HelpCircle,
 } from 'lucide-react'
 import type { LineaReconciliada } from '@/lib/colillas/reconciliar'
 import { ASEGURADORAS_DISPONIBLES, type AseguradoraKey } from '@/lib/colillas/parsers'
@@ -15,8 +15,31 @@ type Paso = 1 | 2 | 3 | 4
 interface Stats {
   total: number
   conciliadas: number
+  probables: number
   noEncontradas: number
   totalComision: number
+}
+
+interface ActualizarNumero {
+  poliza_id:    string
+  nuevo_numero: string
+}
+
+// ── Highlight: subraya la parte que hizo match ────────────────────────────────
+function Hl({ text, q }: { text: string | null; q: string }) {
+  if (!text) return <span className="text-slate-400">—</span>
+  if (!q) return <>{text}</>
+  const idx = text.toLowerCase().indexOf(q.toLowerCase())
+  if (idx === -1) return <>{text}</>
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="underline decoration-emerald-500 font-semibold text-slate-900">
+        {text.slice(idx, idx + q.length)}
+      </span>
+      {text.slice(idx + q.length)}
+    </>
+  )
 }
 
 interface Props {
@@ -208,184 +231,349 @@ function PasoPreview({
 
 // ─── Paso 3: Revisar líneas sin match ────────────────────────────────────────
 function PasoRevisar({
-  lineas, setLineas, aseguradora, workspaceId, onSiguiente, onVolver, guardando,
+  lineas, setLineas, aseguradora, workspaceId, onConfirmar, onVolver, guardando,
 }: {
-  lineas: LineaReconciliada[]
-  setLineas: (l: LineaReconciliada[]) => void
+  lineas:      LineaReconciliada[]
+  setLineas:   (l: LineaReconciliada[]) => void
   aseguradora: string
   workspaceId: string
-  onSiguiente: () => void
-  onVolver: () => void
-  guardando: boolean
+  onConfirmar: (actualizarNumeros: ActualizarNumero[]) => void
+  onVolver:    () => void
+  guardando:   boolean
 }) {
-  const sinMatch = lineas.filter(l => l.estado_conciliacion !== 'conciliada')
-  const [busquedas, setBusquedas] = useState<Record<number, string>>({})
   type PolizaResultado = {
-    id: string
-    numero_poliza: string | null
-    aseguradora: string
-    ramo: string | null
-    nombre_tomador: string | null
-    fecha_inicio: string | null
-    fecha_fin: string | null
-    cliente: { nombre: string } | null
+    id: string; numero_poliza: string | null; aseguradora: string
+    ramo: string | null; nombre_tomador: string | null
+    fecha_fin: string | null; cliente: { nombre: string; telefono: string | null; email: string | null } | null
   }
-  const [resultados, setResultados] = useState<Record<number, PolizaResultado[]>>({})
-  const [notas, setNotas] = useState<Record<number, string>>({})
 
-  const buscar = useCallback(async (idx: number, query: string) => {
-    setBusquedas(prev => ({ ...prev, [idx]: query }))
-    if (query.length < 3) { setResultados(prev => ({ ...prev, [idx]: [] })); return }
-    const { data } = await supabase
-      .from('polizas')
-      .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_inicio, fecha_fin, cliente:clientes(nombre)')
+  // Estado por índice global de línea
+  const [busquedas,       setBusquedas]       = useState<Record<number, string>>({})
+  const [resultados,      setResultados]       = useState<Record<number, PolizaResultado[]>>({})
+  const [actualizarNum,   setActualizarNum]    = useState<Record<number, boolean>>({})
+  const [probableChecked, setProbableChecked]  = useState<Record<number, boolean>>(() => {
+    const init: Record<number, boolean> = {}
+    lineas.forEach((l, i) => { if (l.estado_conciliacion === 'probable') init[i] = true })
+    return init
+  })
+
+  // Grupos por estado (índice global)
+  const grupos = {
+    sinMatch:   lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'no_encontrada'),
+    probables:  lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'probable'),
+    conciliadas: lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'conciliada'),
+  }
+
+  // ── Búsqueda multi-campo ────────────────────────────────────────────
+  const buscar = useCallback(async (globalIdx: number, query: string) => {
+    setBusquedas(prev => ({ ...prev, [globalIdx]: query }))
+    if (query.length < 2) { setResultados(prev => ({ ...prev, [globalIdx]: [] })); return }
+
+    const q = query.trim()
+
+    // Query 1: por número de póliza o nombre del tomador
+    const [{ data: byPol }, { data: byTom }] = await Promise.all([
+      supabase.from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
+        .eq('workspace_id', workspaceId)
+        .ilike('numero_poliza', `%${q}%`)
+        .limit(5),
+      supabase.from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
+        .eq('workspace_id', workspaceId)
+        .ilike('nombre_tomador', `%${q}%`)
+        .limit(5),
+    ])
+
+    // Query 2: buscar por nombre/teléfono/email del cliente
+    const { data: clientes } = await supabase.from('clientes')
+      .select('id')
       .eq('workspace_id', workspaceId)
-      .ilike('numero_poliza', `%${query}%`)
-      .limit(8)
-    setResultados(prev => ({ ...prev, [idx]: (data ?? []) as unknown as PolizaResultado[] }))
-  }, [supabase, workspaceId])
+      .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`)
+      .limit(6)
 
-  const vincular = (lineaIdx: number, polizaId: string, numeroPoliza: string) => {
-    const globalIdx = lineas.findIndex(
-      (l, i) => l.estado_conciliacion !== 'conciliada' &&
-        sinMatch.indexOf(l) === lineaIdx
-    )
-    // Encontrar índice global correcto
-    let count = 0
-    for (let i = 0; i < lineas.length; i++) {
-      if (lineas[i].estado_conciliacion !== 'conciliada') {
-        if (count === lineaIdx) {
-          const updated = [...lineas]
-          updated[i] = { ...updated[i], poliza_id: polizaId, estado_conciliacion: 'corregida_manual' }
-          setLineas(updated)
-          break
-        }
-        count++
-      }
+    let byCliente: PolizaResultado[] = []
+    if (clientes?.length) {
+      const ids = clientes.map((c: { id: string }) => c.id)
+      const { data } = await supabase.from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
+        .eq('workspace_id', workspaceId)
+        .in('client_id', ids)
+        .limit(5)
+      byCliente = (data ?? []) as unknown as PolizaResultado[]
     }
-    setResultados(prev => ({ ...prev, [lineaIdx]: [] }))
-    setBusquedas(prev => ({ ...prev, [lineaIdx]: numeroPoliza }))
+
+    // Merge y dedup por id
+    const all = [...(byPol ?? []), ...(byTom ?? []), ...byCliente] as PolizaResultado[]
+    const seen = new Set<string>()
+    const merged = all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true })
+    setResultados(prev => ({ ...prev, [globalIdx]: merged.slice(0, 8) }))
+  }, [workspaceId])
+
+  // ── Vincular manualmente una línea sin match ────────────────────────
+  const vincular = (globalIdx: number, pol: PolizaResultado) => {
+    const updated = [...lineas]
+    updated[globalIdx] = {
+      ...updated[globalIdx],
+      poliza_id:           pol.id,
+      estado_conciliacion: 'corregida_manual',
+    }
+    setLineas(updated)
+    setResultados(prev => ({ ...prev, [globalIdx]: [] }))
+    setBusquedas(prev => ({ ...prev, [globalIdx]: pol.numero_poliza ?? '' }))
+    // Por defecto activar "actualizar número" cuando se vincula manualmente
+    setActualizarNum(prev => ({ ...prev, [globalIdx]: true }))
   }
 
-  const desvincular = (lineaIdx: number) => {
-    let count = 0
-    for (let i = 0; i < lineas.length; i++) {
-      if (lineas[i].estado_conciliacion !== 'conciliada' || lineas[i].estado_conciliacion === 'corregida_manual') {
-        if (count === lineaIdx) {
-          const updated = [...lineas]
-          updated[i] = { ...updated[i], poliza_id: null, estado_conciliacion: 'no_encontrada' }
-          setLineas(updated)
-          break
-        }
-        count++
+  const desvincular = (globalIdx: number) => {
+    const updated = [...lineas]
+    updated[globalIdx] = { ...updated[globalIdx], poliza_id: null, estado_conciliacion: 'no_encontrada' }
+    setLineas(updated)
+    setActualizarNum(prev => ({ ...prev, [globalIdx]: false }))
+  }
+
+  // ── Confirmar/rechazar probable ─────────────────────────────────────
+  const toggleProbable = (globalIdx: number, checked: boolean) => {
+    setProbableChecked(prev => ({ ...prev, [globalIdx]: checked }))
+  }
+
+  // ── Submit ──────────────────────────────────────────────────────────
+  const handleSubmit = () => {
+    const updated = [...lineas]
+
+    // Resolver probables según checkbox
+    grupos.probables.forEach(({ i }) => {
+      updated[i] = {
+        ...updated[i],
+        estado_conciliacion: probableChecked[i] !== false ? 'corregida_manual' : 'no_encontrada',
+        poliza_id: probableChecked[i] !== false ? updated[i].poliza_id : null,
       }
-    }
+    })
+    setLineas(updated)
+
+    // Construir lista de actualizaciones de número
+    const actualizarNumeros: ActualizarNumero[] = []
+    lineas.forEach((l, i) => {
+      if (
+        l.estado_conciliacion === 'corregida_manual' &&
+        actualizarNum[i] &&
+        l.poliza_id &&
+        l.numero_poliza_raw
+      ) {
+        actualizarNumeros.push({ poliza_id: l.poliza_id, nuevo_numero: l.numero_poliza_raw })
+      }
+    })
+
+    onConfirmar(actualizarNumeros)
   }
 
   const es48Horas = aseguradora === '48 HORAS'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       {es48Horas && (
-        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" />
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
+          <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
           <span>48 Horas usa <strong>VOUCHER</strong>, no número de póliza. Vincula manualmente cada línea.</span>
         </div>
       )}
 
-      {sinMatch.length === 0 ? (
-        <div className="text-center py-8 text-slate-400 text-sm">
-          <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
-          Todas las líneas están conciliadas
-        </div>
-      ) : (
-        <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
-          {sinMatch.map((linea, idx) => (
-            <div key={idx} className={`border rounded-xl p-3 ${linea.estado_conciliacion === 'corregida_manual' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="text-xs font-mono font-semibold text-slate-700">{linea.numero_poliza_raw}</p>
-                  {linea.nombre_tomador && <p className="text-xs text-slate-500">{linea.nombre_tomador}</p>}
+      {/* ── Sección 1: Sin match — vincular manualmente ── */}
+      {grupos.sinMatch.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Sin match ({grupos.sinMatch.length}) — vincula manualmente
+          </p>
+          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-0.5">
+            {grupos.sinMatch.map(({ l, i }) => (
+              <div key={i} className={`border rounded-xl p-3 text-xs ${
+                l.estado_conciliacion === 'corregida_manual'
+                  ? 'border-emerald-200 bg-emerald-50'
+                  : 'border-amber-200 bg-amber-50'
+              }`}>
+                <div className="flex justify-between mb-2">
+                  <div>
+                    <p className="font-mono font-semibold text-slate-700">{l.numero_poliza_raw}</p>
+                    {l.nombre_tomador && <p className="text-slate-500 mt-0.5">{l.nombre_tomador}</p>}
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
+                    {l.estado_conciliacion === 'corregida_manual'
+                      ? <span className="text-emerald-600">✓ Vinculada</span>
+                      : <span className="text-amber-600">Sin match</span>
+                    }
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs font-semibold text-slate-700">{linea.valor_comision != null ? formatCOP(linea.valor_comision) : '—'}</p>
-                  {linea.estado_conciliacion === 'corregida_manual'
-                    ? <span className="text-xs text-emerald-600 font-medium">✓ Vinculada</span>
-                    : <span className="text-xs text-amber-600">Sin match</span>
-                  }
-                </div>
-              </div>
 
-              {/* Buscador de póliza */}
-              <div className="relative">
-                <div className="relative">
-                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                  <input
-                    type="text"
-                    value={busquedas[idx] ?? ''}
-                    onChange={e => buscar(idx, e.target.value)}
-                    placeholder="Buscar póliza en CRM..."
-                    className="w-full border border-slate-200 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                  />
-                </div>
-                {(resultados[idx]?.length ?? 0) > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg max-h-52 overflow-y-auto">
-                    {resultados[idx].map(p => {
-                      const cliente = (p.cliente as { nombre: string } | null)
-                      const tomador = p.nombre_tomador || cliente?.nombre
-                      const vigencia = p.fecha_fin
-                        ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
-                        : null
-                      return (
-                        <button
-                          key={p.id}
-                          onClick={() => vincular(idx, p.id, p.numero_poliza ?? '')}
-                          className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition-colors"
-                        >
-                          {/* Fila 1: número + aseguradora */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-xs font-semibold text-slate-800">{p.numero_poliza}</span>
-                            <span className="text-[10px] font-medium text-slate-400 shrink-0">{p.aseguradora}</span>
-                          </div>
-                          {/* Fila 2: tomador + ramo */}
-                          <div className="flex items-center justify-between gap-2 mt-0.5">
-                            <span className="text-[11px] text-slate-600 truncate">{tomador ?? '—'}</span>
-                            {p.ramo && <span className="text-[10px] text-slate-400 shrink-0 truncate max-w-[80px]">{p.ramo}</span>}
-                          </div>
-                          {/* Fila 3: vigencia */}
-                          {vigencia && (
-                            <p className="text-[10px] text-slate-400 mt-0.5">Vence: {vigencia}</p>
-                          )}
-                        </button>
-                      )
-                    })}
+                {/* Buscador multi-campo */}
+                {l.estado_conciliacion !== 'corregida_manual' && (
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input
+                      type="text"
+                      value={busquedas[i] ?? ''}
+                      onChange={e => buscar(i, e.target.value)}
+                      placeholder="Buscar por N° póliza, nombre, teléfono o email..."
+                      className="w-full border border-slate-200 rounded-lg pl-6 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                    />
+                    {(resultados[i]?.length ?? 0) > 0 && (
+                      <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+                        {resultados[i].map(p => {
+                          const c = p.cliente as { nombre: string; telefono: string | null; email: string | null } | null
+                          const tomador = p.nombre_tomador || c?.nombre
+                          const q = busquedas[i] ?? ''
+                          const vigencia = p.fecha_fin
+                            ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+                            : null
+                          return (
+                            <button
+                              key={p.id}
+                              onClick={() => vincular(i, p)}
+                              className="w-full text-left px-3 py-2 hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition-colors"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="font-mono text-[11px] font-semibold text-slate-800">
+                                  <Hl text={p.numero_poliza} q={q} />
+                                </span>
+                                <span className="text-[10px] text-slate-400 shrink-0">{p.aseguradora}</span>
+                              </div>
+                              <div className="flex items-center justify-between gap-2 mt-0.5">
+                                <span className="text-[11px] text-slate-600 truncate">
+                                  <Hl text={tomador ?? null} q={q} />
+                                </span>
+                                {p.ramo && <span className="text-[10px] text-slate-400 shrink-0">{p.ramo}</span>}
+                              </div>
+                              {(c?.telefono || c?.email) && (
+                                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                                  <Hl text={c?.telefono ?? c?.email ?? null} q={q} />
+                                </p>
+                              )}
+                              {vigencia && <p className="text-[10px] text-slate-400">Vence: {vigencia}</p>}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Vinculada: checkbox actualizar número + botón quitar */}
+                {l.estado_conciliacion === 'corregida_manual' && (
+                  <div className="mt-2 space-y-1.5">
+                    <label className="flex items-start gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={actualizarNum[i] ?? true}
+                        onChange={e => setActualizarNum(prev => ({ ...prev, [i]: e.target.checked }))}
+                        className="mt-0.5 accent-emerald-500"
+                      />
+                      <span className="text-slate-600 leading-snug">
+                        Actualizar N° póliza en CRM
+                        <span className="text-slate-400 block text-[10px]">
+                          Reemplazar por: <span className="font-mono">{l.numero_poliza_raw}</span>
+                        </span>
+                      </span>
+                    </label>
+                    <button onClick={() => desvincular(i)} className="text-slate-400 hover:text-red-500 text-[10px]">
+                      × Quitar vinculación
+                    </button>
                   </div>
                 )}
               </div>
-
-              {linea.estado_conciliacion === 'corregida_manual' && (
-                <button onClick={() => desvincular(idx)} className="mt-1 text-xs text-slate-400 hover:text-red-500">
-                  × Quitar vinculación
-                </button>
-              )}
-
-              <input
-                type="text"
-                value={notas[idx] ?? ''}
-                onChange={e => setNotas(prev => ({ ...prev, [idx]: e.target.value }))}
-                placeholder="Nota opcional..."
-                className="mt-2 w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400"
-              />
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="flex gap-3">
+      {/* ── Sección 2: Sugerencias por nombre ── */}
+      {grupos.probables.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+            <HelpCircle className="w-3.5 h-3.5" />
+            Posibles coincidencias por nombre ({grupos.probables.length})
+          </p>
+          <p className="text-[11px] text-slate-400 mb-2">Desmarca las que no estés seguro — se importarán como "Sin match".</p>
+          <div className="space-y-2 max-h-56 overflow-y-auto pr-0.5">
+            {grupos.probables.map(({ l, i }) => {
+              const sugerida = l.poliza_sugerida
+              const checked  = probableChecked[i] !== false
+              return (
+                <label
+                  key={i}
+                  className={`flex items-start gap-3 border rounded-xl p-3 cursor-pointer transition-colors ${
+                    checked ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-slate-50'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={e => toggleProbable(i, e.target.checked)}
+                    className="mt-0.5 accent-blue-500 shrink-0"
+                  />
+                  <div className="flex-1 min-w-0 text-xs">
+                    {/* Colilla */}
+                    <div className="flex justify-between items-start gap-2 mb-1">
+                      <div>
+                        <p className="text-slate-400 text-[10px] uppercase tracking-wide">Colilla</p>
+                        <p className="font-mono font-semibold text-slate-700">{l.numero_poliza_raw}</p>
+                        <p className="text-slate-500">{l.nombre_tomador}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-semibold text-slate-700">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
+                      </div>
+                    </div>
+                    {/* Sugerencia CRM */}
+                    {sugerida && (
+                      <div className="bg-white rounded-lg px-2.5 py-2 border border-blue-100 mt-1">
+                        <p className="text-[10px] text-blue-500 uppercase tracking-wide mb-0.5">Póliza CRM sugerida</p>
+                        <p className="font-mono font-semibold text-blue-800">{sugerida.numero_poliza ?? '—'}</p>
+                        <p className="text-slate-500 text-[11px]">{sugerida.nombre_tomador ?? '—'} · {sugerida.aseguradora}</p>
+                      </div>
+                    )}
+                  </div>
+                </label>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sección 3: Conciliadas automáticamente ── */}
+      {grupos.conciliadas.length > 0 && (
+        <details className="group">
+          <summary className="text-xs font-semibold text-emerald-700 uppercase tracking-wider cursor-pointer flex items-center gap-1.5 list-none select-none">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Conciliadas automáticamente ({grupos.conciliadas.length})
+            <span className="text-slate-400 normal-case font-normal ml-1">▸ ver detalle</span>
+          </summary>
+          <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+            {grupos.conciliadas.map(({ l, i }) => (
+              <div key={i} className="flex items-center justify-between text-xs text-slate-600 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <span className="font-mono">{l.numero_poliza_raw}</span>
+                  {l.nombre_tomador && <span className="text-slate-400 truncate text-[11px]">{l.nombre_tomador}</span>}
+                </div>
+                <span className="shrink-0 font-medium">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {grupos.sinMatch.length === 0 && grupos.probables.length === 0 && (
+        <div className="text-center py-6 text-slate-400 text-sm">
+          <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
+          Todas las líneas están conciliadas
+        </div>
+      )}
+
+      <div className="flex gap-3 pt-1">
         <button onClick={onVolver} className="flex-1 flex items-center justify-center gap-1.5 border border-slate-200 rounded-lg py-2.5 text-sm text-slate-600 hover:bg-slate-50">
           <ChevronLeft className="w-4 h-4" /> Volver
         </button>
-        <button onClick={onSiguiente} disabled={guardando} className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
+        <button onClick={handleSubmit} disabled={guardando} className="flex-1 flex items-center justify-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-white text-sm font-medium py-2.5 rounded-lg transition-colors">
           {guardando ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronRight className="w-4 h-4" />}
           {guardando ? 'Guardando...' : 'Confirmar importación'}
         </button>
@@ -453,7 +641,7 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
   })
   const [archivo, setArchivo]     = useState<File | null>(null)
   const [lineas, setLineas]       = useState<LineaReconciliada[]>([])
-  const [stats, setStats]         = useState<Stats>({ total: 0, conciliadas: 0, noEncontradas: 0, totalComision: 0 })
+  const [stats, setStats]         = useState<Stats>({ total: 0, conciliadas: 0, probables: 0, noEncontradas: 0, totalComision: 0 })
   const [colillaId, setColillaId] = useState<string | null>(null)
   const [cargando, setCargando]   = useState(false)
   const [guardando, setGuardando] = useState(false)
@@ -482,7 +670,7 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
     }
   }
 
-  const handleConfirmar = async () => {
+  const handleConfirmar = async (actualizarNumeros: ActualizarNumero[] = []) => {
     if (!currentWorkspace) return
     setGuardando(true)
     try {
@@ -491,11 +679,12 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          workspace_id:   currentWorkspace.id,
+          workspace_id:      currentWorkspace.id,
           aseguradora,
           periodo,
-          archivo_nombre: archivo?.name ?? 'desconocido',
+          archivo_nombre:    archivo?.name ?? 'desconocido',
           lineas,
+          actualizar_numeros: actualizarNumeros,
         }),
       })
       const jsonCrear = await resCrear.json()
@@ -512,7 +701,7 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
       const conciliadas   = lineas.filter(l => l.estado_conciliacion === 'conciliada').length
       const corregidas    = lineas.filter(l => l.estado_conciliacion === 'corregida_manual').length
       const noEncontradas = lineas.filter(l => l.estado_conciliacion === 'no_encontrada').length
-      setStats({ total: lineas.length, conciliadas: conciliadas + corregidas, noEncontradas, totalComision: stats.totalComision })
+      setStats({ total: lineas.length, conciliadas: conciliadas + corregidas, probables: 0, noEncontradas, totalComision: stats.totalComision })
       setColillaId(nuevoColillaId)
       setPaso(4)
       onConfirmada()
@@ -523,7 +712,7 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
 
   const resetear = () => {
     setPaso(1); setArchivo(null); setLineas([]); setError('')
-    setStats({ total: 0, conciliadas: 0, noEncontradas: 0, totalComision: 0 })
+    setStats({ total: 0, conciliadas: 0, probables: 0, noEncontradas: 0, totalComision: 0 })
   }
 
   return (
@@ -575,7 +764,7 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
             <PasoPreview
               lineas={lineas} stats={stats}
               aseguradora={aseguradora} periodo={periodo}
-              onSiguiente={() => lineas.some(l => l.estado_conciliacion === 'no_encontrada') ? setPaso(3) : handleConfirmar()}
+              onSiguiente={() => lineas.some(l => l.estado_conciliacion === 'no_encontrada' || l.estado_conciliacion === 'probable') ? setPaso(3) : handleConfirmar()}
               onVolver={() => setPaso(1)}
             />
           )}
@@ -584,7 +773,7 @@ export default function ImportColillasModal({ onClose, onConfirmada }: Props) {
               lineas={lineas} setLineas={setLineas}
               aseguradora={aseguradora}
               workspaceId={currentWorkspace.id}
-              onSiguiente={handleConfirmar}
+              onConfirmar={handleConfirmar}
               onVolver={() => setPaso(2)}
               guardando={guardando}
             />
