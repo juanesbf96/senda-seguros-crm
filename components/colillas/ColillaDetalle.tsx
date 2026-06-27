@@ -5,10 +5,11 @@ import { supabase }          from '@/lib/supabase/client'
 import { useWorkspace }      from '@/contexts/WorkspaceContext'
 import {
   ArrowLeft, CheckCircle2, AlertTriangle, Edit3, Loader2,
-  Search, X, Trash2, Pencil,
+  Search, X, Trash2, Pencil, Plus,
 } from 'lucide-react'
 import PolizaQuickView from '@/components/polizas/PolizaQuickView'
-import type { ColillaImportacion, ColillaLinea } from '@/types'
+import PolizaModal     from '@/components/polizas/PolizaModal'
+import type { ColillaImportacion, ColillaLinea, Poliza } from '@/types'
 
 function formatCOP(n: number | null) {
   if (n == null) return '—'
@@ -25,7 +26,32 @@ interface Props {
   onEliminada?: () => void
 }
 
-interface PolizaResult { id: string; numero_poliza: string | null; aseguradora: string }
+interface PolizaResult {
+  id: string
+  numero_poliza: string | null
+  aseguradora: string
+  ramo: string | null
+  nombre_tomador: string | null
+  fecha_fin: string | null
+  cliente: { nombre: string; telefono: string | null; email: string | null } | null
+}
+
+// Subraya el fragmento que hizo match
+function Hl({ text, q }: { text: string | null; q: string }) {
+  if (!text) return <span className="text-slate-400">—</span>
+  if (!q)    return <>{text}</>
+  const idx = text.toLowerCase().indexOf(q.toLowerCase())
+  if (idx === -1) return <>{text}</>
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="underline decoration-emerald-500 font-semibold text-slate-900">
+        {text.slice(idx, idx + q.length)}
+      </span>
+      {text.slice(idx + q.length)}
+    </>
+  )
+}
 
 // ── Celda editable para líneas sin match ─────────────────────────────────────
 function CeldaVincular({
@@ -35,54 +61,100 @@ function CeldaVincular({
   workspaceId: string
   onActualizada: (lineaId: string, polizaId: string | null, estado: string) => void
 }) {
-  const [abierto, setAbierto]     = useState(false)
-  const [busqueda, setBusqueda]   = useState('')
-  const [resultados, setResultados] = useState<PolizaResult[]>([])
-  const [guardando, setGuardando] = useState(false)
+  const [abierto,     setAbierto]     = useState(false)
+  const [busqueda,    setBusqueda]    = useState('')
+  const [resultados,  setResultados]  = useState<PolizaResult[]>([])
+  const [guardando,   setGuardando]   = useState(false)
+  const [crearModal,  setCrearModal]  = useState(false)
 
   const polizaVinculada = (linea as unknown as { poliza: PolizaResult | null }).poliza
 
-  const buscar = useCallback(async (q: string) => {
-    setBusqueda(q)
-    if (q.length < 2) { setResultados([]); return }
-    const { data } = await supabase
-      .from('polizas')
-      .select('id, numero_poliza, aseguradora')
+  // ── Búsqueda multi-campo ──────────────────────────────────────────
+  const buscar = useCallback(async (query: string) => {
+    setBusqueda(query)
+    if (query.length < 2) { setResultados([]); return }
+    const q = query.trim()
+
+    const [{ data: byPol }, { data: byTom }] = await Promise.all([
+      supabase.from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
+        .eq('workspace_id', workspaceId)
+        .ilike('numero_poliza', `%${q}%`)
+        .limit(5),
+      supabase.from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
+        .eq('workspace_id', workspaceId)
+        .ilike('nombre_tomador', `%${q}%`)
+        .limit(5),
+    ])
+
+    const { data: clientes } = await supabase.from('clientes')
+      .select('id')
       .eq('workspace_id', workspaceId)
-      .ilike('numero_poliza', `%${q}%`)
+      .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`)
       .limit(6)
-    setResultados((data ?? []) as PolizaResult[])
+
+    let byCliente: PolizaResult[] = []
+    if (clientes?.length) {
+      const ids = clientes.map((c: { id: string }) => c.id)
+      const { data } = await supabase.from('polizas')
+        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
+        .eq('workspace_id', workspaceId)
+        .in('client_id', ids)
+        .limit(5)
+      byCliente = (data ?? []) as unknown as PolizaResult[]
+    }
+
+    const all  = [...(byPol ?? []), ...(byTom ?? []), ...byCliente] as PolizaResult[]
+    const seen = new Set<string>()
+    setResultados(all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true }).slice(0, 8))
   }, [workspaceId])
 
+  // ── Vincular a póliza existente ───────────────────────────────────
   const vincular = async (poliza: PolizaResult) => {
     setGuardando(true)
-    const res = await fetch(
-      `/api/colillas/${linea.colilla_id}/linea/${linea.id}`,
-      {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ poliza_id: poliza.id }),
-      }
-    )
-    if (res.ok) {
-      onActualizada(linea.id, poliza.id, 'corregida_manual')
-    }
+    const res = await fetch(`/api/colillas/${linea.colilla_id}/linea/${linea.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ poliza_id: poliza.id }),
+    })
+    if (res.ok) onActualizada(linea.id, poliza.id, 'corregida_manual')
     setGuardando(false)
     setAbierto(false)
     setResultados([])
     setBusqueda('')
   }
 
-  const desvincular = async () => {
+  // ── Tras crear póliza nueva: buscar la más reciente y vincularla ──
+  const handlePolizaCreada = async () => {
+    setCrearModal(false)
     setGuardando(true)
-    const res = await fetch(
-      `/api/colillas/${linea.colilla_id}/linea/${linea.id}`,
-      {
+    const { data } = await supabase
+      .from('polizas')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+    if (data?.id) {
+      const res = await fetch(`/api/colillas/${linea.colilla_id}/linea/${linea.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ poliza_id: null }),
-      }
-    )
+        body: JSON.stringify({ poliza_id: data.id }),
+      })
+      if (res.ok) onActualizada(linea.id, data.id, 'corregida_manual')
+    }
+    setGuardando(false)
+    setAbierto(false)
+  }
+
+  const desvincular = async () => {
+    setGuardando(true)
+    const res = await fetch(`/api/colillas/${linea.colilla_id}/linea/${linea.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ poliza_id: null }),
+    })
     if (res.ok) onActualizada(linea.id, null, 'no_encontrada')
     setGuardando(false)
   }
@@ -103,39 +175,89 @@ function CeldaVincular({
 
   // Modo búsqueda abierto
   if (abierto) {
+    // Prefill para PolizaModal en modo crear
+    const preRelleno = {
+      numero_poliza: linea.numero_poliza_raw,
+      nombre_tomador: linea.nombre_tomador ?? '',
+    } as unknown as Poliza
+
     return (
-      <div className="relative">
-        <div className="flex items-center gap-1">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-            <input
-              autoFocus
-              type="text"
-              value={busqueda}
-              onChange={e => buscar(e.target.value)}
-              placeholder="N° póliza..."
-              className="pl-6 pr-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-400 w-36"
-            />
+      <>
+        <div className="relative">
+          <div className="flex items-center gap-1">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+              <input
+                autoFocus
+                type="text"
+                value={busqueda}
+                onChange={e => buscar(e.target.value)}
+                placeholder="N° póliza, nombre, teléfono..."
+                className="pl-6 pr-2 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-400 w-44"
+              />
+            </div>
+            <button onClick={() => { setAbierto(false); setResultados([]) }} className="text-slate-400 hover:text-slate-600">
+              <X className="w-3.5 h-3.5" />
+            </button>
           </div>
-          <button onClick={() => { setAbierto(false); setResultados([]) }} className="text-slate-400 hover:text-slate-600">
-            <X className="w-3.5 h-3.5" />
-          </button>
+
+          {/* Dropdown resultados */}
+          <div className="absolute z-20 left-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl w-64 max-h-56 overflow-y-auto">
+            {resultados.map(p => {
+              const c      = p.cliente
+              const tomador = p.nombre_tomador || c?.nombre
+              const q       = busqueda
+              const vigencia = p.fecha_fin
+                ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+                : null
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => vincular(p)}
+                  className="w-full text-left px-3 py-2 hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-mono text-[11px] font-semibold text-slate-800">
+                      <Hl text={p.numero_poliza} q={q} />
+                    </span>
+                    <span className="text-[10px] text-slate-400 shrink-0">{p.aseguradora}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 mt-0.5">
+                    <span className="text-[11px] text-slate-600 truncate">
+                      <Hl text={tomador ?? null} q={q} />
+                    </span>
+                    {p.ramo && <span className="text-[10px] text-slate-400 shrink-0">{p.ramo}</span>}
+                  </div>
+                  {(c?.telefono || c?.email) && (
+                    <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                      <Hl text={c?.telefono ?? c?.email ?? null} q={q} />
+                    </p>
+                  )}
+                  {vigencia && <p className="text-[10px] text-slate-400">Vence: {vigencia}</p>}
+                </button>
+              )
+            })}
+
+            {/* Opción crear póliza — siempre visible al final */}
+            <button
+              onClick={() => setCrearModal(true)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-emerald-700 font-medium hover:bg-emerald-50 border-t border-slate-100 transition-colors"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Crear póliza nueva
+            </button>
+          </div>
         </div>
-        {resultados.length > 0 && (
-          <div className="absolute z-20 left-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg w-52 max-h-40 overflow-y-auto">
-            {resultados.map(p => (
-              <button
-                key={p.id}
-                onClick={() => vincular(p)}
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-slate-50 flex justify-between gap-2"
-              >
-                <span className="font-mono">{p.numero_poliza}</span>
-                <span className="text-slate-400 truncate">{p.aseguradora}</span>
-              </button>
-            ))}
-          </div>
+
+        {/* Modal de creación */}
+        {crearModal && (
+          <PolizaModal
+            poliza={preRelleno}
+            onClose={() => setCrearModal(false)}
+            onSaved={handlePolizaCreada}
+          />
         )}
-      </div>
+      </>
     )
   }
 

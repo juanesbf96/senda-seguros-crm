@@ -343,7 +343,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       workspace_id: currentWorkspace?.id,
     }
 
-    const { error: err } = poliza
+    const { error: err } = poliza?.id
       ? await supabase.from('polizas').update(payload).eq('id', poliza.id)
       : await supabase.from('polizas').insert(payload)
 
