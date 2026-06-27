@@ -316,16 +316,25 @@ export default function ColillaDetalle({ colillaId, onVolver, onEliminada }: Pro
   }
 
   const handleEliminar = async () => {
-    if (!confirm(`¿Eliminar esta importación (${colilla?.aseguradora} · ${colilla?.periodo})?\nEsta acción no se puede deshacer.`)) return
+    if (!confirm(`¿Eliminar esta importación (${colilla?.aseguradora} · ${colilla?.periodo})?\nSe restaurarán los valores de comisión anteriores en las pólizas vinculadas.`)) return
+    if (!currentWorkspace) return
     setEliminando(true)
-    const { error } = await supabase
-      .from('colillas_importacion')
-      .delete()
-      .eq('id', colillaId)
-    setEliminando(false)
-    if (!error) {
+    try {
+      const res = await fetch(`/api/colillas/${colillaId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: currentWorkspace.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('[eliminar colilla detalle]', err)
+        alert('Error al eliminar la importación')
+        return
+      }
       onEliminada?.()
       onVolver()
+    } finally {
+      setEliminando(false)
     }
   }
 

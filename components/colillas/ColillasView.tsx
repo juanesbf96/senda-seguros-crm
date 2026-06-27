@@ -40,11 +40,25 @@ export default function ColillasView() {
 
   const handleEliminarFila = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation()
-    if (!confirm('¿Eliminar esta importación? Esta acción no se puede deshacer.')) return
+    if (!confirm('¿Eliminar esta importación? Se restaurarán los valores de comisión anteriores en las pólizas vinculadas.')) return
+    if (!currentWorkspace) return
     setEliminandoId(id)
-    await supabase.from('colillas_importacion').delete().eq('id', id)
-    setColillas(prev => prev.filter(c => c.id !== id))
-    setEliminandoId(null)
+    try {
+      const res = await fetch(`/api/colillas/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workspace_id: currentWorkspace.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        console.error('[eliminar colilla]', err)
+        alert('Error al eliminar la importación')
+        return
+      }
+      setColillas(prev => prev.filter(c => c.id !== id))
+    } finally {
+      setEliminandoId(null)
+    }
   }
 
   const cargar = useCallback(async () => {
