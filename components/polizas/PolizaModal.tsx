@@ -496,6 +496,11 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 </select>
               </Field>
             </div>
+
+            <Field label="Nombre del tomador">
+              <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
+                placeholder="Nombre del tomador de la póliza" className={cls} />
+            </Field>
           </Section>
 
           {/* ── 2. Fechas ── */}
@@ -542,10 +547,6 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
           {/* ── 4. Roles ── */}
           <Section title="Tomador / Asegurado / Beneficiario">
-            <Field label="Tomador">
-              <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
-                placeholder="Nombre del tomador de la póliza" className={cls} />
-            </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Asegurado (nombre)">
                 <input value={form.asegurado_nombre} onChange={e => set('asegurado_nombre', e.target.value)}
