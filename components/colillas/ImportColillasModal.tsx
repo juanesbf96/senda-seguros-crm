@@ -5,9 +5,11 @@ import { supabase }        from '@/lib/supabase/client'
 import { useWorkspace }    from '@/contexts/WorkspaceContext'
 import {
   X, Upload, CheckCircle2, AlertTriangle, Loader2,
-  ChevronRight, ChevronLeft, Search, FileText, HelpCircle,
+  ChevronRight, ChevronLeft, Search, FileText, HelpCircle, Plus, Clock,
 } from 'lucide-react'
+import PolizaModal from '@/components/polizas/PolizaModal'
 import type { LineaReconciliada } from '@/lib/colillas/reconciliar'
+import type { Poliza } from '@/types'
 import { ASEGURADORAS_DISPONIBLES, type AseguradoraKey } from '@/lib/colillas/parsers'
 
 type Paso = 1 | 2 | 3 | 4
@@ -247,101 +249,115 @@ function PasoRevisar({
     fecha_fin: string | null; cliente: { nombre: string; telefono: string | null; email: string | null } | null
   }
 
-  // Estado por índice global de línea
-  const [busquedas,       setBusquedas]       = useState<Record<number, string>>({})
-  const [resultados,      setResultados]       = useState<Record<number, PolizaResultado[]>>({})
-  const [actualizarNum,   setActualizarNum]    = useState<Record<number, boolean>>({})
-  const [probableChecked, setProbableChecked]  = useState<Record<number, boolean>>(() => {
+  const [busquedas,       setBusquedas]      = useState<Record<number, string>>({})
+  const [resultados,      setResultados]     = useState<Record<number, PolizaResultado[]>>({})
+  const [actualizarNum,   setActualizarNum]  = useState<Record<number, boolean>>({})
+  const [probableChecked, setProbableChecked] = useState<Record<number, boolean>>(() => {
     const init: Record<number, boolean> = {}
     lineas.forEach((l, i) => { if (l.estado_conciliacion === 'probable') init[i] = true })
     return init
   })
+  // Candidato seleccionado pero aún no confirmado (estado "por completar")
+  const [pendiente,      setPendiente]      = useState<Record<number, PolizaResultado>>({})
+  // Índice de línea para el que se quiere crear póliza nueva
+  const [crearPolizaIdx, setCrearPolizaIdx] = useState<number | null>(null)
 
   // Grupos por estado (índice global)
   const grupos = {
-    sinMatch:   lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'no_encontrada'),
-    probables:  lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'probable'),
+    sinMatch:    lineas.map((l, i) => ({ l, i })).filter(({ l, i }) =>
+      l.estado_conciliacion === 'no_encontrada' && !pendiente[i]),
+    porCompletar: lineas.map((l, i) => ({ l, i })).filter(({ l, i }) =>
+      l.estado_conciliacion === 'no_encontrada' && !!pendiente[i]),
+    corregidas:  lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'corregida_manual'),
+    probables:   lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'probable'),
     conciliadas: lineas.map((l, i) => ({ l, i })).filter(({ l }) => l.estado_conciliacion === 'conciliada'),
   }
 
-  // ── Búsqueda multi-campo ────────────────────────────────────────────
-  const buscar = useCallback(async (globalIdx: number, query: string) => {
-    setBusquedas(prev => ({ ...prev, [globalIdx]: query }))
-    if (query.length < 2) { setResultados(prev => ({ ...prev, [globalIdx]: [] })); return }
-
+  // ── Búsqueda multi-campo ───────────────────────────────────────────
+  const buscar = useCallback(async (idx: number, query: string) => {
+    setBusquedas(prev => ({ ...prev, [idx]: query }))
+    if (query.length < 2) { setResultados(prev => ({ ...prev, [idx]: [] })); return }
     const q = query.trim()
-
-    // Query 1: por número de póliza o nombre del tomador
     const [{ data: byPol }, { data: byTom }] = await Promise.all([
       supabase.from('polizas')
         .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
-        .eq('workspace_id', workspaceId)
-        .ilike('numero_poliza', `%${q}%`)
-        .limit(5),
+        .eq('workspace_id', workspaceId).ilike('numero_poliza', `%${q}%`).limit(5),
       supabase.from('polizas')
         .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
-        .eq('workspace_id', workspaceId)
-        .ilike('nombre_tomador', `%${q}%`)
-        .limit(5),
+        .eq('workspace_id', workspaceId).ilike('nombre_tomador', `%${q}%`).limit(5),
     ])
-
-    // Query 2: buscar por nombre/teléfono/email del cliente
     const { data: clientes } = await supabase.from('clientes')
-      .select('id')
-      .eq('workspace_id', workspaceId)
-      .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`)
-      .limit(6)
-
+      .select('id').eq('workspace_id', workspaceId)
+      .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`).limit(6)
     let byCliente: PolizaResultado[] = []
     if (clientes?.length) {
       const ids = clientes.map((c: { id: string }) => c.id)
       const { data } = await supabase.from('polizas')
         .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
-        .eq('workspace_id', workspaceId)
-        .in('client_id', ids)
-        .limit(5)
+        .eq('workspace_id', workspaceId).in('client_id', ids).limit(5)
       byCliente = (data ?? []) as unknown as PolizaResultado[]
     }
-
-    // Merge y dedup por id
     const all = [...(byPol ?? []), ...(byTom ?? []), ...byCliente] as PolizaResultado[]
     const seen = new Set<string>()
-    const merged = all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true })
-    setResultados(prev => ({ ...prev, [globalIdx]: merged.slice(0, 8) }))
+    setResultados(prev => ({
+      ...prev,
+      [idx]: all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true }).slice(0, 8),
+    }))
   }, [workspaceId])
 
-  // ── Vincular manualmente una línea sin match ────────────────────────
-  const vincular = (globalIdx: number, pol: PolizaResultado) => {
+  // ── Seleccionar candidato (sin confirmar aún) ──────────────────────
+  const seleccionar = (idx: number, pol: PolizaResultado) => {
+    setPendiente(prev => ({ ...prev, [idx]: pol }))
+    setResultados(prev => ({ ...prev, [idx]: [] }))
+    setBusquedas(prev => ({ ...prev, [idx]: '' }))
+  }
+
+  // ── Confirmar el candidato pendiente → corregida_manual ───────────
+  const confirmarVinculo = (idx: number) => {
+    const pol = pendiente[idx]
+    if (!pol) return
     const updated = [...lineas]
-    updated[globalIdx] = {
-      ...updated[globalIdx],
-      poliza_id:           pol.id,
-      estado_conciliacion: 'corregida_manual',
+    updated[idx] = { ...updated[idx], poliza_id: pol.id, estado_conciliacion: 'corregida_manual' }
+    setLineas(updated)
+    setPendiente(prev => { const n = { ...prev }; delete n[idx]; return n })
+    setActualizarNum(prev => ({ ...prev, [idx]: true }))
+  }
+
+  // ── Cancelar candidato pendiente → vuelve a buscar ────────────────
+  const cancelarPendiente = (idx: number) => {
+    setPendiente(prev => { const n = { ...prev }; delete n[idx]; return n })
+  }
+
+  // ── Tras crear póliza nueva → vincular directamente ───────────────
+  const handlePolizaCreada = async (idx: number) => {
+    setCrearPolizaIdx(null)
+    const { data } = await supabase.from('polizas')
+      .select('id')
+      .eq('workspace_id', workspaceId)
+      .order('created_at', { ascending: false })
+      .limit(1).single()
+    if (data?.id) {
+      const updated = [...lineas]
+      updated[idx] = { ...updated[idx], poliza_id: data.id, estado_conciliacion: 'corregida_manual' }
+      setLineas(updated)
+      setActualizarNum(prev => ({ ...prev, [idx]: true }))
+      setPendiente(prev => { const n = { ...prev }; delete n[idx]; return n })
     }
-    setLineas(updated)
-    setResultados(prev => ({ ...prev, [globalIdx]: [] }))
-    setBusquedas(prev => ({ ...prev, [globalIdx]: pol.numero_poliza ?? '' }))
-    // Por defecto activar "actualizar número" cuando se vincula manualmente
-    setActualizarNum(prev => ({ ...prev, [globalIdx]: true }))
   }
 
-  const desvincular = (globalIdx: number) => {
+  const desvincular = (idx: number) => {
     const updated = [...lineas]
-    updated[globalIdx] = { ...updated[globalIdx], poliza_id: null, estado_conciliacion: 'no_encontrada' }
+    updated[idx] = { ...updated[idx], poliza_id: null, estado_conciliacion: 'no_encontrada' }
     setLineas(updated)
-    setActualizarNum(prev => ({ ...prev, [globalIdx]: false }))
+    setActualizarNum(prev => ({ ...prev, [idx]: false }))
   }
 
-  // ── Confirmar/rechazar probable ─────────────────────────────────────
-  const toggleProbable = (globalIdx: number, checked: boolean) => {
-    setProbableChecked(prev => ({ ...prev, [globalIdx]: checked }))
-  }
+  const toggleProbable = (idx: number, checked: boolean) =>
+    setProbableChecked(prev => ({ ...prev, [idx]: checked }))
 
-  // ── Submit ──────────────────────────────────────────────────────────
+  // ── Submit ────────────────────────────────────────────────────────
   const handleSubmit = () => {
     const updated = [...lineas]
-
-    // Resolver probables según checkbox
     grupos.probables.forEach(({ i }) => {
       updated[i] = {
         ...updated[i],
@@ -350,143 +366,223 @@ function PasoRevisar({
       }
     })
     setLineas(updated)
-
-    // Construir lista de actualizaciones de número
     const actualizarNumeros: ActualizarNumero[] = []
     lineas.forEach((l, i) => {
-      if (
-        l.estado_conciliacion === 'corregida_manual' &&
-        actualizarNum[i] &&
-        l.poliza_id &&
-        l.numero_poliza_raw
-      ) {
+      if (l.estado_conciliacion === 'corregida_manual' && actualizarNum[i] && l.poliza_id && l.numero_poliza_raw)
         actualizarNumeros.push({ poliza_id: l.poliza_id, nuevo_numero: l.numero_poliza_raw })
-      }
     })
-
     onConfirmar(actualizarNumeros)
   }
 
+  const pendientesCount = Object.keys(pendiente).length
   const es48Horas = aseguradora === '48 HORAS'
+
+  // ── Helper: dropdown de resultados de búsqueda ────────────────────
+  function DropdownResultados({ idx }: { idx: number }) {
+    const q = busquedas[idx] ?? ''
+    if ((resultados[idx]?.length ?? 0) === 0) return null
+    return (
+      <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
+        {resultados[idx].map(p => {
+          const c = p.cliente as { nombre: string; telefono: string | null; email: string | null } | null
+          const tomador = p.nombre_tomador || c?.nombre
+          const vigencia = p.fecha_fin
+            ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+            : null
+          return (
+            <button key={p.id} onClick={() => seleccionar(idx, p)}
+              className="w-full text-left px-3 py-2 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-mono text-[11px] font-semibold text-slate-800"><Hl text={p.numero_poliza} q={q} /></span>
+                <span className="text-[10px] text-slate-400 shrink-0">{p.aseguradora}</span>
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-0.5">
+                <span className="text-[11px] text-slate-600 truncate"><Hl text={tomador ?? null} q={q} /></span>
+                {p.ramo && <span className="text-[10px] text-slate-400 shrink-0">{p.ramo}</span>}
+              </div>
+              {(c?.telefono || c?.email) && (
+                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
+                  <Hl text={c?.telefono ?? c?.email ?? null} q={q} />
+                </p>
+              )}
+              {vigencia && <p className="text-[10px] text-slate-400">Vence: {vigencia}</p>}
+            </button>
+          )
+        })}
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-5">
       {es48Horas && (
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-500" />
-          <span>48 Horas usa <strong>VOUCHER</strong>, no número de póliza. Vincula manualmente cada línea.</span>
+          <span>48 Horas usa <strong>VOUCHER</strong>. Vincula manualmente cada línea.</span>
         </div>
       )}
 
-      {/* ── Sección 1: Sin match — vincular manualmente ── */}
+      {/* ── Sección 1: Por completar (candidato seleccionado, sin confirmar) ── */}
+      {grupos.porCompletar.length > 0 && (
+        <div>
+          <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            Por completar ({grupos.porCompletar.length}) — confirma o cancela cada vinculación
+          </p>
+          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-0.5">
+            {grupos.porCompletar.map(({ l, i }) => {
+              const pol = pendiente[i]
+              const tomadorPol = pol.nombre_tomador || (pol.cliente as { nombre: string } | null)?.nombre
+              const vigencia = pol.fecha_fin
+                ? new Date(pol.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
+                : null
+              const preRelleno = {
+                numero_poliza: l.numero_poliza_raw,
+                nombre_tomador: l.nombre_tomador ?? '',
+                aseguradora,
+              } as unknown as Poliza
+              return (
+                <div key={i} className="border border-blue-200 bg-blue-50 rounded-xl p-3 text-xs">
+                  {/* Datos de la colilla */}
+                  <div className="flex justify-between mb-2">
+                    <div>
+                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Colilla</p>
+                      <p className="font-mono font-semibold text-slate-700">{l.numero_poliza_raw}</p>
+                      {l.nombre_tomador && <p className="text-slate-500">{l.nombre_tomador}</p>}
+                    </div>
+                    <p className="font-semibold text-slate-700 shrink-0">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
+                  </div>
+
+                  {/* Póliza CRM seleccionada */}
+                  <div className="bg-white rounded-lg px-3 py-2 border border-blue-100">
+                    <p className="text-[10px] text-blue-500 uppercase tracking-wide mb-1">Póliza CRM seleccionada</p>
+                    <p className="font-mono font-semibold text-blue-800">{pol.numero_poliza ?? '—'}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {tomadorPol && <span className="text-slate-600 text-[11px]">{tomadorPol}</span>}
+                      <span className="text-slate-400 text-[10px]">{pol.aseguradora}</span>
+                      {pol.ramo && <span className="text-slate-400 text-[10px]">· {pol.ramo}</span>}
+                    </div>
+                    {vigencia && <p className="text-[10px] text-slate-400 mt-0.5">Vence: {vigencia}</p>}
+                  </div>
+
+                  {/* Checkbox actualizar número */}
+                  <label className="flex items-center gap-2 mt-2 cursor-pointer select-none">
+                    <input type="checkbox"
+                      checked={actualizarNum[i] ?? true}
+                      onChange={e => setActualizarNum(prev => ({ ...prev, [i]: e.target.checked }))}
+                      className="accent-blue-500" />
+                    <span className="text-slate-600 text-[11px]">
+                      Actualizar N° póliza en CRM
+                      <span className="text-slate-400 ml-1 font-mono">{l.numero_poliza_raw}</span>
+                    </span>
+                  </label>
+
+                  {/* Acciones */}
+                  <div className="flex gap-2 mt-2">
+                    <button onClick={() => cancelarPendiente(i)}
+                      className="flex-1 text-center text-slate-500 border border-slate-200 rounded-lg py-1.5 hover:bg-white text-[11px] transition-colors">
+                      Cancelar
+                    </button>
+                    <button onClick={() => setCrearPolizaIdx(i)}
+                      className="flex items-center justify-center gap-1 flex-1 text-emerald-700 border border-emerald-200 rounded-lg py-1.5 hover:bg-emerald-50 text-[11px] transition-colors">
+                      <Plus className="w-3 h-3" /> Crear nueva
+                    </button>
+                    <button onClick={() => confirmarVinculo(i)}
+                      className="flex-1 text-center bg-blue-500 hover:bg-blue-600 text-white rounded-lg py-1.5 text-[11px] font-medium transition-colors">
+                      ✓ Confirmar
+                    </button>
+                  </div>
+
+                  {crearPolizaIdx === i && (
+                    <PolizaModal poliza={preRelleno} onClose={() => setCrearPolizaIdx(null)} onSaved={() => handlePolizaCreada(i)} />
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Sección 2: Sin match (buscando) ── */}
       {grupos.sinMatch.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <AlertTriangle className="w-3.5 h-3.5" />
-            Sin match ({grupos.sinMatch.length}) — vincula manualmente
+            Sin match ({grupos.sinMatch.length}) — busca la póliza o crea una nueva
           </p>
           <div className="space-y-2.5 max-h-64 overflow-y-auto pr-0.5">
-            {grupos.sinMatch.map(({ l, i }) => (
-              <div key={i} className={`border rounded-xl p-3 text-xs ${
-                l.estado_conciliacion === 'corregida_manual'
-                  ? 'border-emerald-200 bg-emerald-50'
-                  : 'border-amber-200 bg-amber-50'
-              }`}>
-                <div className="flex justify-between mb-2">
-                  <div>
-                    <p className="font-mono font-semibold text-slate-700">{l.numero_poliza_raw}</p>
-                    {l.nombre_tomador && <p className="text-slate-500 mt-0.5">{l.nombre_tomador}</p>}
+            {grupos.sinMatch.map(({ l, i }) => {
+              const preRelleno = {
+                numero_poliza: l.numero_poliza_raw,
+                nombre_tomador: l.nombre_tomador ?? '',
+                aseguradora,
+              } as unknown as Poliza
+              return (
+                <div key={i} className="border border-amber-200 bg-amber-50 rounded-xl p-3 text-xs">
+                  <div className="flex justify-between mb-2">
+                    <div>
+                      <p className="font-mono font-semibold text-slate-700">{l.numero_poliza_raw}</p>
+                      {l.nombre_tomador && <p className="text-slate-500 mt-0.5">{l.nombre_tomador}</p>}
+                    </div>
+                    <p className="font-semibold text-slate-700 shrink-0">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
-                    {l.estado_conciliacion === 'corregida_manual'
-                      ? <span className="text-emerald-600">✓ Vinculada</span>
-                      : <span className="text-amber-600">Sin match</span>
-                    }
-                  </div>
-                </div>
-
-                {/* Buscador multi-campo */}
-                {l.estado_conciliacion !== 'corregida_manual' && (
+                  {/* Buscador + opción crear */}
                   <div className="relative">
                     <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                    <input
-                      type="text"
+                    <input type="text"
                       value={busquedas[i] ?? ''}
                       onChange={e => buscar(i, e.target.value)}
                       placeholder="Buscar por N° póliza, nombre, teléfono o email..."
                       className="w-full border border-slate-200 rounded-lg pl-6 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                     />
-                    {(resultados[i]?.length ?? 0) > 0 && (
-                      <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
-                        {resultados[i].map(p => {
-                          const c = p.cliente as { nombre: string; telefono: string | null; email: string | null } | null
-                          const tomador = p.nombre_tomador || c?.nombre
-                          const q = busquedas[i] ?? ''
-                          const vigencia = p.fecha_fin
-                            ? new Date(p.fecha_fin).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: '2-digit' })
-                            : null
-                          return (
-                            <button
-                              key={p.id}
-                              onClick={() => vincular(i, p)}
-                              className="w-full text-left px-3 py-2 hover:bg-emerald-50 border-b border-slate-100 last:border-0 transition-colors"
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="font-mono text-[11px] font-semibold text-slate-800">
-                                  <Hl text={p.numero_poliza} q={q} />
-                                </span>
-                                <span className="text-[10px] text-slate-400 shrink-0">{p.aseguradora}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-2 mt-0.5">
-                                <span className="text-[11px] text-slate-600 truncate">
-                                  <Hl text={tomador ?? null} q={q} />
-                                </span>
-                                {p.ramo && <span className="text-[10px] text-slate-400 shrink-0">{p.ramo}</span>}
-                              </div>
-                              {(c?.telefono || c?.email) && (
-                                <p className="text-[10px] text-slate-400 mt-0.5 truncate">
-                                  <Hl text={c?.telefono ?? c?.email ?? null} q={q} />
-                                </p>
-                              )}
-                              {vigencia && <p className="text-[10px] text-slate-400">Vence: {vigencia}</p>}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    )}
+                    {/* Dropdown resultados */}
+                    {(resultados[i]?.length ?? 0) > 0 && <DropdownResultados idx={i} />}
                   </div>
-                )}
-
-                {/* Vinculada: checkbox actualizar número + botón quitar */}
-                {l.estado_conciliacion === 'corregida_manual' && (
-                  <div className="mt-2 space-y-1.5">
-                    <label className="flex items-start gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={actualizarNum[i] ?? true}
-                        onChange={e => setActualizarNum(prev => ({ ...prev, [i]: e.target.checked }))}
-                        className="mt-0.5 accent-emerald-500"
-                      />
-                      <span className="text-slate-600 leading-snug">
-                        Actualizar N° póliza en CRM
-                        <span className="text-slate-400 block text-[10px]">
-                          Reemplazar por: <span className="font-mono">{l.numero_poliza_raw}</span>
-                        </span>
-                      </span>
-                    </label>
-                    <button onClick={() => desvincular(i)} className="text-slate-400 hover:text-red-500 text-[10px]">
-                      × Quitar vinculación
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+                  {/* Botón crear póliza nueva */}
+                  <button onClick={() => setCrearPolizaIdx(i)}
+                    className="mt-1.5 flex items-center gap-1 text-[11px] text-emerald-700 hover:text-emerald-800 font-medium">
+                    <Plus className="w-3 h-3" /> Crear póliza nueva
+                  </button>
+                  {crearPolizaIdx === i && (
+                    <PolizaModal poliza={preRelleno} onClose={() => setCrearPolizaIdx(null)} onSaved={() => handlePolizaCreada(i)} />
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}
 
-      {/* ── Sección 2: Sugerencias por nombre ── */}
+      {/* ── Sección 3: Ya vinculadas manualmente ── */}
+      {grupos.corregidas.length > 0 && (
+        <details className="group" open>
+          <summary className="text-xs font-semibold text-emerald-700 uppercase tracking-wider cursor-pointer flex items-center gap-1.5 list-none select-none mb-1">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Vinculadas manualmente ({grupos.corregidas.length})
+            <span className="text-slate-400 normal-case font-normal ml-1">▸ ver detalle</span>
+          </summary>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {grupos.corregidas.map(({ l, i }) => (
+              <div key={i} className="flex items-center justify-between text-xs text-slate-600 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg">
+                <div className="flex items-center gap-2 min-w-0">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                  <span className="font-mono">{l.numero_poliza_raw}</span>
+                  {l.nombre_tomador && <span className="text-slate-400 truncate text-[11px]">{l.nombre_tomador}</span>}
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="font-medium">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</span>
+                  <button onClick={() => desvincular(i)} title="Quitar vínculo"
+                    className="text-slate-300 hover:text-red-400 transition-colors">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {/* ── Sección 4: Sugerencias por nombre (probable) ── */}
       {grupos.probables.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1 flex items-center gap-1.5">
@@ -499,31 +595,21 @@ function PasoRevisar({
               const sugerida = l.poliza_sugerida
               const checked  = probableChecked[i] !== false
               return (
-                <label
-                  key={i}
+                <label key={i}
                   className={`flex items-start gap-3 border rounded-xl p-3 cursor-pointer transition-colors ${
                     checked ? 'border-blue-200 bg-blue-50' : 'border-slate-200 bg-slate-50'
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
+                  }`}>
+                  <input type="checkbox" checked={checked}
                     onChange={e => toggleProbable(i, e.target.checked)}
-                    className="mt-0.5 accent-blue-500 shrink-0"
-                  />
+                    className="mt-0.5 accent-blue-500 shrink-0" />
                   <div className="flex-1 min-w-0 text-xs">
-                    {/* Colilla */}
                     <div className="flex justify-between items-start gap-2 mb-1">
                       <div>
-                        <p className="text-slate-400 text-[10px] uppercase tracking-wide">Colilla</p>
                         <p className="font-mono font-semibold text-slate-700">{l.numero_poliza_raw}</p>
                         <p className="text-slate-500">{l.nombre_tomador}</p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="font-semibold text-slate-700">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
-                      </div>
+                      <p className="font-semibold text-slate-700 shrink-0">{l.valor_comision != null ? formatCOP(l.valor_comision) : '—'}</p>
                     </div>
-                    {/* Sugerencia CRM */}
                     {sugerida && (
                       <div className="bg-white rounded-lg px-2.5 py-2 border border-blue-100 mt-1">
                         <p className="text-[10px] text-blue-500 uppercase tracking-wide mb-0.5">Póliza CRM sugerida</p>
@@ -539,7 +625,7 @@ function PasoRevisar({
         </div>
       )}
 
-      {/* ── Sección 3: Conciliadas automáticamente ── */}
+      {/* ── Sección 5: Conciliadas automáticamente ── */}
       {grupos.conciliadas.length > 0 && (
         <details className="group">
           <summary className="text-xs font-semibold text-emerald-700 uppercase tracking-wider cursor-pointer flex items-center gap-1.5 list-none select-none">
@@ -547,7 +633,7 @@ function PasoRevisar({
             Conciliadas automáticamente ({grupos.conciliadas.length})
             <span className="text-slate-400 normal-case font-normal ml-1">▸ ver detalle</span>
           </summary>
-          <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
+          <div className="mt-2 space-y-1 max-h-40 overflow-y-auto">
             {grupos.conciliadas.map(({ l, i }) => (
               <div key={i} className="flex items-center justify-between text-xs text-slate-600 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-lg">
                 <div className="flex items-center gap-2 min-w-0">
@@ -562,10 +648,21 @@ function PasoRevisar({
         </details>
       )}
 
-      {grupos.sinMatch.length === 0 && grupos.probables.length === 0 && (
+      {grupos.sinMatch.length === 0 && grupos.probables.length === 0 && grupos.porCompletar.length === 0 && (
         <div className="text-center py-6 text-slate-400 text-sm">
           <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-emerald-400" />
           Todas las líneas están conciliadas
+        </div>
+      )}
+
+      {/* Aviso si hay pendientes de confirmar */}
+      {pendientesCount > 0 && (
+        <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2.5 text-xs text-blue-800">
+          <Clock className="w-3.5 h-3.5 mt-0.5 shrink-0 text-blue-500" />
+          <span>
+            <strong>{pendientesCount} selección{pendientesCount > 1 ? 'es' : ''} pendiente{pendientesCount > 1 ? 's' : ''} de confirmar.</strong>{' '}
+            Confírmalas antes de continuar o se importarán como "Sin match".
+          </span>
         </div>
       )}
 
