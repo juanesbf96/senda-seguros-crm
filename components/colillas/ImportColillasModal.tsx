@@ -252,6 +252,7 @@ function PasoRevisar({
 
   const [busquedas,       setBusquedas]      = useState<Record<number, string>>({})
   const [resultados,      setResultados]     = useState<Record<number, PolizaResultado[]>>({})
+  const [buscando,        setBuscando]       = useState<Record<number, boolean>>({})
   const [actualizarNum,   setActualizarNum]  = useState<Record<number, boolean>>({})
   const [probableChecked, setProbableChecked] = useState<Record<number, boolean>>(() => {
     const init: Record<number, boolean> = {}
@@ -279,33 +280,62 @@ function PasoRevisar({
   // ── Búsqueda multi-campo ───────────────────────────────────────────
   const buscar = useCallback(async (idx: number, query: string) => {
     setBusquedas(prev => ({ ...prev, [idx]: query }))
-    if (query.length < 2) { setResultados(prev => ({ ...prev, [idx]: [] })); return }
-    const q = query.trim()
-    const [{ data: byPol }, { data: byTom }] = await Promise.all([
-      supabase.from('polizas')
-        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
-        .eq('workspace_id', workspaceId).ilike('numero_poliza', `%${q}%`).limit(5),
-      supabase.from('polizas')
-        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
-        .eq('workspace_id', workspaceId).ilike('nombre_tomador', `%${q}%`).limit(5),
-    ])
-    const { data: clientes } = await supabase.from('clientes')
-      .select('id').eq('workspace_id', workspaceId)
-      .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`).limit(6)
-    let byCliente: PolizaResultado[] = []
-    if (clientes?.length) {
-      const ids = clientes.map((c: { id: string }) => c.id)
-      const { data } = await supabase.from('polizas')
-        .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, cliente:clientes(nombre, telefono, email)')
-        .eq('workspace_id', workspaceId).in('client_id', ids).limit(5)
-      byCliente = (data ?? []) as unknown as PolizaResultado[]
+    if (query.length < 2) {
+      setResultados(prev => ({ ...prev, [idx]: [] }))
+      setBuscando(prev => ({ ...prev, [idx]: false }))
+      return
     }
-    const all = [...(byPol ?? []), ...(byTom ?? []), ...byCliente] as PolizaResultado[]
-    const seen = new Set<string>()
-    setResultados(prev => ({
-      ...prev,
-      [idx]: all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true }).slice(0, 8),
-    }))
+    setBuscando(prev => ({ ...prev, [idx]: true }))
+    try {
+      const q = query.trim()
+      const [{ data: byPol, error: e1 }, { data: byTom, error: e2 }] = await Promise.all([
+        supabase.from('polizas')
+          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, clientes(nombre, telefono, email)')
+          .eq('workspace_id', workspaceId).ilike('numero_poliza', `%${q}%`).limit(5),
+        supabase.from('polizas')
+          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, clientes(nombre, telefono, email)')
+          .eq('workspace_id', workspaceId).ilike('nombre_tomador', `%${q}%`).limit(5),
+      ])
+      if (e1) console.error('[buscar byPol]', e1)
+      if (e2) console.error('[buscar byTom]', e2)
+
+      const { data: clientesData, error: e3 } = await supabase.from('clientes')
+        .select('id').eq('workspace_id', workspaceId)
+        .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`).limit(6)
+      if (e3) console.error('[buscar clientes]', e3)
+
+      let byCliente: PolizaResultado[] = []
+      if (clientesData?.length) {
+        const ids = clientesData.map((c: { id: string }) => c.id)
+        const { data, error: e4 } = await supabase.from('polizas')
+          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, clientes(nombre, telefono, email)')
+          .eq('workspace_id', workspaceId).in('client_id', ids).limit(5)
+        if (e4) console.error('[buscar byCliente]', e4)
+        byCliente = (data ?? []) as unknown as PolizaResultado[]
+      }
+
+      // Normalizar: el join se llama 'clientes' (no 'cliente')
+      const normalizar = (rows: unknown[]): PolizaResultado[] =>
+        (rows as Record<string, unknown>[]).map(p => ({
+          ...(p as PolizaResultado),
+          cliente: (p.clientes ?? null) as PolizaResultado['cliente'],
+        }))
+
+      const all = [
+        ...normalizar(byPol ?? []),
+        ...normalizar(byTom ?? []),
+        ...byCliente,
+      ]
+      const seen = new Set<string>()
+      setResultados(prev => ({
+        ...prev,
+        [idx]: all.filter(p => { if (seen.has(p.id)) return false; seen.add(p.id); return true }).slice(0, 8),
+      }))
+    } catch (err) {
+      console.error('[buscar] error inesperado', err)
+    } finally {
+      setBuscando(prev => ({ ...prev, [idx]: false }))
+    }
   }, [workspaceId])
 
   // ── Seleccionar candidato (sin confirmar aún) ──────────────────────
@@ -383,14 +413,26 @@ function PasoRevisar({
   // ── Helper: dropdown de resultados de búsqueda (portal para evitar overflow clip) ──
   function DropdownResultados({ idx }: { idx: number }) {
     const q = busquedas[idx] ?? ''
-    if ((resultados[idx]?.length ?? 0) === 0) return null
+    const hayResultados = (resultados[idx]?.length ?? 0) > 0
+    const estaBuscando  = buscando[idx] ?? false
+    // Mostrar si el usuario escribió >= 2 chars (con carga, resultados o vacío)
+    if (q.length < 2 && !hayResultados && !estaBuscando) return null
+    if (q.length < 2) return null
     const anchor = inputContainerRefs.current[idx]
     if (!anchor) return null
     const rect = anchor.getBoundingClientRect()
     return createPortal(
       <div style={{ position: 'fixed', top: rect.bottom + 4, left: rect.left, width: rect.width, zIndex: 9999 }}
         className="bg-white border border-slate-200 rounded-xl shadow-xl max-h-52 overflow-y-auto">
-        {resultados[idx].map(p => {
+        {estaBuscando && (
+          <div className="flex items-center gap-2 px-3 py-3 text-xs text-slate-400">
+            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Buscando...
+          </div>
+        )}
+        {!estaBuscando && !hayResultados && (
+          <div className="px-3 py-3 text-xs text-slate-400">Sin resultados para &ldquo;{q}&rdquo;</div>
+        )}
+        {!estaBuscando && resultados[idx]?.map(p => {
           const c = p.cliente as { nombre: string; telefono: string | null; email: string | null } | null
           const tomador = p.nombre_tomador || c?.nombre
           const vigencia = p.fecha_fin
@@ -543,8 +585,8 @@ function PasoRevisar({
                       placeholder="Buscar por N° póliza, nombre, teléfono o email..."
                       className="w-full border border-slate-200 rounded-lg pl-6 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
                     />
-                    {/* Dropdown resultados via portal */}
-                    {(resultados[i]?.length ?? 0) > 0 && <DropdownResultados idx={i} />}
+                    {/* Dropdown via portal (se muestra desde 2 chars) */}
+                    {(busquedas[i]?.length ?? 0) >= 2 && <DropdownResultados idx={i} />}
                   </div>
                   {/* Botón crear póliza nueva */}
                   <button onClick={() => setCrearPolizaIdx(i)}
