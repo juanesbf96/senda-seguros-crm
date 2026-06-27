@@ -429,7 +429,7 @@ function PasoRevisar({
             <Clock className="w-3.5 h-3.5" />
             Por completar ({grupos.porCompletar.length}) — confirma o cancela cada vinculación
           </p>
-          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-0.5">
+          <div className="space-y-2.5 pr-0.5">
             {grupos.porCompletar.map(({ l, i }) => {
               const pol = pendiente[i]
               const tomadorPol = pol.nombre_tomador || (pol.cliente as { nombre: string } | null)?.nombre
@@ -510,7 +510,7 @@ function PasoRevisar({
             <AlertTriangle className="w-3.5 h-3.5" />
             Sin match ({grupos.sinMatch.length}) — busca la póliza o crea una nueva
           </p>
-          <div className="space-y-2.5 max-h-64 overflow-y-auto pr-0.5">
+          <div className="space-y-2.5 pr-0.5">
             {grupos.sinMatch.map(({ l, i }) => {
               const preRelleno = {
                 numero_poliza: l.numero_poliza_raw,
