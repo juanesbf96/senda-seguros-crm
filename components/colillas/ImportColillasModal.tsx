@@ -288,43 +288,53 @@ function PasoRevisar({
     setBuscando(prev => ({ ...prev, [idx]: true }))
     try {
       const q = query.trim()
+
+      // Buscar pólizas por número y por nombre_tomador (sin join)
       const [{ data: byPol, error: e1 }, { data: byTom, error: e2 }] = await Promise.all([
         supabase.from('polizas')
-          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, clientes(nombre, telefono, email)')
+          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, client_id')
           .eq('workspace_id', workspaceId).ilike('numero_poliza', `%${q}%`).limit(5),
         supabase.from('polizas')
-          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, clientes(nombre, telefono, email)')
+          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, client_id')
           .eq('workspace_id', workspaceId).ilike('nombre_tomador', `%${q}%`).limit(5),
       ])
       if (e1) console.error('[buscar byPol]', e1)
       if (e2) console.error('[buscar byTom]', e2)
 
+      // Buscar clientes por nombre/teléfono/email → luego sus pólizas
       const { data: clientesData, error: e3 } = await supabase.from('clientes')
-        .select('id').eq('workspace_id', workspaceId)
-        .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`).limit(6)
+        .select('id, nombre, telefono, email')
+        .eq('workspace_id', workspaceId)
+        .or(`nombre.ilike.%${q}%,telefono.ilike.%${q}%,email.ilike.%${q}%`)
+        .limit(6)
       if (e3) console.error('[buscar clientes]', e3)
 
-      let byCliente: PolizaResultado[] = []
+      type ClienteRow = { id: string; nombre: string; telefono: string | null; email: string | null }
+      const clienteMap = new Map<string, ClienteRow>(
+        (clientesData ?? []).map((c: ClienteRow) => [c.id, c])
+      )
+
+      let byCliente: (PolizaResultado & { client_id: string | null })[] = []
       if (clientesData?.length) {
-        const ids = clientesData.map((c: { id: string }) => c.id)
+        const ids = (clientesData as ClienteRow[]).map(c => c.id)
         const { data, error: e4 } = await supabase.from('polizas')
-          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, clientes(nombre, telefono, email)')
+          .select('id, numero_poliza, aseguradora, ramo, nombre_tomador, fecha_fin, client_id')
           .eq('workspace_id', workspaceId).in('client_id', ids).limit(5)
         if (e4) console.error('[buscar byCliente]', e4)
-        byCliente = (data ?? []) as unknown as PolizaResultado[]
+        byCliente = (data ?? []) as unknown as typeof byCliente
       }
 
-      // Normalizar: el join se llama 'clientes' (no 'cliente')
-      const normalizar = (rows: unknown[]): PolizaResultado[] =>
-        (rows as Record<string, unknown>[]).map(p => ({
-          ...(p as PolizaResultado),
-          cliente: (p.clientes ?? null) as PolizaResultado['cliente'],
-        }))
+      // Combinar y adjuntar datos del cliente si existen
+      type RawRow = { id: string; numero_poliza: string | null; aseguradora: string; ramo: string | null; nombre_tomador: string | null; fecha_fin: string | null; client_id: string | null }
+      const toResultado = (r: RawRow): PolizaResultado => {
+        const c = r.client_id ? clienteMap.get(r.client_id) ?? null : null
+        return { id: r.id, numero_poliza: r.numero_poliza, aseguradora: r.aseguradora, ramo: r.ramo, nombre_tomador: r.nombre_tomador, fecha_fin: r.fecha_fin, cliente: c ? { nombre: c.nombre, telefono: c.telefono, email: c.email } : null }
+      }
 
-      const all = [
-        ...normalizar(byPol ?? []),
-        ...normalizar(byTom ?? []),
-        ...byCliente,
+      const all: PolizaResultado[] = [
+        ...(byPol ?? []).map(r => toResultado(r as RawRow)),
+        ...(byTom ?? []).map(r => toResultado(r as RawRow)),
+        ...byCliente.map(r => toResultado(r as RawRow)),
       ]
       const seen = new Set<string>()
       setResultados(prev => ({
