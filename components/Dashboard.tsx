@@ -8,7 +8,7 @@ import { formatCOP, daysUntil, cn } from '@/lib/utils'
 import Link from 'next/link'
 import {
   ArrowUpRight, Cake, ShieldAlert, CheckSquare,
-  RefreshCw, FileText, Banknote, Percent, Loader2, TrendingUp,
+  RefreshCw, FileText, Banknote, Percent, Loader2, TrendingUp, TrendingDown,
   ClipboardList, Users, Target,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/Badge'
@@ -89,6 +89,13 @@ export default function Dashboard() {
   const [metasCumplidas,setMetasCumplidas]= useState(0)
   const [loading, setLoading] = useState(true)
 
+  // Comparaciones mensuales
+  const [polizasMes,        setPolizasMes]        = useState<{ prima_neta: number | null; comision_agencia: number | null; vendedor_id: string | null }[]>([])
+  const [polizasMesPasado,  setPolizasMesPasado]  = useState<{ prima_neta: number | null; comision_agencia: number | null }[]>([])
+  const [clientesMes,       setClientesMes]       = useState(0)
+  const [clientesMesPasado, setClientesMesPasado] = useState(0)
+  const [vendedores,        setVendedores]        = useState<{ id: string; nombre: string }[]>([])
+
   // Datos para charts
   const [trendData,        setTrendData]        = useState<TrendDatum[]>([])
   const [renovacionesData, setRenovacionesData] = useState<BarsDatum[]>([])
@@ -118,6 +125,11 @@ export default function Dashboard() {
       const trendStart = year12Ago.toISOString().split('T')[0]
       const days30Ago = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
       const in90days = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
+
+      const ahora          = new Date()
+      const mesActualStart = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split('T')[0]
+      const mesPasadoStart = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1).toISOString().split('T')[0]
+      const mesPasadoEnd   = new Date(ahora.getFullYear(), ahora.getMonth(), 0).toISOString().split('T')[0]
 
       // Base queries — global vs per-agent
       let qClientes = supabase.from('clientes').select('*').eq('workspace_id', wsId).order('created_at', { ascending: false })
@@ -272,6 +284,38 @@ export default function Dashboard() {
         setMetasCumplidas(0)
       }
 
+      // ── Comparaciones mensuales + producción por asesor ─────────────
+      let qPMes  = supabase.from('polizas').select('prima_neta, comision_agencia, vendedor_id')
+        .eq('workspace_id', wsId).eq('eliminada', false).gte('fecha_inicio', mesActualStart)
+      let qPMesP = supabase.from('polizas').select('prima_neta, comision_agencia')
+        .eq('workspace_id', wsId).eq('eliminada', false)
+        .gte('fecha_inicio', mesPasadoStart).lte('fecha_inicio', mesPasadoEnd)
+      if (!isGlobal && uid) {
+        qPMes  = qPMes.eq('vendedor_id', uid)
+        qPMesP = qPMesP.eq('vendedor_id', uid)
+      }
+      const [
+        { data: pMes }, { data: pMesP }, { data: cMes }, { data: cMesP }, { data: vends },
+      ] = await Promise.all([
+        qPMes,
+        qPMesP,
+        (isGlobal || !uid
+          ? supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesActualStart + 'T00:00:00')
+          : supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesActualStart + 'T00:00:00').eq('assigned_to', uid)
+        ),
+        (isGlobal || !uid
+          ? supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesPasadoStart + 'T00:00:00').lte('created_at', mesPasadoEnd + 'T23:59:59')
+          : supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesPasadoStart + 'T00:00:00').lte('created_at', mesPasadoEnd + 'T23:59:59').eq('assigned_to', uid)
+        ),
+        supabase.from('vendedores').select('id, nombre').eq('workspace_id', wsId).order('nombre'),
+      ])
+      type PMesRow = { prima_neta: number | null; comision_agencia: number | null; vendedor_id: string | null }
+      setPolizasMes((pMes ?? []) as PMesRow[])
+      setPolizasMesPasado((pMesP ?? []) as { prima_neta: number | null; comision_agencia: number | null }[])
+      setClientesMes((cMes ?? []).length)
+      setClientesMesPasado((cMesP ?? []).length)
+      setVendedores((vends ?? []) as { id: string; nombre: string }[])
+
       setLoading(false)
     }
     load()
@@ -315,6 +359,24 @@ export default function Dashboard() {
       .map(estado => ({ estado, count: map.get(estado) || 0 }))
       .filter(s => s.count > 0)
   }, [todasPolizas])
+
+  const primaMes       = useMemo(() => polizasMes.reduce((s, p) => s + (p.prima_neta || 0), 0), [polizasMes])
+  const primaMesPasado = useMemo(() => polizasMesPasado.reduce((s, p) => s + (p.prima_neta || 0), 0), [polizasMesPasado])
+
+  // Producción por asesor del mes actual (solo admin/supervisor)
+  const produccionAsesores = useMemo(() => {
+    if (!isGlobal || polizasMes.length === 0) return []
+    const map = new Map<string, { nombre: string; count: number; prima: number; comision: number }>()
+    polizasMes.forEach(p => {
+      const vid = p.vendedor_id || '__sin_asignar__'
+      const slot = map.get(vid) || { nombre: '', count: 0, prima: 0, comision: 0 }
+      map.set(vid, { nombre: slot.nombre, count: slot.count + 1, prima: slot.prima + (p.prima_neta || 0), comision: slot.comision + (p.comision_agencia || 0) })
+    })
+    vendedores.forEach(v => { const s = map.get(v.id); if (s) s.nombre = v.nombre })
+    return Array.from(map.entries())
+      .map(([id, d]) => ({ id, nombre: d.nombre || (id === '__sin_asignar__' ? 'Sin asignar' : '—'), count: d.count, prima: d.prima, comision: d.comision }))
+      .sort((a, b) => b.prima - a.prima)
+  }, [polizasMes, vendedores, isGlobal])
 
   const porEtapa = (e: Etapa) => clientes.filter(c => c.etapa === e).length
   const primaTotal    = polizas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
@@ -392,10 +454,14 @@ export default function Dashboard() {
               <Sparkline data={polizasSpark} tone="primary" width={60} height={22} />
             </div>
 
-            <div className="flex items-baseline gap-1.5 mb-2.5">
+            <div className="flex items-baseline gap-1.5 mb-1.5">
               <span className="text-3xl font-semibold text-ink-700 tracking-tight tabular-nums">{polizas.length}</span>
               <span className="text-base text-ink-300 tabular-nums">/ {totalPolizas}</span>
               <Badge variant="success" size="sm" dot className="ml-auto">{pctActivas}%</Badge>
+            </div>
+            <div className="flex items-center gap-2 mb-2.5">
+              <span className="text-xs text-ink-400 tabular-nums">{polizasMes.length} nuevas este mes</span>
+              <ChgBadge current={polizasMes.length} previous={polizasMesPasado.length} />
             </div>
 
             {totalPolizas > 0 && (
@@ -438,7 +504,12 @@ export default function Dashboard() {
             </div>
 
             <p className="text-2xl font-semibold text-ink-700 tracking-tight tabular-nums">{formatCOP(primaTotal)}</p>
-            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-cream-100">
+            <div className="flex items-center gap-2 mt-2">
+              <span className="text-xs text-ink-400">Emitida este mes:</span>
+              <span className="text-xs font-semibold text-ink-700 tabular-nums">{formatCOP(primaMes)}</span>
+              <ChgBadge current={primaMes} previous={primaMesPasado} />
+            </div>
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-cream-100">
               <Percent className="w-3 h-3 text-primary-700" />
               <span className="text-xs text-ink-400">Comisión:</span>
               <span className="text-xs font-semibold text-primary-700 ml-auto tabular-nums">{formatCOP(comisionTotal)}</span>
@@ -460,9 +531,10 @@ export default function Dashboard() {
             </div>
 
             <p className="text-3xl font-semibold text-ink-700 tracking-tight tabular-nums">{totalLeads}</p>
-            <div className="flex items-center gap-3 mt-3 pt-3 border-t border-cream-100 text-xs text-ink-500">
-              <span><span className="font-semibold text-ink-700 tabular-nums">{porEtapa('nuevo')}</span> nuevos</span>
-              <span className="text-ink-200">·</span>
+            <div className="flex items-center gap-2 mt-3 pt-3 border-t border-cream-100 text-xs text-ink-500 flex-wrap">
+              <span><span className="font-semibold text-ink-700 tabular-nums">{clientesMes}</span> este mes</span>
+              <ChgBadge current={clientesMes} previous={clientesMesPasado} />
+              <span className="text-ink-200 ml-auto">·</span>
               <span><span className="font-semibold text-ink-700 tabular-nums">{porEtapa('cotizacion')}</span> cotizando</span>
             </div>
           </ClickCard>
@@ -640,6 +712,65 @@ export default function Dashboard() {
           </p>
         </ClickCard>
       </div>
+
+      {/* ── Producción por asesor (solo admin/supervisor) ──────── */}
+      {isGlobal && produccionAsesores.length > 0 && (
+        <div className="bg-white rounded-2xl border border-cream-200 shadow-soft p-5">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-primary-100 flex items-center justify-center">
+                <Target className="w-4 h-4 text-primary-700" />
+              </div>
+              <div>
+                <p className="text-[11px] text-ink-400 leading-tight">Mes actual</p>
+                <p className="text-sm font-semibold text-ink-700 mt-0.5">Producción por asesor</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-xs text-ink-500">
+              <span className="font-semibold text-ink-700 tabular-nums">{polizasMes.length}</span>
+              <span>pólizas nuevas</span>
+              <ChgBadge current={polizasMes.length} previous={polizasMesPasado.length} />
+            </div>
+          </div>
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-widest text-ink-400 border-b border-cream-200">
+                  <th className="pb-2.5 font-medium">Asesor</th>
+                  <th className="pb-2.5 font-medium text-right">Pólizas</th>
+                  <th className="pb-2.5 font-medium text-right">Prima emitida</th>
+                  <th className="pb-2.5 font-medium text-right hidden sm:table-cell">Comisión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {produccionAsesores.map(a => (
+                  <tr key={a.id} className="border-b border-cream-100 last:border-0 hover:bg-cream-50/60 transition-colors">
+                    <td className="py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <Avatar fallback={a.nombre} size="sm" />
+                        <span className="font-medium text-ink-700">{a.nombre}</span>
+                      </div>
+                    </td>
+                    <td className="py-2.5 text-right font-semibold text-ink-700 tabular-nums">{a.count}</td>
+                    <td className="py-2.5 text-right font-semibold text-ink-700 tabular-nums">{formatCOP(a.prima)}</td>
+                    <td className="py-2.5 text-right text-ink-500 tabular-nums hidden sm:table-cell">{formatCOP(a.comision)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-cream-200">
+                  <td className="pt-2.5 text-[11px] text-ink-400 font-semibold uppercase tracking-widest">Total</td>
+                  <td className="pt-2.5 text-right font-semibold text-ink-700 tabular-nums">{polizasMes.length}</td>
+                  <td className="pt-2.5 text-right font-semibold text-ink-700 tabular-nums">{formatCOP(primaMes)}</td>
+                  <td className="pt-2.5 text-right font-semibold text-ink-500 tabular-nums hidden sm:table-cell">
+                    {formatCOP(polizasMes.reduce((s, p) => s + (p.comision_agencia || 0), 0))}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ── Distribuciones · Ramo + Aseguradora ───────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -830,6 +961,23 @@ function ClickCard({ href, className, children }: {
     >
       {children}
     </Link>
+  )
+}
+
+function ChgBadge({ current, previous }: { current: number; previous: number }) {
+  if (current === 0 && previous === 0) return null
+  const pct = previous === 0
+    ? (current > 0 ? 100 : 0)
+    : Math.round(((current - previous) / Math.abs(previous)) * 100)
+  const up = pct >= 0
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums rounded-full px-1.5 py-0.5',
+      up ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'
+    )}>
+      {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+      {up ? '+' : ''}{pct}%
+    </span>
   )
 }
 
