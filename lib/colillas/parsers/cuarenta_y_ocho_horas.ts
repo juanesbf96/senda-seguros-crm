@@ -9,6 +9,8 @@ import type { ColillaLineaRaw, ParseResult } from './types'
 
 function parseNum(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0
+  // xlsx ya entrega celdas numéricas como number; solo limpiar si viene como texto
+  if (typeof val === 'number') return val
   return parseFloat(String(val).replace(/[$.]/g, '').replace(',', '.')) || 0
 }
 
@@ -45,10 +47,10 @@ export async function parseCuarentaYOchoHoras(buffer: ArrayBuffer): Promise<Pars
     }
 
     const headers    = (rows[headerIdx] as unknown[]).map(c => String(c ?? ''))
-    const colVoucher = findCol(headers, 'voucher')
-    const colComision = findCol(headers, 'comision', 'comisión', 'valor comision')
-    const colPrima    = findCol(headers, 'prima', 'valor prima', 'importe')
-    const colTomador  = findCol(headers, 'tomador', 'cliente', 'nombre')
+    const colVoucher  = findCol(headers, 'voucher')
+    const colComision = findCol(headers, 'total comision pesos cop', 'total comisión pesos cop', 'total comision', 'comisión', 'comision')
+    const colPrima    = findCol(headers, 'total cop', 'prima', 'valor prima', 'importe')
+    const colTomador  = findCol(headers, 'pasajero', 'tomador', 'cliente', 'nombre')
 
     const resultado: ColillaLineaRaw[] = []
 

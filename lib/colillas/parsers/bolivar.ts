@@ -1,52 +1,56 @@
 /**
- * Parser SEGUROS BOLÍVAR — PDF multi-bloque por empresa
+ * Parser SEGUROS BOLÍVAR — PDF exportado desde el portal web (transac.segurosbolivar.com)
  *
- * El PDF tiene secciones por compañía. Dentro de cada sección, las filas
- * de comisión tienen el concepto 71005 = COMISION GRAVADA.
- * Columnas: POLIZA | VLR PRI. | VLR COM.
+ * El texto extraído NO trae una fila por póliza: el nombre del cliente
+ * queda partido en varias líneas (una por palabra) y a veces incluso
+ * cruza un salto de página. Lo único estable es:
+ *   - una línea de metadata con el número de póliza (13 dígitos), y
+ *   - unas líneas después, la línea de montos "$VLR_PRI $VLR_REC PART% $VLR_COM"
+ * Formato numérico: separador de miles ',' y decimales '.' (estilo US),
+ * a diferencia de los demás parsers PDF que usan estilo europeo.
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
 
-function parseNum(raw: string): number {
-  return parseFloat(raw.replace(/[$.]/g, '').replace(',', '.').trim()) || 0
+function parseNumUS(raw: string): number {
+  return parseFloat(raw.replace(/,/g, '').trim()) || 0
 }
+
+const POLIZA_RE = /(\d{10,})/
+const MONTOS_RE = /\$([\d,]+)\s+\$([\d,]+)\s+\d+\s+\$([\d,]+)/
+const VENTANA_BUSQUEDA = 15
 
 export async function parseBolivar(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { CanvasFactory } = require('pdf-parse/worker')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer) }).getText()
+    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
     const resultado: ColillaLineaRaw[] = []
 
-    for (const line of lines) {
-      // Solo líneas con concepto 71005 (COMISION GRAVADA)
-      if (!line.includes('71005')) continue
+    for (let i = 0; i < lines.length; i++) {
+      const polizaMatch = lines[i].match(POLIZA_RE)
+      if (!polizaMatch) continue
 
-      const parts = line.split(/\s+/)
-      // Formato típico: POLIZA  71005  COMISION GRAVADA  VLR_PRI  VLR_COM
-      // La póliza es el primer token alfanumérico largo
-      const polizaIdx = parts.findIndex((p: string) => /^[A-Z0-9]{6,}$/i.test(p) && !/71005/.test(p))
-      if (polizaIdx === -1) continue
+      for (let j = i + 1; j < Math.min(i + VENTANA_BUSQUEDA, lines.length); j++) {
+        const montosMatch = lines[j].match(MONTOS_RE)
+        if (!montosMatch) continue
 
-      const poliza   = parts[polizaIdx]
-      const numeros  = parts.filter((p: string) => /^[\d.,]+$/.test(p) && parseNum(p) > 0).map(parseNum)
-      if (numeros.length < 2) continue
-
-      const vlrPrima    = numeros[0]
-      const vlrComision = numeros[numeros.length - 1]
-
-      resultado.push({
-        numero_poliza_raw: poliza,
-        valor_prima:       vlrPrima,
-        valor_comision:    vlrComision,
-      })
+        const [, vlrPri, , vlrCom] = montosMatch
+        resultado.push({
+          numero_poliza_raw: polizaMatch[1],
+          valor_prima:       parseNumUS(vlrPri),
+          valor_comision:    parseNumUS(vlrCom),
+        })
+        break
+      }
     }
 
     if (resultado.length === 0) {
-      return { ok: false, error: 'No se encontraron líneas de comisión (71005) en el PDF de Bolívar' }
+      return { ok: false, error: 'No se encontraron líneas de comisión en el PDF de Bolívar' }
     }
 
     return { ok: true, lineas: resultado }

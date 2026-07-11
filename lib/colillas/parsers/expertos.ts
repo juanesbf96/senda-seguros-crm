@@ -1,54 +1,47 @@
 /**
- * Parser COMISIONES EXPERTOS — PDF simple
+ * Parser COMISIONES EXPERTOS — PDF de recibo de comisión
  *
- * Tabla directa con columnas:
- *   POLIZA | ASEGURADORA | CLIENTE | PRIMA | COMISION TOTAL | COMISION ASESOR
- *
- * Se usa COMISION ASESOR como valor_comision.
+ * El layout es una "cuenta de cobro" (no una tabla de filas homogénea):
+ * en el texto extraído, cada línea de póliza queda como
+ *   POLIZA<tab>ASEGURADORA<tab>CLIENTE
+ * y la línea siguiente trae los 3 montos (PRIMA, COMISION TOTAL, COMISION ASESOR)
+ * con separador de miles '.', normalmente antecedidos por un código de concepto
+ * (p.ej. "ANG") y seguidos de signos "$" sueltos.
+ * Se usa COMISION ASESOR (el 3er monto) como valor_comision.
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
 
 function parseNum(raw: string): number {
-  return parseFloat(raw.replace(/[$.]/g, '').replace(',', '.').trim()) || 0
+  return parseFloat(raw.replace(/\./g, '').replace(',', '.').trim()) || 0
 }
+
+const MONTO_RE = /\d{1,3}(?:\.\d{3})+/g
 
 export async function parseExpertos(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { CanvasFactory } = require('pdf-parse/worker')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer) }).getText()
+    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
-    const headerIdx = lines.findIndex((l: string) =>
-      /POLIZA/i.test(l) && /CLIENTE/i.test(l) && /COMISION/i.test(l)
-    )
-    if (headerIdx === -1) {
-      return { ok: false, error: 'No se encontró la tabla en el PDF de Expertos' }
-    }
-
     const resultado: ColillaLineaRaw[] = []
 
-    for (let i = headerIdx + 1; i < lines.length; i++) {
-      const line = lines[i]
-      if (/^TOTAL/i.test(line) || line === '') break
+    for (let i = 0; i < lines.length; i++) {
+      const headerMatch = lines[i].match(/^(\d{5,})\s+(\S+)\s+(.+)$/)
+      if (!headerMatch) continue
 
-      // Formato: POLIZA  ASEGURADORA  CLIENTE  PRIMA  COMISION_TOTAL  COMISION_ASESOR
-      const parts = line.split(/\s{2,}/)
-      if (parts.length < 5) continue
-
-      const poliza = parts[0]?.trim()
-      if (!poliza || !/\d/.test(poliza)) continue
-
-      const cliente        = parts[2]?.trim()
-      const prima          = parseNum(parts[3] ?? '')
-      const comisionAsesor = parseNum(parts[parts.length - 1] ?? '')
+      const [, poliza, , cliente] = headerMatch
+      const montos = (lines[i + 1] ?? '').match(MONTO_RE)
+      if (!montos || montos.length < 3) continue
 
       resultado.push({
         numero_poliza_raw: poliza,
-        nombre_tomador:    cliente,
-        valor_prima:       prima,
-        valor_comision:    comisionAsesor,
+        nombre_tomador:    cliente.trim(),
+        valor_prima:       parseNum(montos[0]),
+        valor_comision:    parseNum(montos[2]),
       })
     }
 

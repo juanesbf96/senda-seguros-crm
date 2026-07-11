@@ -9,6 +9,8 @@ import type { ColillaLineaRaw, ParseResult } from './types'
 
 function parseNum(val: unknown): number {
   if (val === null || val === undefined || val === '') return 0
+  // xlsx ya entrega celdas numéricas como number; solo limpiar si viene como texto
+  if (typeof val === 'number') return val
   return parseFloat(String(val).replace(/[$.]/g, '').replace(',', '.')) || 0
 }
 
@@ -45,6 +47,7 @@ export async function parseSbs(buffer: ArrayBuffer): Promise<ParseResult> {
     const colPoliza    = findCol(headers, 'póliza', 'poliza', 'número poliza', 'no poliza')
     const colComision  = findCol(headers, 'comisión acreditada', 'comision acreditada', 'comisión')
     const colPrima     = findCol(headers, 'prima cobrada', 'prima', 'valor prima')
+    const colTomador   = findCol(headers, 'documento - asegurado', 'asegurado', 'documento')
 
     if (colPoliza === -1) {
       return { ok: false, error: 'No se encontró la columna Póliza en el archivo SBS' }
@@ -59,6 +62,7 @@ export async function parseSbs(buffer: ArrayBuffer): Promise<ParseResult> {
 
       resultado.push({
         numero_poliza_raw: pol,
+        nombre_tomador:    colTomador !== -1 ? String(row[colTomador] ?? '').trim() || undefined : undefined,
         valor_prima:       colPrima   !== -1 ? parseNum(row[colPrima])   : undefined,
         valor_comision:    colComision !== -1 ? parseNum(row[colComision]) : undefined,
       })
