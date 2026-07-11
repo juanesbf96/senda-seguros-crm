@@ -7,19 +7,10 @@ import { parseSbs }                from './sbs'
 import { parseViva }               from './viva'
 import { parseCuarentaYOchoHoras } from './cuarenta_y_ocho_horas'
 import type { ParseResult }        from './types'
+import { ASEGURADORAS_DISPONIBLES, type AseguradoraKey } from './constants'
 
-export const ASEGURADORAS_DISPONIBLES = [
-  'SURA',
-  'AXA',
-  'EXPERTOS',
-  'QUÁLITAS',
-  'BOLÍVAR',
-  'SBS',
-  'VIVA',
-  '48 HORAS',
-] as const
-
-export type AseguradoraKey = typeof ASEGURADORAS_DISPONIBLES[number]
+export { ASEGURADORAS_DISPONIBLES }
+export type { AseguradoraKey }
 
 /** Decodifica un ArrayBuffer con encoding latin-1 (necesario para CSV de SURA) */
 function decodeLatinBuffer(buffer: ArrayBuffer): string {

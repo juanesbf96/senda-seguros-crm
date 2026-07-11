@@ -2,48 +2,46 @@
  * Parser QUÁLITAS — PDF estado de cuenta
  *
  * Filtrar solo filas con CVE = 'ACN' (comisión normal).
- * Columnas relevantes: PÓLIZA | IMPORTE | % COMIS. | COMISIÓN
- * Las filas de subtotal/total no tienen número de póliza válido.
+ * Columnas reales: FECHA PÓLIZA ENDOSO RECIBO SERIE REG.CTB. CVE
+ *                  ASEGURADO/CONCEPTO IMPORTE %COMIS. COMISIÓN IVA.PAG
+ *                  RETEFUENTE RETEICA RETEIVA CARGO ABONO
+ * Las filas de subtotal/total (TOT. RAMO, SALDO, etc.) no tienen CVE ACN.
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
 
 function parseNum(raw: string): number {
-  return parseFloat(raw.replace(/[$.,$]/g, '').replace(',', '.').trim()) || 0
+  return parseFloat(raw.replace(/,/g, '').trim()) || 0
 }
+
+// FECHA POLIZA ENDOSO RECIBO SERIE REG.CTB. ACN ASEGURADO(lazy) IMPORTE %COMIS COMISION
+const FILA_ACN_RE =
+  /^\d{1,2}\s+(\d+)\s+\d+\s+\d+\s+\S+\s+\d+\s+ACN\s+(.+?)\s+([\d,]+)\s+([\d.]+)\s+([\d,]+)\s/i
 
 export async function parseQualitas(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { CanvasFactory } = require('pdf-parse/worker')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer) }).getText()
+    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
 
-    const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
+    const lines = text.split('\n').map((l: string) => `${l.trim()} `)
 
     const resultado: ColillaLineaRaw[] = []
 
     for (const line of lines) {
-      // Solo procesar líneas que contengan CVE ACN (comisión normal)
-      if (!/ACN/i.test(line)) continue
+      const match = line.match(FILA_ACN_RE)
+      if (!match) continue
 
-      // Buscar número de póliza: cadena alfanumérica de 6+ chars que no sea "ACN"
-      const parts = line.split(/\s+/)
-      const polizaIdx = parts.findIndex((p: string) => /^[A-Z0-9]{6,}$/i.test(p) && !/ACN/i.test(p))
-      if (polizaIdx === -1) continue
-
-      const poliza     = parts[polizaIdx]
-      const numeros    = parts.filter((p: string) => /^[\d.,]+$/.test(p)).map(parseNum)
-      if (numeros.length < 2) continue
-
-      // El importe es el mayor, la comisión el último número relevante
-      const importe   = numeros[0] ?? 0
-      const comision  = numeros[numeros.length - 1] ?? 0
-      const pct       = numeros.length >= 3 ? numeros[1] : undefined
+      const [, poliza, asegurado, importe, pct, comision] = match
+      if (!poliza || poliza === '0' || /^0+$/.test(poliza)) continue
 
       resultado.push({
         numero_poliza_raw:   poliza,
-        valor_prima:         importe,
-        valor_comision:      comision,
-        porcentaje_comision: pct,
+        nombre_tomador:      asegurado.trim(),
+        valor_prima:         parseNum(importe),
+        porcentaje_comision: parseNum(pct),
+        valor_comision:      parseNum(comision),
       })
     }
 

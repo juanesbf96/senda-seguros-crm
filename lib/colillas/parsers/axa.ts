@@ -1,11 +1,11 @@
 /**
  * Parser AXA Colpatria — PDF texto
  *
- * La tabla útil aparece en la página 2 (o donde esté el header):
- *   POLIZA  TOMADOR  VR RECAUDO  VR COMISION  FECHA RE  %
- *
- * Estrategia: parsear texto completo, localizar header, leer filas hasta
- * encontrar "TOTAL" o línea en blanco larga.
+ * Cada concepto/página trae su propia tabla:
+ *   POLIZA TOMADOR RECIBO RAMO PERIODO VR RECAUDO VR COMISION FECHA RE %
+ * Un mismo estado de cuenta puede traer varias tablas (una por concepto),
+ * así que se recorre el documento completo en vez de detenerse en el primer TOTAL.
+ * Fecha viene en formato YYYYMMDD (sin separadores).
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
 
@@ -14,8 +14,10 @@ function parseNum(raw: string): number {
 }
 
 function parseDate(raw: string): string {
-  // Puede venir 'DD/MM/YYYY' o 'YYYY-MM-DD'
   if (!raw) return ''
+  if (/^\d{8}$/.test(raw)) {
+    return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`
+  }
   if (raw.includes('/')) {
     const [d, m, y] = raw.split('/')
     return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
@@ -23,44 +25,48 @@ function parseDate(raw: string): string {
   return raw.substring(0, 10)
 }
 
+// POLIZA (.TOMADOR lazy) RECIBO RAMO PERIODO VR_RECAUDO VR_COMISION FECHA(8díg) %
+const FILA_RE =
+  /^(\d{6,})\s+(.+?)\s+\d+\s+\d+\s+\d+\s+([\d.,]+)\s+([\d.,]+)\s+(\d{8})\s+[\d,.]+/
+
 export async function parseAxa(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { CanvasFactory } = require('pdf-parse/worker')
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer) }).getText()
+    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
-    // Localizar header
-    const headerIdx = lines.findIndex((l: string) =>
-      /POLIZA/i.test(l) && /COMISION/i.test(l)
-    )
-    if (headerIdx === -1) {
-      return { ok: false, error: 'No se encontró la tabla de comisiones en el PDF de AXA' }
-    }
-
     const resultado: ColillaLineaRaw[] = []
+    let enTabla = false
 
-    for (let i = headerIdx + 1; i < lines.length; i++) {
-      const line = lines[i]
-      if (/^TOTAL/i.test(line) || /^Página/i.test(line)) break
+    for (const line of lines) {
+      if (/POLIZA/i.test(line) && /TOMADOR/i.test(line) && /COMISION/i.test(line)) {
+        enTabla = true
+        continue
+      }
+      if (!enTabla) continue
 
-      // Las columnas en el PDF de AXA vienen separadas por espacios múltiples
-      // Patrón: número de póliza (todo números o alfanumérico), luego datos
-      const match = line.match(
-        /^(\S+)\s+(.+?)\s+([\d.,]+)\s+([\d.,]+)\s+(\d{2}[/\-]\d{2}[/\-]\d{4})\s+([\d.]+)%?/
-      )
+      if (/^TOTAL/i.test(line) || /^Página/i.test(line) || /^FIN DEL REPORTE/i.test(line)) {
+        enTabla = false
+        continue
+      }
+
+      const match = line.match(FILA_RE)
       if (!match) continue
 
-      const [, poliza, tomador, vrRecaudo, vrComision, fecha] = match
-      if (!poliza || !/\d/.test(poliza)) continue
+      const [, poliza, tomadorRaw, vrRecaudo, vrComision, fecha] = match
+      // El primer token de tomadorRaw suele ser un código numérico residual de columna, se descarta
+      const tomador = tomadorRaw.replace(/^\d+\s+/, '').trim()
 
       resultado.push({
-        numero_poliza_raw:   poliza.trim(),
-        nombre_tomador:      tomador.trim(),
-        valor_prima:         parseNum(vrRecaudo),
-        valor_comision:      parseNum(vrComision),
-        fecha_pago:          parseDate(fecha),
+        numero_poliza_raw: poliza,
+        nombre_tomador:    tomador,
+        valor_prima:       parseNum(vrRecaudo),
+        valor_comision:    parseNum(vrComision),
+        fecha_pago:        parseDate(fecha),
       })
     }
 

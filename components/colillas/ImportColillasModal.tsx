@@ -11,7 +11,7 @@ import {
 import PolizaModal from '@/components/polizas/PolizaModal'
 import type { LineaReconciliada } from '@/lib/colillas/reconciliar'
 import type { Poliza } from '@/types'
-import { ASEGURADORAS_DISPONIBLES, type AseguradoraKey } from '@/lib/colillas/parsers'
+import { ASEGURADORAS_DISPONIBLES, type AseguradoraKey } from '@/lib/colillas/parsers/constants'
 
 type Paso = 1 | 2 | 3 | 4
 
