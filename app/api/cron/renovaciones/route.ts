@@ -131,9 +131,15 @@ function buildEmail(
 // ── Handler principal ──────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   // 1. Verificar que viene de Vercel Cron (header Authorization: Bearer CRON_SECRET)
+  // Fail-closed: sin CRON_SECRET configurado se rechaza siempre — este endpoint
+  // usa el service role key (bypasea RLS) y envía correos.
   const authHeader = req.headers.get('authorization')
   const cronSecret = process.env.CRON_SECRET
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  if (!cronSecret) {
+    console.error('Cron: CRON_SECRET no está configurado; se rechaza la petición')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (authHeader !== `Bearer ${cronSecret}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

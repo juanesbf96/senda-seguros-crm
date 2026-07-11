@@ -23,8 +23,16 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
   const { pathname } = request.nextUrl
+
+  // El cron de Vercel llega sin cookies de sesión: se autentica con
+  // Authorization: Bearer CRON_SECRET dentro del propio route handler.
+  // Sin esta exención, el middleware lo redirige a /login y nunca corre.
+  if (pathname.startsWith('/api/cron/')) {
+    return supabaseResponse
+  }
+
+  const { data: { user } } = await supabase.auth.getUser()
 
   const isPublic = PUBLIC_ROUTES.some(r => pathname.startsWith(r))
 
