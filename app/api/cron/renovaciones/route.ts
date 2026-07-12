@@ -171,7 +171,9 @@ export async function GET(req: NextRequest) {
   }
 
   // 5. Agrupar por workspace + filtrar por umbral (7, 15, 30 días)
-  //    Para evitar duplicados: verificar tabla notificaciones_renovacion
+  //    Para evitar duplicados: verificar tabla notificaciones_renovacion.
+  //    El dedup es por (poliza, umbral) sin importar la fecha: cada póliza
+  //    recibe máximo un aviso por umbral (30, 15 y 7 días), no uno diario.
   const umbrales = [7, 15, 30]
   const hoy = new Date().toISOString().split('T')[0]
 
@@ -180,27 +182,16 @@ export async function GET(req: NextRequest) {
     umbrales.some(u => p.dias_restantes <= u)
   )
 
-  // Verificar cuáles ya fueron notificadas hoy
+  // Verificar qué combinaciones (poliza, umbral) ya fueron notificadas
   const polizaIds = porUmbral.map(p => p.poliza_id)
   const { data: yaEnviadas } = await supabase
     .from('notificaciones_renovacion')
     .select('poliza_id, dias_alerta')
     .in('poliza_id', polizaIds)
-    .eq('fecha_envio', hoy)
 
   const enviadas = new Set((yaEnviadas || []).map(n => `${n.poliza_id}-${n.dias_alerta}`))
 
-  // 6. Determinar umbral aplicable por póliza (el menor umbral que aún no se notificó)
-  function umbralAplicable(dias: number): number | null {
-    for (const u of [7, 15, 30]) {
-      if (dias <= u && !enviadas.has(`${dias}-${u}`)) {
-        return u
-      }
-    }
-    return null
-  }
-
-  // Agrupar por workspace
+  // 6. Agrupar por workspace
   const porWorkspace = new Map<string, { polizas: Map<number, PolizaPorVencer[]>; admin: PolizaPorVencer }>()
 
   for (const p of todas) {
