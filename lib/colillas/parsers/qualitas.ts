@@ -8,6 +8,7 @@
  * Las filas de subtotal/total (TOT. RAMO, SALDO, etc.) no tienen CVE ACN.
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
+import { extraerTextoPdf } from './pdf'
 
 function parseNum(raw: string): number {
   return parseFloat(raw.replace(/,/g, '').trim()) || 0
@@ -19,11 +20,7 @@ const FILA_ACN_RE =
 
 export async function parseQualitas(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { CanvasFactory } = require('pdf-parse/worker')
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
+    const text = await extraerTextoPdf(buffer)
 
     const lines = text.split('\n').map((l: string) => `${l.trim()} `)
 

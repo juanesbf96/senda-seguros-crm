@@ -8,6 +8,7 @@
  * Fecha viene en formato YYYYMMDD (sin separadores).
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
+import { extraerTextoPdf } from './pdf'
 
 function parseNum(raw: string): number {
   return parseFloat(raw.replace(/[$.]/g, '').replace(',', '.').trim()) || 0
@@ -31,11 +32,7 @@ const FILA_RE =
 
 export async function parseAxa(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { CanvasFactory } = require('pdf-parse/worker')
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
+    const text = await extraerTextoPdf(buffer)
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
