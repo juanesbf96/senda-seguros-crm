@@ -1,0 +1,42 @@
+# CI básico: typecheck + build en cada push/PR a main.
+#
+# Notas:
+# - El build necesita las variables NEXT_PUBLIC_* porque el cliente de
+#   Supabase se instancia durante el prerender; se usan valores dummy —
+#   el CI no debe depender de credenciales reales.
+# - `npm run lint` NO está incluido: hay ~118 errores acumulados. Cuando se
+#   limpien, agregarlo como paso adicional.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://dummy.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy-anon-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
