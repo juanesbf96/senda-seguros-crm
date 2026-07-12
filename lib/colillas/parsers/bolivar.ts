@@ -10,6 +10,7 @@
  * a diferencia de los demás parsers PDF que usan estilo europeo.
  */
 import type { ColillaLineaRaw, ParseResult } from './types'
+import { extraerTextoPdf } from './pdf'
 
 function parseNumUS(raw: string): number {
   return parseFloat(raw.replace(/,/g, '').trim()) || 0
@@ -21,11 +22,7 @@ const VENTANA_BUSQUEDA = 15
 
 export async function parseBolivar(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { CanvasFactory } = require('pdf-parse/worker')
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PDFParse } = require('pdf-parse')
-    const { text } = await new PDFParse({ data: Buffer.from(buffer), CanvasFactory }).getText()
+    const text = await extraerTextoPdf(buffer)
 
     const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
 
