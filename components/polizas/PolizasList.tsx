@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Poliza, EstadoPoliza, PolizaAnexo, PolizaVinculado } from '@/types'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -66,6 +66,23 @@ export default function PolizasList() {
   const [showFilters, setShowFilters] = useState(false)
   const [activeTab, setActiveTab]   = useState<Tab>('polizas')
 
+  // Paginación server-side para los tabs pólizas/cumplimiento.
+  // La búsqueda y los filtros van en la query — no se carga todo el workspace.
+  const PAGE_SIZE = 50
+  const [page, setPage]             = useState(0)
+  const [totalActivo, setTotalActivo] = useState(0)   // total de filas del tab principal con filtros aplicados
+  const [tabCounts, setTabCounts]   = useState({ normales: 0, cumplimiento: 0 })
+  const [headerStats, setHeaderStats] = useState({ activas: 0, prima: 0 })
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  // Al cambiar tab/filtros se pueden solapar dos fetches; solo la respuesta
+  // del último request puede escribir estado (evita que uno lento la pise).
+  const fetchIdRef = useRef(0)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
   // Modals
   const [showPolizaModal, setShowPolizaModal]           = useState(false)
   const [editingPoliza, setEditingPoliza]               = useState<PolizaConCliente | undefined>()
@@ -101,14 +118,103 @@ export default function PolizasList() {
     }
   }
 
+  /** Lista PostgREST para filtros .in()/.not-in con los ramos de cumplimiento */
+  const RAMOS_CUMPL_IN = `(${RAMOS_CUMPLIMIENTO.map(r => `"${r}"`).join(',')})`
+
+  /** Carga la página actual del tab principal (pólizas o cumplimiento) con
+   *  búsqueda y filtros aplicados en la query — nunca trae todo el workspace. */
   async function loadPolizas() {
-    const { data } = await supabase
+    if (!currentWorkspace) return
+    const fetchId = ++fetchIdRef.current
+    const esCumplimiento = activeTab === 'cumplimiento'
+
+    let query = supabase
       .from('polizas')
-      .select('*, cliente:clientes(id, nombre), vendedor:vendedores(id, nombre)')
+      .select('*, cliente:clientes(id, nombre), vendedor:vendedores(id, nombre)', { count: 'exact' })
       .eq('eliminada', false)
-      .eq('workspace_id', currentWorkspace?.id || '')
+      .eq('workspace_id', currentWorkspace.id)
+
+    query = esCumplimiento
+      ? query.in('ramo', RAMOS_CUMPLIMIENTO)
+      : query.not('ramo', 'in', RAMOS_CUMPL_IN)
+
+    if (filterEstado !== 'all')  query = query.eq('estado', filterEstado)
+    if (extra.aseguradora)       query = query.eq('aseguradora', extra.aseguradora)
+    if (extra.ramo)              query = query.eq('ramo', extra.ramo)
+    if (extra.modalidad)         query = query.eq('tipo_modalidad', extra.modalidad)
+
+    if (extra.vencimiento !== 'all') {
+      const hoy = new Date()
+      const limite = new Date(hoy.getTime() + parseInt(extra.vencimiento) * 86400000)
+      query = query
+        .gte('fecha_fin', hoy.toISOString().split('T')[0])
+        .lte('fecha_fin', limite.toISOString().split('T')[0])
+    }
+
+    if (debouncedSearch) {
+      // PostgREST no filtra el padre por columnas del join, así que la
+      // búsqueda por nombre de cliente se resuelve en dos pasos:
+      // ids de clientes que matchean → client_id.in en el or().
+      const q = debouncedSearch.replace(/[,()%]/g, '').trim()
+      if (q) {
+        const { data: cls } = await supabase
+          .from('clientes')
+          .select('id')
+          .eq('workspace_id', currentWorkspace.id)
+          .ilike('nombre', `%${q}%`)
+          .limit(100)
+        const ids = (cls ?? []).map(c => c.id)
+        const orParts = [
+          `numero_poliza.ilike.*${q}*`,
+          `aseguradora.ilike.*${q}*`,
+          `ramo.ilike.*${q}*`,
+          `riesgo.ilike.*${q}*`,
+          `nombre_tomador.ilike.*${q}*`,
+          `asegurado_nombre.ilike.*${q}*`,
+        ]
+        if (ids.length > 0) orParts.push(`client_id.in.(${ids.join(',')})`)
+        query = query.or(orParts.join(','))
+      }
+    }
+
+    const { data, count } = await query
       .order('fecha_fin', { ascending: true, nullsFirst: false })
+      .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1)
+
+    if (fetchId !== fetchIdRef.current) return  // respuesta obsoleta
     setPolizas((data as PolizaConCliente[]) || [])
+    setTotalActivo(count ?? 0)
+  }
+
+  /** Counts de los tabs principales + stats del header (queries livianas). */
+  async function loadCounts() {
+    if (!currentWorkspace) return
+    const base = () => supabase
+      .from('polizas')
+      .select('id', { count: 'exact', head: true })
+      .eq('eliminada', false)
+      .eq('workspace_id', currentWorkspace.id)
+
+    const hoy = new Date().toISOString().split('T')[0]
+    const [norm, cumpl, slim] = await Promise.all([
+      base().not('ramo', 'in', RAMOS_CUMPL_IN),
+      base().in('ramo', RAMOS_CUMPLIMIENTO),
+      // Proyección mínima para las stats del header (sin joins ni select *)
+      supabase
+        .from('polizas')
+        .select('fecha_fin, estado, prima_neta, prima')
+        .eq('eliminada', false)
+        .eq('workspace_id', currentWorkspace.id)
+        .not('ramo', 'in', RAMOS_CUMPL_IN),
+    ])
+
+    setTabCounts({ normales: norm.count ?? 0, cumplimiento: cumpl.count ?? 0 })
+
+    const activas = (slim.data ?? []).filter(p => p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa')
+    setHeaderStats({
+      activas: activas.length,
+      prima:   activas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0),
+    })
   }
 
   async function loadEliminadas() {
@@ -141,23 +247,34 @@ export default function PolizasList() {
 
   async function load() {
     setLoading(true)
-    await Promise.all([loadPolizas(), loadEliminadas(), loadAnexos(), loadVinculados(), loadAseguradoras(), loadRamos()])
+    await Promise.all([loadPolizas(), loadCounts(), loadEliminadas(), loadAnexos(), loadVinculados(), loadAseguradoras(), loadRamos()])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [currentWorkspace?.id])
 
+  // Volver a la página 1 cuando cambian tab, filtros o búsqueda
+  useEffect(() => { setPage(0) }, [activeTab, filterEstado, extra, debouncedSearch])
+
+  // Recargar la página del tab principal cuando cambia cualquier parámetro de la query
+  useEffect(() => {
+    if (loading) return  // el load() inicial ya la trae
+    if (activeTab === 'polizas' || activeTab === 'cumplimiento') loadPolizas()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, filterEstado, extra, debouncedSearch, page])
+
   async function softDelete(id: string) {
     if (!confirm('¿Mover esta póliza a Eliminadas?')) return
     await supabase.from('polizas').update({ eliminada: true }).eq('id', id).eq('workspace_id', currentWorkspace?.id || '')
     setPolizas(prev => prev.filter(p => p.id !== id))
-    await loadEliminadas()
+    setTotalActivo(prev => Math.max(0, prev - 1))
+    await Promise.all([loadEliminadas(), loadCounts()])
   }
 
   async function restorePoliza(id: string) {
     await supabase.from('polizas').update({ eliminada: false }).eq('id', id).eq('workspace_id', currentWorkspace?.id || '')
     setEliminadas(prev => prev.filter(p => p.id !== id))
-    await loadPolizas()
+    await Promise.all([loadPolizas(), loadCounts()])
   }
 
   async function deleteAnexo(id: string) {
@@ -173,38 +290,10 @@ export default function PolizasList() {
   }
 
   // Splits
-  const polizasNormales    = polizas.filter(p => !RAMOS_CUMPLIMIENTO.includes(p.ramo))
-  const polizasCumplimiento = polizas.filter(p => RAMOS_CUMPLIMIENTO.includes(p.ramo))
-
+  // Los tabs pólizas/cumplimiento ya vienen filtrados y paginados del servidor
   const q = search.toLowerCase()
-
-  function filterPolizas(list: PolizaConCliente[]) {
-    const today = new Date()
-    return list.filter(p => {
-      const matchSearch = !search ||
-        p.cliente?.nombre?.toLowerCase().includes(q) ||
-        p.aseguradora.toLowerCase().includes(q) ||
-        p.ramo.toLowerCase().includes(q) ||
-        p.numero_poliza?.includes(search) ||
-        p.riesgo?.toLowerCase().includes(q) ||
-        p.nombre_tomador?.toLowerCase().includes(q) ||
-        p.asegurado_nombre?.toLowerCase().includes(q)
-      const matchEstado    = filterEstado === 'all' || p.estado === filterEstado
-      const matchAseg      = !extra.aseguradora || p.aseguradora === extra.aseguradora
-      const matchRamo      = !extra.ramo        || p.ramo === extra.ramo
-      const matchModalidad = !extra.modalidad   || p.tipo_modalidad === extra.modalidad
-      let matchVenc = true
-      if (extra.vencimiento !== 'all' && p.fecha_fin) {
-        const days = Math.ceil((new Date(p.fecha_fin).getTime() - today.getTime()) / 86400000)
-        const limit = parseInt(extra.vencimiento)
-        matchVenc = days >= 0 && days <= limit
-      }
-      return matchSearch && matchEstado && matchAseg && matchRamo && matchModalidad && matchVenc
-    })
-  }
-
-  const filteredPolizas    = filterPolizas(polizasNormales)
-  const filteredCumplimiento = filterPolizas(polizasCumplimiento)
+  const filteredPolizas      = polizas
+  const filteredCumplimiento = polizas
   const filteredEliminadas = eliminadas.filter(p =>
     !search ||
     p.cliente?.nombre?.toLowerCase().includes(q) ||
@@ -225,11 +314,11 @@ export default function PolizasList() {
   )
 
   const TABS: { key: Tab; label: string; icon: React.ElementType; count: number }[] = [
-    { key: 'polizas',     label: 'Pólizas',      icon: FileText,    count: polizasNormales.length      },
+    { key: 'polizas',     label: 'Pólizas',      icon: FileText,    count: tabCounts.normales          },
     { key: 'anexos',      label: 'Anexos',        icon: Paperclip,   count: anexos.length               },
     { key: 'vinculados',  label: 'Vinculados',    icon: Users,       count: vinculados.length           },
     { key: 'eliminadas',  label: 'Eliminadas',    icon: Archive,     count: eliminadas.length           },
-    { key: 'cumplimiento',label: 'Cumplimiento',  icon: ShieldCheck, count: polizasCumplimiento.length  },
+    { key: 'cumplimiento',label: 'Cumplimiento',  icon: ShieldCheck, count: tabCounts.cumplimiento      },
   ]
 
   if (loading) return (
@@ -245,8 +334,8 @@ export default function PolizasList() {
         <div>
           <h1 className="text-2xl font-bold text-ink-700">Pólizas</h1>
           <p className="text-ink-400 text-sm mt-1">
-            {polizasNormales.filter(p => p.fecha_fin ? p.fecha_fin >= new Date().toISOString().split('T')[0] : p.estado === 'activa').length} activas ·{' '}
-            Prima: {formatCOP(polizasNormales.filter(p => p.fecha_fin ? p.fecha_fin >= new Date().toISOString().split('T')[0] : p.estado === 'activa').reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0))}
+            {headerStats.activas} activas ·{' '}
+            Prima: {formatCOP(headerStats.prima)}
           </p>
         </div>
         <div className="flex gap-2">
@@ -373,12 +462,15 @@ export default function PolizasList() {
 
       {/* ── Tab: Pólizas ── */}
       {activeTab === 'polizas' && (
-        <PolizasTable
-          polizas={filteredPolizas}
-          onEdit={p => { setEditingPoliza(p); setShowPolizaModal(true) }}
-          onDelete={softDelete}
-          showRiesgo={false}
-        />
+        <>
+          <PolizasTable
+            polizas={filteredPolizas}
+            onEdit={p => { setEditingPoliza(p); setShowPolizaModal(true) }}
+            onDelete={softDelete}
+            showRiesgo={false}
+          />
+          <Paginacion page={page} pageSize={PAGE_SIZE} total={totalActivo} onPage={setPage} />
+        </>
       )}
 
       {/* ── Tab: Anexos ── */}
@@ -546,9 +638,9 @@ export default function PolizasList() {
       {activeTab === 'cumplimiento' && (
         <div className="space-y-4">
           {/* Stats */}
-          {polizasCumplimiento.length > 0 && (() => {
+          {filteredCumplimiento.length > 0 && (() => {
             const hoy = new Date().toISOString().split('T')[0]
-            const activas = polizasCumplimiento.filter(p => p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa')
+            const activas = filteredCumplimiento.filter(p => p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa')
             const primaNeta   = activas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
             const totalPrima  = activas.reduce((s, p) => s + (p.total_prima || 0), 0)
             const comision    = activas.reduce((s, p) => s + (p.comision_agencia || 0), 0)
@@ -669,6 +761,7 @@ export default function PolizasList() {
               </div>
             )}
           </div>
+          <Paginacion page={page} pageSize={PAGE_SIZE} total={totalActivo} onPage={setPage} />
         </div>
       )}
 
@@ -712,6 +805,36 @@ function selCls(active: boolean) {
     'px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 transition-colors',
     active ? 'border-primary-400 bg-primary-50 text-primary-800' : 'border-ink-200 bg-white text-ink-500',
   ].join(' ')
+}
+
+function Paginacion({ page, pageSize, total, onPage }: {
+  page: number; pageSize: number; total: number; onPage: (p: number) => void
+}) {
+  if (total <= pageSize) return null
+  const desde = page * pageSize + 1
+  const hasta = Math.min((page + 1) * pageSize, total)
+  const ultima = Math.ceil(total / pageSize) - 1
+  return (
+    <div className="flex items-center justify-between mt-4 text-sm">
+      <p className="text-ink-400 text-xs">
+        {desde}–{hasta} de {total.toLocaleString('es-CO')}
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => onPage(page - 1)}
+          disabled={page === 0}
+          className="px-3 py-1.5 rounded-lg border border-ink-200 text-ink-500 text-xs font-medium hover:bg-cream-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          ← Anterior
+        </button>
+        <button
+          onClick={() => onPage(page + 1)}
+          disabled={page >= ultima}
+          className="px-3 py-1.5 rounded-lg border border-ink-200 text-ink-500 text-xs font-medium hover:bg-cream-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+          Siguiente →
+        </button>
+      </div>
+    </div>
+  )
 }
 
 function FiltroSelect({ label, value, onChange, children }: {
