@@ -1,73 +1,11 @@
 'use client'
 import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
-import { supabase } from '@/lib/supabase/client'
 import { X, Upload, CheckCircle, AlertCircle, FileText, Loader2, Info } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import type { ExcelRow, ImportResult } from '@/lib/import/types'
 
 /* ── Tipos ──────────────────────────────────────────────────────── */
-
-interface ExcelRow {
-  // Flags
-  es_renovacion: boolean
-  mes_emision: string
-  oneroso: boolean
-  endoso_enviado: boolean
-  cancelada_anterior: boolean
-  aseguradora_anterior: string
-  // Cliente
-  tipo_poliza: string
-  nombre: string
-  tipo_documento: string
-  cedula: string
-  fecha_nacimiento: string
-  telefono: string
-  email: string
-  // Póliza base
-  fecha_inicio: string
-  fecha_fin: string
-  aseguradora: string
-  numero_poliza: string
-  ramo: string
-  periodicidad: string
-  // Financiero
-  pct_comision_negocio: number | null
-  prima_neta: number | null
-  prima_periodica: number | null
-  comision_agencia: number | null
-  comision_periodica: number | null
-  retencion_agencia: number | null
-  // Intermediario
-  intermediario: string
-  pct_comision_int: number | null
-  comision_intermediario: number | null
-  // Asesor
-  asesor: string
-  pct_comision_asesor: number | null
-  retencion_asesor: number | null
-  comision_asesor: number | null
-  // Referido
-  referido: string
-  pct_comision_referido: number | null
-  retencion_referido: number | null
-  comision_referido: number | null
-  // ABC / Agencia neta
-  comision_abc_periodica: number | null
-  pct_comision_abc: number | null
-  retencion_abc: number | null
-  comision_abc_anual: number | null
-  comision_recibida: boolean          // ¿La aseguradora ya pagó la comisión? (Sí/null)
-  fecha_pago_abc: string              // Fecha en que recibimos la comisión
-  asesor_pago_estado: 'pagada' | 'pendiente' | 'no_aplica'  // Estado pago al asesor
-  fecha_pago_asesor: string           // Fecha en que pagamos al asesor
-}
-
-interface ImportResult {
-  clientesCreados: number
-  clientesExistentes: number
-  polizasCreadas: number
-  errores: string[]
-}
 
 type Stage = 'idle' | 'select_sheet' | 'preview' | 'importing' | 'done'
 
@@ -302,258 +240,6 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
   return { rows, errors }
 }
 
-/* ── Importar a Supabase ────────────────────────────────────────── */
-
-async function importarFilas(rows: ExcelRow[], wsId: string): Promise<ImportResult> {
-  const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [] }
-
-  // 0a. Pre-cargar vendedores del workspace → cache nombre normalizado → { id, pct }
-  type VendedorCache = { id: string; pct: number | null }
-  const vendedoresMap = new Map<string, VendedorCache>()
-  const { data: vData } = await supabase
-    .from('vendedores')
-    .select('id, nombre, comisiones_por_anio')
-    .eq('activo', true)
-  if (vData) {
-    for (const v of vData) {
-      const key = norm(v.nombre ?? '')
-      const pct = (v.comisiones_por_anio as { porcentaje?: number }[] | null)?.[0]?.porcentaje ?? null
-      vendedoresMap.set(key, { id: v.id, pct })
-    }
-  }
-
-  // 0b. Crear vendedores nuevos del Excel que no existan en el workspace
-  const asesoresUnicos = new Set(rows.map(r => r.asesor).filter(Boolean))
-  for (const nombre of asesoresUnicos) {
-    const existe = (() => {
-      const k = norm(nombre)
-      if (vendedoresMap.has(k)) return true
-      for (const key of vendedoresMap.keys()) {
-        if (k.includes(key) || key.includes(k)) return true
-      }
-      return false
-    })()
-    if (!existe) {
-      const { data: nuevo } = await supabase
-        .from('vendedores')
-        .insert({ nombre, workspace_id: wsId, activo: true })
-        .select('id')
-        .single()
-      if (nuevo) {
-        vendedoresMap.set(norm(nombre), { id: nuevo.id, pct: null })
-      }
-    }
-  }
-
-  // 0c. Pre-cargar tarifas de comisión desde configuracion
-  interface TarifaRow { id: string; codigo: string; ramo: string; aseguradora: string; porcentaje: number }
-  const tarifasComision: TarifaRow[] = []
-  const { data: cfgData } = await supabase
-    .from('configuracion')
-    .select('valor')
-    .eq('workspace_id', wsId)
-    .eq('clave', 'comisiones_tarifas')
-    .maybeSingle()
-  if (cfgData?.valor) {
-    try {
-      const parsed: TarifaRow[] = JSON.parse(cfgData.valor)
-      tarifasComision.push(...parsed.filter(t => typeof t.porcentaje === 'number'))
-    } catch { /* ignore */ }
-  }
-
-  function matchTarifa(ramo: string, aseguradora: string): number | null {
-    // Coincidencia exacta ramo + aseguradora
-    const exact = tarifasComision.find(t => t.ramo === ramo && t.aseguradora === aseguradora)
-    if (exact) return exact.porcentaje
-    // Coincidencia solo por ramo
-    const byRamo = tarifasComision.find(t => t.ramo === ramo)
-    if (byRamo) return byRamo.porcentaje
-    return null
-  }
-
-  function matchVendedor(asesorNombre: string): VendedorCache | null {
-    if (!asesorNombre) return null
-    const k = norm(asesorNombre)
-    // 1. Coincidencia exacta
-    if (vendedoresMap.has(k)) return vendedoresMap.get(k)!
-    // 2. El nombre del Excel contiene el nombre del vendedor o viceversa
-    for (const [key, v] of vendedoresMap) {
-      if (k.includes(key) || key.includes(k)) return v
-    }
-    return null
-  }
-
-  // Cache de cedula → cliente_id para no re-buscar
-  const clienteCache = new Map<string, string>()
-
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i]
-
-    try {
-      // 1. Buscar o crear cliente
-      const cedulaKey = r.cedula || r.nombre.toLowerCase()
-      let clienteId: string | null = clienteCache.get(cedulaKey) ?? null
-
-      if (!clienteId && r.cedula) {
-        // Buscar por cédula en el workspace
-        const { data: existing } = await supabase
-          .from('clientes')
-          .select('id')
-          .eq('workspace_id', wsId)
-          .eq('cedula', r.cedula)
-          .maybeSingle()
-
-        if (existing) {
-          clienteId = existing.id
-          result.clientesExistentes++
-        }
-      }
-
-      if (!clienteId) {
-        // Crear cliente nuevo
-        const clienteData: Record<string, unknown> = {
-          workspace_id:    wsId,
-          nombre:          r.nombre,
-          tipo_documento:  r.tipo_documento || null,
-          cedula:          r.cedula || null,
-          telefono:        r.telefono || null,
-          email:           r.email || null,
-          etapa:           'cerrado',  // Ya tiene póliza → cliente activo
-        }
-        if (r.fecha_nacimiento) clienteData.fecha_nacimiento = r.fecha_nacimiento
-        // Tipo cliente según tipo_documento
-        if (r.tipo_documento?.toUpperCase() === 'NIT') {
-          clienteData.tipo_cliente = 'empresa'
-          clienteData.nit = r.cedula || null
-        }
-
-        const { data: nuevo, error: errCliente } = await supabase
-          .from('clientes')
-          .insert(clienteData)
-          .select('id')
-          .single()
-
-        if (errCliente || !nuevo) {
-          result.errores.push(`Fila ${i + 2}: No se pudo crear cliente "${r.nombre}" — ${errCliente?.message}`)
-          continue
-        }
-
-        clienteId = nuevo.id
-        result.clientesCreados++
-      }
-
-      if (!clienteId) continue
-      clienteCache.set(cedulaKey, clienteId)
-
-      // 2. Crear póliza
-      // Auto-detectar estado según fecha_fin
-      const hoy = new Date().toISOString().split('T')[0]
-      let estadoPoliza: string = 'activa'
-      if (r.fecha_fin && r.fecha_fin < hoy) estadoPoliza = 'vencida'
-      else if (!r.fecha_inicio && !r.fecha_fin) estadoPoliza = 'pendiente'
-
-      // Resolver vendedor por nombre
-      const vendedorMatch = matchVendedor(r.asesor)
-      const vendedorId    = vendedorMatch?.id ?? null
-      const pctVendedor   = r.pct_comision_asesor ?? vendedorMatch?.pct ?? null
-
-      // Auto-calcular comisión agencia si no viene del Excel — fallback a tarifas configuradas
-      const primaNeta      = r.prima_neta ?? 0
-      const pctAgencia     = r.pct_comision_negocio ?? matchTarifa(r.ramo, r.aseguradora) ?? null
-      const comisionAgencia = r.comision_agencia
-        ?? (primaNeta && pctAgencia ? Math.round(primaNeta * pctAgencia / 100 * 100) / 100 : null)
-
-      // Auto-calcular comisión vendedor si no viene del Excel
-      const comisionVendedor = r.comision_asesor
-        ?? (comisionAgencia && pctVendedor ? Math.round(comisionAgencia * pctVendedor / 100 * 100) / 100 : null)
-
-      const polizaData: Record<string, unknown> = {
-        workspace_id:               wsId,
-        client_id:                  clienteId,
-        aseguradora:                r.aseguradora || 'Sin asignar',
-        ramo:                       r.ramo || 'Sin ramo',
-        numero_poliza:              r.numero_poliza || null,
-        tipo_poliza:                r.tipo_poliza || null,
-        fecha_inicio:               r.fecha_inicio || null,
-        fecha_fin:                  r.fecha_fin || null,
-        periodicidad_pago:          r.periodicidad || null,
-        estado:                     estadoPoliza,
-        eliminada:                  false,
-        // Flags
-        es_renovacion:              r.es_renovacion,
-        mes_emision:                r.mes_emision || null,
-        beneficiario_oneroso:       r.oneroso,
-        endoso_enviado:             r.endoso_enviado,
-        cancelada_anterior:         r.cancelada_anterior,
-        aseguradora_anterior:       r.aseguradora_anterior || null,
-        // Financiero
-        prima_neta:                 r.prima_neta,
-        prima:                      r.prima_neta,
-        prima_periodica:            r.prima_periodica,
-        porcentaje_comision_agencia: pctAgencia,
-        comision_agencia:           comisionAgencia,
-        comision_periodica:         r.comision_periodica,
-        retencion_agencia:          r.retencion_agencia,
-        // Intermediario
-        intermediario:              r.intermediario || null,
-        pct_comision_int:           r.pct_comision_int,
-        comision_intermediario:     r.comision_intermediario,
-        // Vendedor (resuelto por nombre)
-        vendedor_id:                vendedorId,
-        porcentaje_comision_vendedor: pctVendedor,
-        retencion_vendedor:         r.retencion_asesor ?? 10,
-        comision_vendedor:          comisionVendedor,
-        // Referido
-        referido:                   r.referido || null,
-        pct_comision_referido:      r.pct_comision_referido,
-        retencion_referido:         r.retencion_referido,
-        comision_referido:          r.comision_referido,
-        // ABC
-        comision_abc_periodica:     r.comision_abc_periodica,
-        pct_comision_abc:           r.pct_comision_abc,
-        retencion_abc:              r.retencion_abc,
-        comision_abc_anual:         r.comision_abc_anual,
-        comision_recibida:          r.comision_recibida,
-        fecha_pago_abc:             r.fecha_pago_abc || null,
-        asesor_pago_estado:         r.asesor_pago_estado,
-        fecha_pago_asesor:          r.fecha_pago_asesor || null,
-      }
-
-      // Buscar si ya existe la póliza por numero_poliza + workspace → actualizar, sino insertar
-      let errPoliza = null
-      if (r.numero_poliza) {
-        const { data: existente } = await supabase
-          .from('polizas')
-          .select('id')
-          .eq('workspace_id', wsId)
-          .eq('numero_poliza', r.numero_poliza)
-          .maybeSingle()
-
-        if (existente) {
-          const { error } = await supabase.from('polizas').update(polizaData).eq('id', existente.id)
-          errPoliza = error
-        } else {
-          const { error } = await supabase.from('polizas').insert(polizaData)
-          errPoliza = error
-        }
-      } else {
-        const { error } = await supabase.from('polizas').insert(polizaData)
-        errPoliza = error
-      }
-
-      if (errPoliza) {
-        result.errores.push(`Fila ${i + 2}: No se pudo guardar póliza para "${r.nombre}" — ${errPoliza.message}`)
-      } else {
-        result.polizasCreadas++
-      }
-    } catch (e) {
-      result.errores.push(`Fila ${i + 2}: Error inesperado — ${String(e)}`)
-    }
-  }
-
-  return result
-}
-
 /* ── Componente ─────────────────────────────────────────────────── */
 
 interface Props {
@@ -634,8 +320,21 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
   async function importar() {
     if (!currentWorkspace) return
     setStage('importing')
-    const res = await importarFilas(rows, currentWorkspace.id)
-    setResult(res)
+    try {
+      const resp = await fetch('/api/polizas/import', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ workspace_id: currentWorkspace.id, rows }),
+      })
+      if (!resp.ok) {
+        const { error } = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }))
+        setResult({ clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [error ?? `HTTP ${resp.status}`] })
+      } else {
+        setResult(await resp.json())
+      }
+    } catch (e) {
+      setResult({ clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [`Error de red: ${String(e)}`] })
+    }
     setStage('done')
   }
 
