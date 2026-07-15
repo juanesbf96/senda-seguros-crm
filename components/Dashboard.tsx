@@ -192,6 +192,7 @@ export default function Dashboard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspace?.id])
 
+  
   // ── Valores derivados de las métricas del RPC ────────────────────
   const carteraRamo: DonutSlice[] = useMemo(() =>
     (m?.cartera_ramo ?? []).map((s, i) => ({
