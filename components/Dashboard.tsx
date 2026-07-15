@@ -3,8 +3,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
-import { Cliente, Poliza, Etapa } from '@/types'
-import { formatCOP, daysUntil, cn } from '@/lib/utils'
+import { Cliente, Etapa } from '@/types'
+import { formatCOP, cn } from '@/lib/utils'
 import Link from 'next/link'
 import {
   ArrowUpRight, Cake, ShieldAlert, CheckSquare,
@@ -70,9 +70,33 @@ export default function Dashboard() {
   const isGlobal = isAdmin || isSupervisor
   const [userName, setUserName] = useState('')
 
-  const [clientes,   setClientes]   = useState<Cliente[]>([])
-  const [polizas,    setPolizas]    = useState<Poliza[]>([])
-  const [todasPolizas, setTodasPolizas] = useState<{ estado: string }[]>([])
+  // Métricas agregadas del RPC get_dashboard_metrics — reemplaza las ~20
+  // queries que traían filas al navegador solo para contar/sumar en JS.
+  interface DashMetrics {
+    clientes_total: number
+    clientes_por_etapa: Record<string, number>
+    clientes_recientes: Pick<Cliente, 'id' | 'nombre' | 'ciudad' | 'etapa' | 'categoria' | 'telefono'>[]
+    cumpleanos: { id: string; nombre: string; fecha_nacimiento: string }[]
+    polizas_activas: number
+    polizas_total: number
+    polizas_por_estado: Record<string, number>
+    prima_total: number
+    comision_total: number
+    renov_30: number
+    renov_60: number
+    renov_buckets: number[]
+    cartera_ramo: { label: string; value: number }[]
+    cartera_aseguradora: { label: string; value: number }[]
+    trend: { mes: number; prima: number; comision: number }[]
+    spark_clientes: number[]
+    spark_polizas: number[]
+    mes: { polizas: number; prima: number; comision: number }
+    mes_pasado: { polizas: number; prima: number; comision: number }
+    clientes_mes: number
+    clientes_mes_pasado: number
+    produccion_asesores: { id: string; nombre: string; count: number; prima: number; comision: number }[]
+  }
+  const [m, setM] = useState<DashMetrics | null>(null)
   const [siniestrosPendientes, setSiniestrosPendientes] = useState(0)
   const [tareasHoy,     setTareasHoy]     = useState(0)
   const [tareasVencidas,setTareasVencidas]= useState(0)
@@ -88,13 +112,6 @@ export default function Dashboard() {
   const [metasProgress, setMetasProgress] = useState(0)
   const [metasCumplidas,setMetasCumplidas]= useState(0)
   const [loading, setLoading] = useState(true)
-
-  // Comparaciones mensuales
-  const [polizasMes,        setPolizasMes]        = useState<{ prima_neta: number | null; comision_agencia: number | null; vendedor_id: string | null }[]>([])
-  const [polizasMesPasado,  setPolizasMesPasado]  = useState<{ prima_neta: number | null; comision_agencia: number | null }[]>([])
-  const [clientesMes,       setClientesMes]       = useState(0)
-  const [clientesMesPasado, setClientesMesPasado] = useState(0)
-  const [vendedores,        setVendedores]        = useState<{ id: string; nombre: string }[]>([])
 
   // Datos para charts
   const [trendData,        setTrendData]        = useState<TrendDatum[]>([])
@@ -114,285 +131,105 @@ export default function Dashboard() {
     if (!currentWorkspace) return
     setLoading(true)
     async function load() {
-      const wsId     = currentWorkspace!.id
-      const uid      = currentUserId
-      const today    = new Date().toISOString().split('T')[0]
-      const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0]
-      const in7days  = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]
-      const year12Ago = new Date()
-      year12Ago.setMonth(year12Ago.getMonth() - 11)
-      year12Ago.setDate(1)
-      const trendStart = year12Ago.toISOString().split('T')[0]
-      const days30Ago = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
-      const in90days = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
+      const wsId = currentWorkspace!.id
+      const uid  = currentUserId
 
-      const ahora          = new Date()
-      const mesActualStart = new Date(ahora.getFullYear(), ahora.getMonth(), 1).toISOString().split('T')[0]
-      const mesPasadoStart = new Date(ahora.getFullYear(), ahora.getMonth() - 1, 1).toISOString().split('T')[0]
-      const mesPasadoEnd   = new Date(ahora.getFullYear(), ahora.getMonth(), 0).toISOString().split('T')[0]
-
-      // Base queries — global vs per-agent
-      let qClientes = supabase.from('clientes').select('*').eq('workspace_id', wsId).order('created_at', { ascending: false })
-      let qPolizas  = supabase.from('polizas').select('*, cliente:clientes(nombre)').eq('workspace_id', wsId).eq('estado', 'activa').eq('eliminada', false)
-      let qAllP     = supabase.from('polizas').select('estado').eq('workspace_id', wsId).eq('eliminada', false)
-      let qSin      = supabase.from('siniestros').select('id').eq('workspace_id', wsId).not('estado', 'in', '("cerrado","rechazado")')
-      let qTV       = supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).lt('fecha_vencimiento', today)
-      let qTH       = supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', today)
-      let qTM       = supabase.from('tareas').select('id').eq('workspace_id', wsId).eq('completada', false).eq('fecha_vencimiento', tomorrow)
-      let qCobros   = supabase.from('cobros').select('valor, estado, tipo').eq('workspace_id', wsId).neq('estado', 'anulado')
-      let qLiqs     = supabase.from('liquidaciones').select('total_comision, estado').eq('workspace_id', wsId).eq('estado', 'pendiente')
-      let qSols     = supabase.from('solicitudes').select('id, estado, prioridad, fecha_limite').eq('workspace_id', wsId)
-
-      if (!isGlobal && uid) {
-        qClientes = qClientes.eq('assigned_to', uid)
-        qPolizas  = qPolizas.eq('vendedor_id', uid)
-        qAllP     = qAllP.eq('vendedor_id', uid)
-        qTV       = qTV.eq('asignado_a', uid)
-        qTH       = qTH.eq('asignado_a', uid)
-        qTM       = qTM.eq('asignado_a', uid)
-        qSols     = qSols.eq('asignado_a', uid)
+      // Un solo RPC con todos los agregados calculados en Postgres
+      // (ver supabase/migration_dashboard_metrics.sql)
+      const { data, error } = await supabase.rpc('get_dashboard_metrics', {
+        p_ws:  wsId,
+        p_uid: !isGlobal && uid ? uid : null,
+      })
+      if (error || !data) {
+        console.error('Dashboard: error cargando métricas', error)
+        setLoading(false)
+        return
       }
 
-      const [
-        { data: c }, { data: p }, { data: allP }, { data: sin },
-        { data: tareasV }, { data: tareasH }, { data: tareasM },
-        { data: cobros }, { data: liqs }, { data: sols },
-        { data: polizasTrend }, { data: renovs90 },
-        { data: clientesNew }, { data: polizasNew },
-        { data: metas },
-      ] = await Promise.all([
-        qClientes,
-        qPolizas,
-        qAllP,
-        qSin,
-        qTV, qTH, qTM,
-        qCobros,
-        qLiqs,
-        qSols,
-        // Tendencia 12 meses (global, no per-agent)
-        supabase.from('polizas')
-          .select('fecha_inicio, prima_neta, comision_agencia')
-          .eq('workspace_id', wsId).eq('eliminada', false).gte('fecha_inicio', trendStart),
-        // Renovaciones próximos 90 días (respeta per-agent si aplica)
-        (isGlobal || !uid
-          ? supabase.from('polizas').select('fecha_fin').eq('workspace_id', wsId).eq('estado', 'activa').eq('eliminada', false)
-          : supabase.from('polizas').select('fecha_fin').eq('workspace_id', wsId).eq('estado', 'activa').eq('eliminada', false).eq('vendedor_id', uid)
-        ).gte('fecha_fin', today).lte('fecha_fin', in90days),
-        // Sparklines últimos 30 días
-        (isGlobal || !uid
-          ? supabase.from('clientes').select('created_at').eq('workspace_id', wsId)
-          : supabase.from('clientes').select('created_at').eq('workspace_id', wsId).eq('assigned_to', uid)
-        ).gte('created_at', days30Ago),
-        (isGlobal || !uid
-          ? supabase.from('polizas').select('fecha_inicio').eq('workspace_id', wsId).eq('eliminada', false)
-          : supabase.from('polizas').select('fecha_inicio').eq('workspace_id', wsId).eq('eliminada', false).eq('vendedor_id', uid)
-        ).gte('fecha_inicio', days30Ago),
-        // Metas activas (workspace-level)
-        supabase.from('metas')
-          .select('valor_meta, valor_actual')
-          .eq('workspace_id', wsId)
-          .lte('fecha_inicio', today)
-          .gte('fecha_fin', today),
-      ])
+      const dm = data as DashMetrics & { tareas_vencidas: number; tareas_hoy: number; tareas_manana: number;
+        siniestros_pendientes: number; cobros_pendiente: number; cobros_vencido: number; liq_pendiente: number;
+        sol_nuevas: number; sol_urgentes: number; sol_activas: number; sol_por_vencer: number;
+        metas_activas: number; metas_progreso: number; metas_cumplidas: number }
 
-      setClientes(c || [])
-      setPolizas(p || [])
-      setTodasPolizas(allP || [])
-      setSiniestrosPendientes((sin || []).length)
-      setTareasVencidas((tareasV || []).length)
-      setTareasHoy((tareasH || []).length)
-      setTareasMañana((tareasM || []).length)
+      setM(dm)
+      setSiniestrosPendientes(dm.siniestros_pendientes)
+      setTareasVencidas(dm.tareas_vencidas)
+      setTareasHoy(dm.tareas_hoy)
+      setTareasMañana(dm.tareas_manana)
+      setCobrosPendiente(dm.cobros_pendiente)
+      setCobrosVencido(dm.cobros_vencido)
+      setLiqPendiente(dm.liq_pendiente)
+      setSolNuevas(dm.sol_nuevas)
+      setSolUrgentes(dm.sol_urgentes)
+      setSolActivas(dm.sol_activas)
+      setSolPorVencer(dm.sol_por_vencer)
+      setMetasActivas(dm.metas_activas)
+      setMetasProgress(dm.metas_progreso)
+      setMetasCumplidas(dm.metas_cumplidas)
 
-      const cList = (cobros || []) as { valor: number; estado: string; tipo: string }[]
-      setCobrosPendiente(
-        cList.filter(c => c.estado === 'pendiente' && (c.tipo === 'por_cobrar' || c.tipo === 'comision_por_cobrar'))
-          .reduce((s, c) => s + c.valor, 0)
-      )
-      setCobrosVencido(cList.filter(c => c.estado === 'vencido').reduce((s, c) => s + c.valor, 0))
-      setLiqPendiente((liqs || []).reduce((s, l) => s + (l.total_comision || 0), 0))
-
-      const sList = (sols || []) as { id: string; estado: string; prioridad: string; fecha_limite: string | null }[]
-      const activas = sList.filter(s => s.estado === 'nueva' || s.estado === 'en_proceso')
-      setSolNuevas(sList.filter(s => s.estado === 'nueva').length)
-      setSolUrgentes(activas.filter(s => s.prioridad === 'urgente').length)
-      setSolActivas(activas.length)
-      setSolPorVencer(activas.filter(s => s.fecha_limite && s.fecha_limite <= in7days).length)
-
-      // Tendencia mensual
-      const monthMap = new Map<string, { prima: number; comision: number }>()
-      for (let i = 11; i >= 0; i--) {
-        const d = new Date()
-        d.setMonth(d.getMonth() - i)
-        d.setDate(1)
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-        monthMap.set(key, { prima: 0, comision: 0 })
-      }
-      ;(polizasTrend || []).forEach((p: { fecha_inicio: string; prima_neta?: number; comision_agencia?: number }) => {
-        if (!p.fecha_inicio) return
-        const d = new Date(p.fecha_inicio + 'T00:00:00')
-        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-        const slot = monthMap.get(key)
-        if (slot) {
-          slot.prima    += p.prima_neta || 0
-          slot.comision += p.comision_agencia || 0
-        }
-      })
-      const trend: TrendDatum[] = Array.from(monthMap.entries()).map(([key, v]) => {
-        const monthIdx = parseInt(key.split('-')[1], 10) - 1
-        return { label: MONTH_LABELS_ES[monthIdx], value: v.prima, secondary: v.comision }
-      })
-      setTrendData(trend)
+      // Tendencia 12 meses
+      setTrendData(dm.trend.map(t => ({
+        label: MONTH_LABELS_ES[t.mes - 1],
+        value: t.prima,
+        secondary: t.comision,
+      })))
 
       // Renovaciones por bloque de 15 días
-      const buckets = ['0-15d', '16-30d', '31-45d', '46-60d', '61-75d', '76-90d']
-      const renovMap = new Map<string, number>(buckets.map(b => [b, 0]))
-      ;(renovs90 || []).forEach((r: { fecha_fin: string }) => {
-        const d = daysUntil(r.fecha_fin)
-        let bucket = '76-90d'
-        if (d <= 15) bucket = '0-15d'
-        else if (d <= 30) bucket = '16-30d'
-        else if (d <= 45) bucket = '31-45d'
-        else if (d <= 60) bucket = '46-60d'
-        else if (d <= 75) bucket = '61-75d'
-        renovMap.set(bucket, (renovMap.get(bucket) || 0) + 1)
-      })
-      const renovData: BarsDatum[] = buckets.map((b, i) => ({
-        label: b,
-        value: renovMap.get(b) || 0,
+      const bucketLabels = ['0-15d', '16-30d', '31-45d', '46-60d', '61-75d', '76-90d']
+      setRenovacionesData(bucketLabels.map((label, i) => ({
+        label,
+        value: dm.renov_buckets[i] ?? 0,
         tone: i === 0 ? 'error' : i === 1 ? 'warning' : 'primary',
-      }))
-      setRenovacionesData(renovData)
+      })))
 
-      // Sparklines
-      const sparkClientes = bucketByDay(clientesNew as { created_at: string }[] || [], 'created_at', 30)
-      const sparkPolizas  = bucketByDay(polizasNew  as { fecha_inicio: string }[]  || [], 'fecha_inicio', 30)
-      setClientesSpark(sparkClientes)
-      setPolizasSpark(sparkPolizas)
-
-      // Metas — progreso promedio
-      const mList = (metas || []) as { valor_meta: number; valor_actual: number }[]
-      setMetasActivas(mList.length)
-      if (mList.length > 0) {
-        const progresos = mList.map(m =>
-          m.valor_meta > 0 ? Math.min((m.valor_actual / m.valor_meta) * 100, 100) : 0
-        )
-        const promedio = progresos.reduce((a, b) => a + b, 0) / mList.length
-        setMetasProgress(Math.round(promedio))
-        setMetasCumplidas(progresos.filter(p => p >= 100).length)
-      } else {
-        setMetasProgress(0)
-        setMetasCumplidas(0)
-      }
-
-      // ── Comparaciones mensuales + producción por asesor ─────────────
-      let qPMes  = supabase.from('polizas').select('prima_neta, comision_agencia, vendedor_id')
-        .eq('workspace_id', wsId).eq('eliminada', false).gte('fecha_inicio', mesActualStart)
-      let qPMesP = supabase.from('polizas').select('prima_neta, comision_agencia')
-        .eq('workspace_id', wsId).eq('eliminada', false)
-        .gte('fecha_inicio', mesPasadoStart).lte('fecha_inicio', mesPasadoEnd)
-      if (!isGlobal && uid) {
-        qPMes  = qPMes.eq('vendedor_id', uid)
-        qPMesP = qPMesP.eq('vendedor_id', uid)
-      }
-      const [
-        { data: pMes }, { data: pMesP }, { data: cMes }, { data: cMesP }, { data: vends },
-      ] = await Promise.all([
-        qPMes,
-        qPMesP,
-        (isGlobal || !uid
-          ? supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesActualStart + 'T00:00:00')
-          : supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesActualStart + 'T00:00:00').eq('assigned_to', uid)
-        ),
-        (isGlobal || !uid
-          ? supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesPasadoStart + 'T00:00:00').lte('created_at', mesPasadoEnd + 'T23:59:59')
-          : supabase.from('clientes').select('id').eq('workspace_id', wsId).gte('created_at', mesPasadoStart + 'T00:00:00').lte('created_at', mesPasadoEnd + 'T23:59:59').eq('assigned_to', uid)
-        ),
-        supabase.from('vendedores').select('id, nombre').eq('workspace_id', wsId).order('nombre'),
-      ])
-      type PMesRow = { prima_neta: number | null; comision_agencia: number | null; vendedor_id: string | null }
-      setPolizasMes((pMes ?? []) as PMesRow[])
-      setPolizasMesPasado((pMesP ?? []) as { prima_neta: number | null; comision_agencia: number | null }[])
-      setClientesMes((cMes ?? []).length)
-      setClientesMesPasado((cMesP ?? []).length)
-      setVendedores((vends ?? []) as { id: string; nombre: string }[])
+      // Sparklines últimos 30 días
+      setClientesSpark(dm.spark_clientes)
+      setPolizasSpark(dm.spark_polizas)
 
       setLoading(false)
     }
     load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspace?.id])
 
-  // Distribución por ramo (de pólizas activas)
-  const carteraRamo: DonutSlice[] = useMemo(() => {
-    const map = new Map<string, number>()
-    polizas.forEach(p => {
-      const ramo = p.ramo || 'Sin ramo'
-      map.set(ramo, (map.get(ramo) || 0) + 1)
-    })
-    const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1])
-    return entries.slice(0, 6).map(([label, value], i) => ({
-      label, value, color: RAMO_COLORS[i % RAMO_COLORS.length],
-    }))
-  }, [polizas])
+  // ── Valores derivados de las métricas del RPC ────────────────────
+  const carteraRamo: DonutSlice[] = useMemo(() =>
+    (m?.cartera_ramo ?? []).map((s, i) => ({
+      label: s.label, value: s.value, color: RAMO_COLORS[i % RAMO_COLORS.length],
+    })), [m])
 
-  // Distribución por aseguradora (de pólizas activas)
-  const carteraAseguradora: DonutSlice[] = useMemo(() => {
-    const map = new Map<string, number>()
-    polizas.forEach(p => {
-      const aseg = p.aseguradora || 'Sin asignar'
-      map.set(aseg, (map.get(aseg) || 0) + 1)
-    })
-    const entries = Array.from(map.entries()).sort((a, b) => b[1] - a[1])
-    return entries.slice(0, 6).map(([label, value], i) => ({
-      label, value, color: ASEG_COLORS[i % ASEG_COLORS.length],
-    }))
-  }, [polizas])
+  const carteraAseguradora: DonutSlice[] = useMemo(() =>
+    (m?.cartera_aseguradora ?? []).map((s, i) => ({
+      label: s.label, value: s.value, color: ASEG_COLORS[i % ASEG_COLORS.length],
+    })), [m])
 
-  // Distribución por estado (todas las pólizas)
   const estadosDist = useMemo(() => {
-    const map = new Map<string, number>()
-    todasPolizas.forEach(p => {
-      const e = p.estado || 'otro'
-      map.set(e, (map.get(e) || 0) + 1)
-    })
-    const order = ['activa', 'pendiente', 'vencida', 'cancelada']
-    return order
-      .map(estado => ({ estado, count: map.get(estado) || 0 }))
+    const porEstado = m?.polizas_por_estado ?? {}
+    return ['activa', 'pendiente', 'vencida', 'cancelada']
+      .map(estado => ({ estado, count: porEstado[estado] || 0 }))
       .filter(s => s.count > 0)
-  }, [todasPolizas])
+  }, [m])
 
-  const primaMes       = useMemo(() => polizasMes.reduce((s, p) => s + (p.prima_neta || 0), 0), [polizasMes])
-  const primaMesPasado = useMemo(() => polizasMesPasado.reduce((s, p) => s + (p.prima_neta || 0), 0), [polizasMesPasado])
+  const mesPolizas        = m?.mes.polizas ?? 0
+  const mesComision       = m?.mes.comision ?? 0
+  const mesPasadoPolizas  = m?.mes_pasado.polizas ?? 0
+  const primaMes          = m?.mes.prima ?? 0
+  const primaMesPasado    = m?.mes_pasado.prima ?? 0
+  const clientesMes       = m?.clientes_mes ?? 0
+  const clientesMesPasado = m?.clientes_mes_pasado ?? 0
 
-  // Producción por asesor del mes actual (solo admin/supervisor)
-  const produccionAsesores = useMemo(() => {
-    if (!isGlobal || polizasMes.length === 0) return []
-    const map = new Map<string, { nombre: string; count: number; prima: number; comision: number }>()
-    polizasMes.forEach(p => {
-      const vid = p.vendedor_id || '__sin_asignar__'
-      const slot = map.get(vid) || { nombre: '', count: 0, prima: 0, comision: 0 }
-      map.set(vid, { nombre: slot.nombre, count: slot.count + 1, prima: slot.prima + (p.prima_neta || 0), comision: slot.comision + (p.comision_agencia || 0) })
-    })
-    vendedores.forEach(v => { const s = map.get(v.id); if (s) s.nombre = v.nombre })
-    return Array.from(map.entries())
-      .map(([id, d]) => ({ id, nombre: d.nombre || (id === '__sin_asignar__' ? 'Sin asignar' : '—'), count: d.count, prima: d.prima, comision: d.comision }))
-      .sort((a, b) => b.prima - a.prima)
-  }, [polizasMes, vendedores, isGlobal])
+  const produccionAsesores = isGlobal ? (m?.produccion_asesores ?? []) : []
 
-  const porEtapa = (e: Etapa) => clientes.filter(c => c.etapa === e).length
-  const primaTotal    = polizas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
-  const comisionTotal = polizas.reduce((s, p) => s + (p.comision_agencia || 0), 0)
-  const renovaciones30 = polizas.filter(p => { if (!p.fecha_fin) return false; const d = daysUntil(p.fecha_fin); return d >= 0 && d <= 30 })
-  const renovaciones60 = polizas.filter(p => { if (!p.fecha_fin) return false; const d = daysUntil(p.fecha_fin); return d > 30 && d <= 60 })
-  const totalRenovaciones90 = renovaciones30.length + renovaciones60.length
-  const totalPolizas = todasPolizas.length
-  const cumpleaños = clientes.filter(c => {
-    if (!c.fecha_nacimiento) return false
-    const hoy = new Date()
-    const fn  = new Date(c.fecha_nacimiento)
-    const esteAño = new Date(hoy.getFullYear(), fn.getMonth(), fn.getDate())
-    if (esteAño < hoy) esteAño.setFullYear(hoy.getFullYear() + 1)
-    return Math.ceil((esteAño.getTime() - hoy.getTime()) / 86400000) <= 5
-  })
+  const porEtapa = (e: Etapa) => m?.clientes_por_etapa[e] ?? 0
+  const polizasActivas    = m?.polizas_activas ?? 0
+  const primaTotal        = m?.prima_total ?? 0
+  const comisionTotal     = m?.comision_total ?? 0
+  const renovaciones30    = m?.renov_30 ?? 0
+  const renovaciones60    = m?.renov_60 ?? 0
+  const totalRenovaciones90 = renovaciones30 + renovaciones60
+  const totalPolizas      = m?.polizas_total ?? 0
+  const cumpleaños        = m?.cumpleanos ?? []
+  const clientesRecientes = m?.clientes_recientes ?? []
 
   if (wsLoading || loading) return (
     <div className="flex items-center justify-center h-full">
@@ -408,8 +245,8 @@ export default function Dashboard() {
 
   const displayName = userName || 'Bienvenido'
   const firstName = displayName.split(' ')[0]
-  const pctActivas = totalPolizas > 0 ? Math.round((polizas.length / totalPolizas) * 100) : 0
-  const totalLeads = clientes.length
+  const pctActivas = totalPolizas > 0 ? Math.round((polizasActivas / totalPolizas) * 100) : 0
+  const totalLeads = m?.clientes_total ?? 0
 
   return (
     <div className="px-6 lg:px-8 py-6 lg:py-8 max-w-[1400px] mx-auto space-y-4">
@@ -455,13 +292,13 @@ export default function Dashboard() {
             </div>
 
             <div className="flex items-baseline gap-1.5 mb-1.5">
-              <span className="text-3xl font-semibold text-ink-700 tracking-tight tabular-nums">{polizas.length}</span>
+              <span className="text-3xl font-semibold text-ink-700 tracking-tight tabular-nums">{polizasActivas}</span>
               <span className="text-base text-ink-300 tabular-nums">/ {totalPolizas}</span>
               <Badge variant="success" size="sm" dot className="ml-auto">{pctActivas}%</Badge>
             </div>
             <div className="flex items-center gap-2 mb-2.5">
-              <span className="text-xs text-ink-400 tabular-nums">{polizasMes.length} nuevas este mes</span>
-              <ChgBadge current={polizasMes.length} previous={polizasMesPasado.length} />
+              <span className="text-xs text-ink-400 tabular-nums">{mesPolizas} nuevas este mes</span>
+              <ChgBadge current={mesPolizas} previous={mesPasadoPolizas} />
             </div>
 
             {totalPolizas > 0 && (
@@ -564,7 +401,7 @@ export default function Dashboard() {
               totalRenovaciones90 > 0 ? 'text-ink-700' : 'text-ink-200'
             )}>{totalRenovaciones90}</p>
             <p className="text-xs text-ink-400">
-              <span className="font-semibold text-ink-700 tabular-nums">{renovaciones30.length}</span> próximos 30d
+              <span className="font-semibold text-ink-700 tabular-nums">{renovaciones30}</span> próximos 30d
             </p>
           </div>
 
@@ -727,9 +564,9 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2 text-xs text-ink-500">
-              <span className="font-semibold text-ink-700 tabular-nums">{polizasMes.length}</span>
+              <span className="font-semibold text-ink-700 tabular-nums">{mesPolizas}</span>
               <span>pólizas nuevas</span>
-              <ChgBadge current={polizasMes.length} previous={polizasMesPasado.length} />
+              <ChgBadge current={mesPolizas} previous={mesPasadoPolizas} />
             </div>
           </div>
           <div className="overflow-x-auto -mx-5 px-5">
@@ -760,10 +597,10 @@ export default function Dashboard() {
               <tfoot>
                 <tr className="border-t border-cream-200">
                   <td className="pt-2.5 text-[11px] text-ink-400 font-semibold uppercase tracking-widest">Total</td>
-                  <td className="pt-2.5 text-right font-semibold text-ink-700 tabular-nums">{polizasMes.length}</td>
+                  <td className="pt-2.5 text-right font-semibold text-ink-700 tabular-nums">{mesPolizas}</td>
                   <td className="pt-2.5 text-right font-semibold text-ink-700 tabular-nums">{formatCOP(primaMes)}</td>
                   <td className="pt-2.5 text-right font-semibold text-ink-500 tabular-nums hidden sm:table-cell">
-                    {formatCOP(polizasMes.reduce((s, p) => s + (p.comision_agencia || 0), 0))}
+                    {formatCOP(mesComision)}
                   </td>
                 </tr>
               </tfoot>
@@ -915,7 +752,7 @@ export default function Dashboard() {
               </tr>
             </thead>
             <tbody>
-              {clientes.slice(0,5).map(c => (
+              {clientesRecientes.map(c => (
                 <tr key={c.id} className="border-b border-cream-100 last:border-0 hover:bg-cream-50/60 transition-colors">
                   <td className="py-2.5">
                     <Link href={`/clientes/${c.id}`} className="flex items-center gap-3 group">
