@@ -130,10 +130,78 @@ export default function ClientesList() {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
+  /* ── Paginación y filtros server-side ── */
+  const PAGE_SIZE = 50
+  const [page, setPage]                 = useState(1)
+  const [total, setTotal]               = useState(0)           // filas que matchean los filtros actuales
+  const [totalWorkspace, setTotalWorkspace] = useState(0)       // todas las filas del workspace (badge del tab)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const fetchIdRef = useRef(0)
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(t)
+  }, [search])
+
+  /** Query base con búsqueda y filtros aplicados (sin paginar). */
+  function buildQuery(withCount: boolean) {
+    let query = withCount
+      ? supabase.from('clientes').select('*', { count: 'exact' })
+      : supabase.from('clientes').select('*')
+    query = query.eq('workspace_id', currentWorkspace?.id || '')
+
+    if (filters.etapa !== 'all')  query = query.eq('etapa', filters.etapa)
+    if (filters.tipo !== 'all')   query = query.eq('tipo_cliente', filters.tipo)
+    if (filters.categoria)        query = query.eq('categoria', filters.categoria)
+    if (filters.departamento)     query = query.eq('departamento', filters.departamento)
+    if (filters.genero)           query = query.eq('genero', filters.genero)
+    if (filters.assignedTo)       query = query.eq('assigned_to', filters.assignedTo)
+    // 'no' debe incluir null (mismo criterio que el filtro en JS anterior)
+    if (filters.vehiculo !== 'all') {
+      query = filters.vehiculo === 'si'
+        ? query.is('tiene_vehiculo', true)
+        : query.not('tiene_vehiculo', 'is', true)
+    }
+    if (filters.autoriza !== 'all') {
+      query = filters.autoriza === 'si'
+        ? query.is('autoriza_datos', true)
+        : query.not('autoriza_datos', 'is', true)
+    }
+
+    const q = debouncedSearch.replace(/[,()%]/g, '').trim()
+    if (q) {
+      query = query.or([
+        `nombre.ilike.*${q}*`,
+        `sobrenombre.ilike.*${q}*`,
+        `telefono.ilike.*${q}*`,
+        `email.ilike.*${q}*`,
+        `cedula.ilike.*${q}*`,
+        `nit.ilike.*${q}*`,
+      ].join(','))
+    }
+    return query
+  }
+
+  /** Carga la página actual con filtros en la query — no trae todo el workspace. */
   async function load() {
-    const { data } = await supabase.from('clientes').select('*').eq('workspace_id', currentWorkspace?.id || '').order('created_at', { ascending: false })
+    if (!currentWorkspace) return
+    const fetchId = ++fetchIdRef.current
+    const { data, count } = await buildQuery(true)
+      .order('created_at', { ascending: false })
+      .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+    if (fetchId !== fetchIdRef.current) return  // respuesta obsoleta
     setClientes(data || [])
+    setTotal(count ?? 0)
     setLoading(false)
+  }
+
+  async function loadTotalWorkspace() {
+    if (!currentWorkspace) return
+    const { count } = await supabase
+      .from('clientes')
+      .select('id', { count: 'exact', head: true })
+      .eq('workspace_id', currentWorkspace.id)
+    setTotalWorkspace(count ?? 0)
   }
 
   async function loadContactCount() {
@@ -144,13 +212,22 @@ export default function ClientesList() {
 
   useEffect(() => {
     load()
+    loadTotalWorkspace()
     loadContactCount()
     // Cargar miembros para filtro y visualización
     if (currentWorkspace) {
       supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
         .then(({ data }) => { if (data) setMembers(data as Member[]) })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentWorkspace?.id])
+
+  // Recargar al cambiar página, filtros o búsqueda (el load inicial ya corre arriba)
+  useEffect(() => {
+    if (loading) return
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, filters, debouncedSearch])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -168,6 +245,8 @@ export default function ClientesList() {
     if (!confirm('¿Eliminar este cliente y todos sus datos?')) return
     await supabase.from('clientes').delete().eq('id', id)
     setClientes(prev => prev.filter(c => c.id !== id))
+    setTotal(prev => Math.max(0, prev - 1))
+    loadTotalWorkspace()
   }
 
   function setF<K extends keyof Filters>(k: K, v: Filters[K]) {
@@ -176,39 +255,16 @@ export default function ClientesList() {
 
   function clearFilters() { setFilters(defaultFilters); setSearch('') }
 
-  const filtered = clientes.filter(c => {
-    const q = search.toLowerCase()
-    const matchSearch = !search ||
-      c.nombre.toLowerCase().includes(q) ||
-      c.telefono?.includes(search) ||
-      c.email?.toLowerCase().includes(q) ||
-      c.cedula?.includes(search) ||
-      c.nit?.includes(search) ||
-      c.sobrenombre?.toLowerCase().includes(q)
-
-    const matchEtapa       = filters.etapa === 'all'     || c.etapa === filters.etapa
-    const matchTipo        = filters.tipo  === 'all'     || c.tipo_cliente === filters.tipo
-    const matchCategoria   = !filters.categoria          || c.categoria === filters.categoria
-    const matchDepto       = !filters.departamento       || c.departamento === filters.departamento
-    const matchGenero      = !filters.genero             || c.genero === filters.genero
-    const matchVehiculo    = filters.vehiculo === 'all'  ||
-      (filters.vehiculo === 'si' ? c.tiene_vehiculo : !c.tiene_vehiculo)
-    const matchAutoriza    = filters.autoriza === 'all'  ||
-      (filters.autoriza === 'si' ? c.autoriza_datos : !c.autoriza_datos)
-    const matchAssigned    = !filters.assignedTo || c.assigned_to === filters.assignedTo
-
-    return matchSearch && matchEtapa && matchTipo && matchCategoria && matchDepto && matchGenero && matchVehiculo && matchAutoriza && matchAssigned
-  })
+  // Los filtros ya vienen aplicados del servidor; `clientes` es la página actual
+  const filtered = clientes
 
   const activeFilterCount = countActiveFilters(filters)
 
-  /* ── Pagination ── */
-  const PAGE_SIZE = 50
-  const [page, setPage] = useState(1)
+  /* ── Pagination (server-side; ver load()) ── */
   // Reset page when filters/search change
-  useEffect(() => { setPage(1) }, [search, filters])
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  useEffect(() => { setPage(1) }, [debouncedSearch, filters])
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const paginated  = filtered
 
   /* ── Selection helpers ── */
   function toggleSelect(id: string) {
@@ -238,15 +294,19 @@ export default function ClientesList() {
   async function bulkDelete() {
     const ids = Array.from(selected)
     await supabase.from('clientes').delete().in('id', ids)
-    setClientes(prev => prev.filter(c => !ids.includes(c.id)))
     setSelected(new Set())
     setConfirmingBulkDelete(false)
+    await Promise.all([load(), loadTotalWorkspace()])
   }
 
   /* ── CSV exports ── */
-  function exportCSV() {
+  async function exportCSV() {
+    // Trae TODAS las filas que matchean los filtros (no solo la página visible)
+    const { data } = await buildQuery(false)
+      .order('created_at', { ascending: false })
+      .limit(10000)
     const filename = `clientes_${new Date().toISOString().split('T')[0]}.csv`
-    downloadCSV(clientesToCSV(filtered), filename)
+    downloadCSV(clientesToCSV(data || []), filename)
   }
 
   function exportSelected() {
@@ -276,7 +336,7 @@ export default function ClientesList() {
           <h1 className="text-2xl font-bold text-ink-700">Clientes</h1>
           <p className="text-ink-400 text-sm mt-1">
             {activeTab === 'clientes'
-              ? `${filtered.length} de ${clientes.length} registros${totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ''}`
+              ? `${total} de ${totalWorkspace} registros${totalPages > 1 ? ` · Página ${page} de ${totalPages}` : ''}`
               : activeTab === 'contactos'
               ? `${contactCount} contactos vinculados`
               : 'Pipeline comercial y oportunidades'}
@@ -314,7 +374,7 @@ export default function ClientesList() {
           <Users className="w-4 h-4" />
           Clientes
           <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${activeTab === 'clientes' ? 'bg-primary-100 text-primary-700' : 'bg-cream-200 text-ink-400'}`}>
-            {clientes.length}
+            {totalWorkspace}
           </span>
         </button>
         <button onClick={() => setActiveTab('contactos')}
@@ -622,7 +682,7 @@ export default function ClientesList() {
           {/* ── Pagination ── */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between mt-4 text-sm text-slate-500">
-              <p>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} de {filtered.length} clientes</p>
+              <p>{((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, total)} de {total} clientes</p>
               <div className="flex items-center gap-1">
                 <button onClick={() => setPage(1)} disabled={page === 1}
                   className="px-2 py-1 rounded hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors">«</button>
@@ -713,13 +773,13 @@ export default function ClientesList() {
           cliente={editing}
           members={members}
           onClose={() => setShowModal(false)}
-          onSaved={() => { setShowModal(false); load() }}
+          onSaved={() => { setShowModal(false); load(); loadTotalWorkspace() }}
         />
       )}
       {showImport && (
         <ImportPolizasModal
           onClose={() => setShowImport(false)}
-          onImported={() => { setShowImport(false); load() }}
+          onImported={() => { setShowImport(false); load(); loadTotalWorkspace() }}
         />
       )}
     </div>

@@ -74,7 +74,10 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [nuevaTarifaForm, setNuevaTarifaForm] = useState<Omit<TarifaComision,'id'>>({ codigo:'', ramo:'', aseguradora:'', porcentaje:0 })
   const [nuevaTarifaErr,  setNuevaTarifaErr]  = useState('')
   const [savingTarifa,    setSavingTarifa]    = useState(false)
-  const [clienteSearch,   setClienteSearch]   = useState('')
+  // Pre-poblar búsqueda con nombre_tomador cuando se crea desde colilla (sin client_id aún)
+  const [clienteSearch,   setClienteSearch]   = useState(
+    !poliza?.id && !poliza?.client_id && poliza?.nombre_tomador ? poliza.nombre_tomador : ''
+  )
   const [showClienteList, setShowClienteList] = useState(false)
   const clienteRef = useRef<HTMLDivElement>(null)
 
@@ -95,8 +98,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     // fechas
     fecha_expedicion: poliza?.fecha_expedicion || '',
     fecha_recepcion:  poliza?.fecha_recepcion  || '',
-    fecha_inicio:     poliza?.fecha_inicio     || (poliza ? '' : new Date().toISOString().slice(0, 10)),
-    fecha_fin:        poliza?.fecha_fin        || (poliza ? '' : (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10) })()),
+    fecha_inicio:     poliza?.fecha_inicio     || (poliza?.id ? '' : new Date().toISOString().slice(0, 10)),
+    fecha_fin:        poliza?.fecha_fin        || (poliza?.id ? '' : (() => { const d = new Date(); d.setFullYear(d.getFullYear() + 1); return d.toISOString().slice(0, 10) })()),
     // riesgo
     riesgo:          poliza?.riesgo          || '',
     valor_asegurado: poliza?.valor_asegurado?.toString() || '',
@@ -343,7 +346,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       workspace_id: currentWorkspace?.id,
     }
 
-    const { error: err } = poliza
+    const { error: err } = poliza?.id
       ? await supabase.from('polizas').update(payload).eq('id', poliza.id)
       : await supabase.from('polizas').insert(payload)
 
@@ -360,7 +363,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
         {/* header */}
         <div className="flex items-center justify-between p-5 border-b border-ink-200">
-          <h2 className="font-semibold text-ink-700">{poliza ? 'Editar póliza' : 'Nueva póliza'}</h2>
+          <h2 className="font-semibold text-ink-700">{poliza?.id ? 'Editar póliza' : 'Nueva póliza'}</h2>
           <button onClick={onClose} className="text-ink-400 hover:text-ink-500">
             <X className="w-5 h-5" />
           </button>
@@ -371,7 +374,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
           {/* ── 1. Info básica ── */}
           <Section title="Información básica">
             {!clientId && (
-              <Field label="Cliente *">
+              <Field label="Cliente CRM *">
                 <div ref={clienteRef} className="relative">
                   <div className="relative">
                     <input
@@ -496,6 +499,11 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 </select>
               </Field>
             </div>
+
+            <Field label="Nombre del tomador (en la póliza)">
+              <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
+                placeholder="Nombre exacto como aparece en la póliza de la aseguradora" className={cls} />
+            </Field>
           </Section>
 
           {/* ── 2. Fechas ── */}
@@ -542,10 +550,6 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
           {/* ── 4. Roles ── */}
           <Section title="Tomador / Asegurado / Beneficiario">
-            <Field label="Tomador">
-              <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
-                placeholder="Nombre del tomador de la póliza" className={cls} />
-            </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Asegurado (nombre)">
                 <input value={form.asegurado_nombre} onChange={e => set('asegurado_nombre', e.target.value)}

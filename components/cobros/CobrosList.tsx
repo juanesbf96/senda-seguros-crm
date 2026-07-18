@@ -5,10 +5,12 @@ import { Cobro, EstadoCobro, TipoCobro } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Plus, Search, Pencil, Trash2, AlertTriangle, DollarSign,
-  ArrowDownToLine, ArrowUpFromLine, TrendingDown, TrendingUp,
+  ArrowDownToLine, ArrowUpFromLine, TrendingDown, TrendingUp, Upload,
 } from 'lucide-react'
 import Link from 'next/link'
 import CobrosModal from './CobrosModal'
+import ImportColillasModal from '@/components/colillas/ImportColillasModal'
+import PolizaQuickView from '@/components/polizas/PolizaQuickView'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const ESTADO_COLORS: Record<EstadoCobro, string> = {
@@ -31,7 +33,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType; desc: string }[]
 ]
 
 export default function CobrosList() {
-  const { currentWorkspace } = useWorkspace()
+  const { currentWorkspace, isAdmin, isSupervisor, currentRole } = useWorkspace()
   const [cobros, setCobros]         = useState<Cobro[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -39,6 +41,10 @@ export default function CobrosList() {
   const [activeTab, setActiveTab]   = useState<Tab>('por_cobrar')
   const [showModal, setShowModal]   = useState(false)
   const [editing, setEditing]       = useState<Cobro | undefined>()
+  const [importModal, setImportModal]       = useState(false)
+  const [quickViewId, setQuickViewId]       = useState<string | null>(null)
+
+  const puedeImportar = isAdmin || isSupervisor
 
   async function load() {
     if (!currentWorkspace) return
@@ -108,10 +114,32 @@ export default function CobrosList() {
             {filtered.filter(c => c.estado === 'pendiente').length} pendientes · {formatCOP(totalPendiente)}
           </p>
         </div>
-        <button onClick={() => { setEditing(undefined); setShowModal(true) }}
-          className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          <Plus className="w-4 h-4" /> Nuevo cobro
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Importar colilla — visible para todos, deshabilitado para agentes */}
+          <div className="relative group">
+            <button
+              onClick={() => puedeImportar && setImportModal(true)}
+              disabled={!puedeImportar}
+              className={`flex items-center gap-2 border px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                puedeImportar
+                  ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                  : 'border-slate-200 text-slate-300 cursor-not-allowed'
+              }`}
+            >
+              <Upload className="w-4 h-4" />
+              Importar colilla
+            </button>
+            {!puedeImportar && (
+              <div className="pointer-events-none absolute right-0 top-full mt-1 z-50 bg-slate-700 text-white text-xs px-2.5 py-1.5 rounded-lg shadow whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+                Solo admins y supervisores pueden importar
+              </div>
+            )}
+          </div>
+          <button onClick={() => { setEditing(undefined); setShowModal(true) }}
+            className="flex items-center gap-2 bg-primary-500 hover:bg-primary-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" /> Nuevo cobro
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -216,8 +244,19 @@ export default function CobrosList() {
                       {c.porcentaje_comision ? `${c.porcentaje_comision}%` : '—'}
                     </td>
                   )}
-                  <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs font-mono">
-                    {c.numero_poliza || c.poliza?.numero_poliza || '—'}
+                  <td className="px-4 py-3 hidden md:table-cell text-xs font-mono">
+                    {c.poliza?.id
+                      ? (
+                        <button
+                          onClick={e => { e.stopPropagation(); setQuickViewId(c.poliza!.id) }}
+                          className="text-emerald-600 hover:text-emerald-700 hover:underline underline-offset-2 transition-colors"
+                          title="Ver póliza"
+                        >
+                          {c.numero_poliza || c.poliza.numero_poliza || '—'}
+                        </button>
+                      )
+                      : <span className="text-ink-400">{c.numero_poliza || '—'}</span>
+                    }
                   </td>
                   <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.valor)}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
@@ -290,6 +329,20 @@ export default function CobrosList() {
         <CobrosModal cobro={editing} activeTab={activeTab}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load() }} />
+      )}
+
+      {importModal && (
+        <ImportColillasModal
+          onClose={() => setImportModal(false)}
+          onConfirmada={() => setImportModal(false)}
+        />
+      )}
+
+      {quickViewId && (
+        <PolizaQuickView
+          polizaId={quickViewId}
+          onClose={() => setQuickViewId(null)}
+        />
       )}
     </div>
   )

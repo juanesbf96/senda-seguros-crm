@@ -133,6 +133,48 @@ export interface Poliza {
   cliente?: Cliente
 }
 
+// ─── Colillas de comisiones ───────────────────────────────────────────────────
+
+export type EstadoColilla       = 'borrador' | 'confirmada'
+export type EstadoConciliacion  = 'conciliada' | 'no_encontrada' | 'corregida_manual'
+
+export interface ColillaImportacion {
+  id: string
+  workspace_id: string
+  aseguradora: string
+  periodo: string                      // 'YYYY-MM'
+  archivo_nombre: string
+  total_lineas: number
+  conciliadas: number
+  no_encontradas: number
+  corregidas_manual: number
+  estado: EstadoColilla
+  creado_por: string | null
+  created_at: string
+  confirmed_at: string | null
+}
+
+export interface ColillaLinea {
+  id: string
+  colilla_id: string
+  workspace_id: string
+  poliza_id: string | null
+  numero_poliza_raw: string
+  nombre_tomador: string | null
+  valor_prima: number | null
+  valor_comision: number | null
+  porcentaje_comision: number | null
+  fecha_pago: string | null
+  fecha_recaudo: string | null
+  retefuente: number | null
+  estado_conciliacion: EstadoConciliacion
+  notas: string | null
+  created_at: string
+  // Joins opcionales
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+  colilla?: Pick<ColillaImportacion, 'id' | 'aseguradora' | 'periodo' | 'estado'>
+}
+
 export interface PolizaPlan {
   id: string
   workspace_id: string

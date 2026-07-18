@@ -24,10 +24,22 @@ function LoginContent() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const NETWORK_ERROR_MSG = 'No se pudo conectar con el servidor. Verifica tu conexión a internet e inténtalo de nuevo.'
 
-    if (error) {
-      setError('Correo o contraseña incorrectos')
+    let signInError: Error | null = null
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      signInError = error
+    } catch {
+      setError(NETWORK_ERROR_MSG)
+      setLoading(false)
+      return
+    }
+
+    if (signInError) {
+      const msg = signInError.message?.toLowerCase() ?? ''
+      const isNetworkError = msg.includes('fetch') || msg.includes('network') || signInError.name === 'AuthRetryableFetchError'
+      setError(isNetworkError ? NETWORK_ERROR_MSG : 'Correo o contraseña incorrectos')
       setLoading(false)
       return
     }
