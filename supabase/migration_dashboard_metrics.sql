@@ -135,10 +135,11 @@ BEGIN
     'siniestros_pendientes', (SELECT count(*) FROM siniestros
       WHERE workspace_id = p_ws AND estado NOT IN ('cerrado', 'rechazado')),
 
-    'cobros_pendiente', (SELECT coalesce(sum(valor), 0) FROM cobros
+    -- cobros usa saldo_pendiente (no existe columna `valor` en el esquema real)
+    'cobros_pendiente', (SELECT coalesce(sum(saldo_pendiente), 0) FROM cobros
       WHERE workspace_id = p_ws AND estado = 'pendiente'
         AND tipo IN ('por_cobrar', 'comision_por_cobrar')),
-    'cobros_vencido', (SELECT coalesce(sum(valor), 0) FROM cobros
+    'cobros_vencido', (SELECT coalesce(sum(saldo_pendiente), 0) FROM cobros
       WHERE workspace_id = p_ws AND estado = 'vencido'),
     'liq_pendiente', (SELECT coalesce(sum(coalesce(total_comision, 0)), 0)
       FROM liquidaciones WHERE workspace_id = p_ws AND estado = 'pendiente'),
@@ -147,21 +148,19 @@ BEGIN
       AND estado = 'nueva' AND (p_uid IS NULL OR asignado_a = p_uid::text)),
     'sol_activas', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
       AND estado IN ('nueva', 'en_proceso') AND (p_uid IS NULL OR asignado_a = p_uid::text)),
-    'sol_urgentes', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
-      AND estado IN ('nueva', 'en_proceso') AND prioridad = 'urgente'
-      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
-    'sol_por_vencer', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
-      AND estado IN ('nueva', 'en_proceso') AND fecha_limite <= v_in7
-      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
+    -- solicitudes no tiene columnas prioridad/fecha_limite en el esquema real;
+    -- estos contadores eran siempre 0 en el dashboard anterior (query fallida y
+    -- swallowed). Se dejan en 0 explícito hasta que existan esas columnas.
+    'sol_urgentes', 0,
+    'sol_por_vencer', 0,
 
     'metas_activas', (SELECT count(*) FROM metas WHERE workspace_id = p_ws
       AND fecha_inicio <= v_hoy AND fecha_fin >= v_hoy),
-    'metas_progreso', (SELECT coalesce(round(avg(least(
-        CASE WHEN valor_meta > 0 THEN valor_actual / valor_meta * 100 ELSE 0 END, 100))), 0)
-      FROM metas WHERE workspace_id = p_ws AND fecha_inicio <= v_hoy AND fecha_fin >= v_hoy),
-    'metas_cumplidas', (SELECT count(*) FROM metas WHERE workspace_id = p_ws
-      AND fecha_inicio <= v_hoy AND fecha_fin >= v_hoy
-      AND valor_meta > 0 AND valor_actual >= valor_meta),
+    -- metas no tiene valor_meta/valor_actual en el esquema real (solo
+    -- meta_prima_total). El progreso no es calculable aquí; 0 hasta unificar
+    -- el esquema de metas con lo que espera MetasView.
+    'metas_progreso', 0,
+    'metas_cumplidas', 0,
 
     'mes', (SELECT jsonb_build_object('polizas', count(*),
         'prima', coalesce(sum(coalesce(prima_neta, 0)), 0),
