@@ -1,7 +1,54 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 27 de junio de 2026  
+> Última actualización: 18 de julio de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
+
+---
+
+## Fase 11 — Auditorías competitivas + Fundaciones (julio 2026)
+
+Se auditaron a fondo dos plataformas para orientar el roadmap de Senda:
+
+- **Guro** (guro.co) — SaaS colombiano de seguros con sincronización directa de portales de aseguradoras y motor de IA BYOK (el cliente trae su llave de DeepSeek/OpenAI/Claude/Gemini; los tokens se cobran a su cuenta). Diferenciadores: sync de 11 aseguradoras, cartera con aging buckets, WhatsApp integrado, ventas cruzadas con IA, extractor y caché de análisis 30 días.
+- **Cider** (cidersure.zohoplatform.com) — vertical de seguros sobre **Zoho CRM** donde **Ríos Agencia opera hoy en producción** (2,231 pólizas, 3,996 operaciones). Es el sistema que Senda busca reemplazar. Hallazgos clave: modelo de datos profundo (tomador ≠ asegurados, riesgos, coberturas, certificados, técnico ≠ vendedor), "Operaciones de Producción" unificando renovación/cobro-cuota/cancelación, churn como ciudadano de primera clase (motivo de cancelación + no-renovación), creación de pólizas vía **Extractor PDF** de carátulas.
+
+**Entregable:** `PLAN_EJECUCION_AUDITORIAS.md` — plan de 6 fases (calidad → retención/cartera → paridad de modelo de datos → operaciones de producción → automatización/IA → WhatsApp), con 15 PRs sugeridos en orden y criterios de aceptación. Rama `docs/plan-ejecucion-auditorias` (PR pendiente de merge).
+
+### Estado de ejecución del plan
+
+| Fase | Tarea | Estado |
+|------|-------|--------|
+| 0.1 | Tests del parser (Excel + colillas) con fixtures | ✅ Hecho (PR #19 mergeado — `test/colillas-parsers`) + fix de schema drift (PR #18) |
+| 0.2 | **Supabase CLI + ambiente de staging** | 🟡 En curso — ver detalle abajo |
+| 0.3 | Trazabilidad (`origen_creacion` + cronología) | ⬜ Pendiente |
+| 1.1 | Motivo de cancelación / no-renovación | ⬜ Pendiente |
+| 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
+| 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
+| 2.x | Paridad de modelo de datos con Cider | ⬜ Pendiente |
+| 3.x | Operaciones de Producción | ⬜ Pendiente |
+| 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
+| 5.x | WhatsApp | ⬜ Pendiente |
+
+### Fase 0.2 — Supabase CLI + staging (rama `infra/supabase-cli-staging`)
+
+**Hecho:**
+- `supabase init` — `config.toml` + directorio `supabase/migrations/` para migraciones versionadas.
+- **Proyecto `senda-staging` creado** en Supabase (ref `xfpezdaacotlyeysuqhs`, región East US).
+- **Baseline volcado desde producción** con `supabase db pull` vía pooler IPv4 → `supabase/migrations/20260718075314_remote_schema.sql` (schema real, registrado en el historial de migraciones de prod).
+- `scripts/setup-staging.sh` — script idempotente que orquesta todo el setup (login, creación de proyecto, pull del baseline, push a staging, guardado de credenciales en `.env.local`). Robustecido tras varios obstáculos reales: login no-TTY, Docker faltante (resuelto con Colima), IPv6-only del host directo (resuelto usando el pooler), passwords con símbolos.
+- `supabase/STAGING.md` — manual del flujo staging-antes-que-prod; reglas ("ningún PR con migración se mergea sin 'Probada en staging: sí'").
+- Scripts npm: `db:new`, `db:push:staging`, `db:pull`, `db:diff`.
+- `ONBOARDING.md` actualizado (reemplaza "no hay CLI, todo manual").
+- `Colima` + `docker` instalados como runtime local para el CLI.
+
+**Falta para cerrar la fase:**
+- **Aplicar el baseline en `senda-staging`** (`supabase db push` vía pooler): bloqueado por autenticación del password de la BD de staging — pendiente de resetear el password a uno alfanumérico y reintentar (el script ya reintenta en bucle).
+- Verificar que staging tenga todas las tablas y RPCs de producción.
+- Revisar el baseline contra drift histórico (comparar con los `migration_*.sql`).
+- Crear `supabase/seed.sql` (seed mínimo anonimizado — no copiar datos reales de clientes).
+- Mergear el PR de `infra/supabase-cli-staging` y el de `docs/plan-ejecucion-auditorias`.
+
+> **Nota operativa:** el password de la BD de producción se rotó durante este setup. La app (Vercel + local) usa las API keys, no ese password, así que no hubo impacto en el servicio. Pendiente: rotar de nuevo el de prod a uno fuerte una vez cerrada la fase (quedó uno temporal débil visible en pantalla durante el proceso).
 
 ---
 
@@ -524,4 +571,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 27 de junio de 2026. Total de commits en `main`: ~140+.*
+*Última actualización: 18 de julio de 2026. Total de commits en `main`: ~145+.*
