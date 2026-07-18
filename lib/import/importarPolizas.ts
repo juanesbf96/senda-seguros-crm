@@ -55,7 +55,8 @@ export async function importarPolizas(
   }
 
   // ── 1b. Crear vendedores nuevos (un solo insert) ──────────────────
-  const asesoresNuevos = [...new Set(rows.map(r => r.asesor).filter(Boolean))].filter(nombre => {
+  // Sólo nombres de texto: un asesor que empieza en dígito indica una columna mal mapeada
+  const asesoresNuevos = [...new Set(rows.map(r => r.asesor).filter(a => a && !/^\d/.test(a)))].filter(nombre => {
     const k = norm(nombre)
     if (vendedoresMap.has(k)) return false
     for (const key of vendedoresMap.keys()) {
@@ -207,7 +208,8 @@ export async function importarPolizas(
     const pctAgencia      = r.pct_comision_negocio ?? matchTarifa(r.ramo, r.aseguradora) ?? null
     const comisionAgencia = r.comision_agencia
       ?? (primaNeta && pctAgencia ? Math.round(primaNeta * pctAgencia / 100 * 100) / 100 : null)
-    const comisionVendedor = r.comision_asesor
+    // Tratar 0 como null para que el cálculo derivado aplique cuando el Excel trae ceros
+    const comisionVendedor = (r.comision_asesor || null)
       ?? (comisionAgencia && pctVendedor ? Math.round(comisionAgencia * pctVendedor / 100 * 100) / 100 : null)
 
     const polizaData: Record<string, unknown> = {
@@ -258,7 +260,12 @@ export async function importarPolizas(
 
     const existenteId = r.numero_poliza ? polizaIdPorNumero.get(r.numero_poliza) : undefined
     if (existenteId) {
-      updatesPorId.set(existenteId, { data: polizaData, fila: i + 2 })
+      // En UPDATE: no pisar aseguradora/ramo existentes si el Excel trae vacío o un valor inválido
+      const BAD_VALUES = new Set(['cancelada', 'sin asignar', 'sin ramo', ''])
+      const updateData = { ...polizaData }
+      if (!r.aseguradora || BAD_VALUES.has(r.aseguradora.toLowerCase().trim())) delete updateData.aseguradora
+      if (!r.ramo      || BAD_VALUES.has(r.ramo.toLowerCase().trim()))      delete updateData.ramo
+      updatesPorId.set(existenteId, { data: updateData, fila: i + 2 })
     } else {
       // Clave de dedupe: el número de póliza; sin número, cada fila es única
       const clave = r.numero_poliza || `__fila_${i}`
