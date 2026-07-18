@@ -196,7 +196,7 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
         r[colFn(h => h.includes('fin') && h.includes('vigencia'))] ??
         r[colFn(h => h.includes('vencimiento'))]
       ),
-      aseguradora:    toText(r[col('aseguradora')]),
+      aseguradora:    toText(r[colFn(h => h === 'aseguradora')]),
       numero_poliza:  toText(r[col('numero de poliza', 'numero poliza', 'no poliza', 'n° poliza', 'nro poliza')]),
       ramo:           toText(r[col('ramo')]),
       periodicidad:   toText(r[col('periodicidad')]),
@@ -211,10 +211,10 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       intermediario:         toText(r[col('intermediario inicial', 'intermediario')]),
       pct_comision_int:      toPct(r[col('porcentaje comision intermediario', '% comision intermediario')]),
       comision_intermediario: toNum(r[col('comision intermediario inicial', 'comision intermediario')]),
-      // Asesor
-      asesor:               toText(r[col('asesor', 'concesionario', 'vendedor')]),
-      pct_comision_asesor:  toPct(r[col('% comision asesor', 'porcentaje comision asesor')]),
-      retencion_asesor:     toNum(r[col('retencion asesor')]),
+      // Asesor/Vendedor — búsqueda exacta para no mezclar con 'comision asesor'
+      asesor:               toText(r[colFn(h => h === 'vendedor' || h === 'concesionario / asesor' || h === 'asesor')]),
+      pct_comision_asesor:  toPct(r[col('% comision asesor', 'porcentaje comision asesor', '% comision vendedor', 'porcentaje comision vendedor')]),
+      retencion_asesor:     toNum(r[col('retencion asesor', 'retencion vendedor')]),
       comision_asesor:      toNum(r[col('comision asesor')]),
       // Referido
       referido:              toText(r[col('referido')]),
@@ -228,8 +228,8 @@ function parseSheet(buffer: ArrayBuffer, sheetName: string): { rows: ExcelRow[];
       comision_abc_anual:     toNum(r[col('comision abc anual')]),
       comision_recibida:      toBool(r[col('comision abc recibida', 'abc recibida', 'comision recibida')]),
       fecha_pago_abc:         excelDateToISO(r[col('fecha pago abc')]),
-      asesor_pago_estado:     toAsesorEstado(r[col('pago comision asesor')]),
-      fecha_pago_asesor:      excelDateToISO(r[col('fecha pago asesor')]),
+      asesor_pago_estado:     toAsesorEstado(r[col('pago comision asesor', 'pago comision vendedor')]),
+      fecha_pago_asesor:      excelDateToISO(r[col('fecha pago asesor', 'fecha pago vendedor')]),
     })
   }
 

@@ -293,28 +293,35 @@ export default function PolizaDetalle({ id }: { id: string }) {
               {poliza.porcentaje_comision_vendedor != null ? `${poliza.porcentaje_comision_vendedor}%` : '—'}
             </p>
           </div>
-          <div>
-            <p className="text-xs text-ink-400 mb-0.5">Comisión bruta</p>
-            <p className="text-sm font-medium text-primary-700">
-              {poliza.comision_vendedor != null ? formatCOP(poliza.comision_vendedor) : '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-ink-400 mb-0.5">Retención ({poliza.retencion_vendedor ?? 10}%)</p>
-            <p className="text-sm font-medium text-ink-700">
-              {poliza.comision_vendedor != null
-                ? formatCOP(poliza.comision_vendedor * (poliza.retencion_vendedor ?? 10) / 100)
-                : '—'}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-ink-400 mb-0.5">Comisión neta</p>
-            <p className="text-sm font-semibold text-primary-700">
-              {poliza.comision_vendedor != null
-                ? formatCOP(poliza.comision_vendedor * (1 - (poliza.retencion_vendedor ?? 10) / 100))
-                : '—'}
-            </p>
-          </div>
+          {(() => {
+            // Calcular comisión bruta: usar valor DB si > 0, sino derivar de comision_agencia * %
+            const pct = poliza.porcentaje_comision_vendedor
+            const base = poliza.comision_agencia
+            const bruta = (poliza.comision_vendedor && poliza.comision_vendedor > 0)
+              ? poliza.comision_vendedor
+              : (base && pct ? Math.round(base * pct / 100) : null)
+            const ret = poliza.retencion_vendedor ?? 10
+            return (<>
+              <div>
+                <p className="text-xs text-ink-400 mb-0.5">Comisión bruta</p>
+                <p className="text-sm font-medium text-primary-700">
+                  {bruta != null ? formatCOP(bruta) : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-400 mb-0.5">Retención ({ret}%)</p>
+                <p className="text-sm font-medium text-ink-700">
+                  {bruta != null ? formatCOP(bruta * ret / 100) : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-ink-400 mb-0.5">Comisión neta</p>
+                <p className="text-sm font-semibold text-primary-700">
+                  {bruta != null ? formatCOP(bruta * (1 - ret / 100)) : '—'}
+                </p>
+              </div>
+            </>)
+          })()}
           <div className="col-span-2">
             <p className="text-xs text-ink-400 mb-1">Estado pago vendedor</p>
             {poliza.asesor_pago_estado === 'no_aplica' || (!poliza.vendedor_id && !poliza.asesor_pago_estado)
