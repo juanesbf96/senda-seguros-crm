@@ -18,35 +18,38 @@ function parseNum(raw: string): number {
 const FILA_ACN_RE =
   /^\d{1,2}\s+(\d+)\s+\d+\s+\d+\s+\S+\s+\d+\s+ACN\s+(.+?)\s+([\d,]+)\s+([\d.]+)\s+([\d,]+)\s/i
 
+/** Lógica pura: parsea el texto ya extraído del PDF. Testeable sin pdf-parse. */
+export function parseQualitasText(text: string): ParseResult {
+  const lines = text.split('\n').map((l: string) => `${l.trim()} `)
+
+  const resultado: ColillaLineaRaw[] = []
+
+  for (const line of lines) {
+    const match = line.match(FILA_ACN_RE)
+    if (!match) continue
+
+    const [, poliza, asegurado, importe, pct, comision] = match
+    if (!poliza || poliza === '0' || /^0+$/.test(poliza)) continue
+
+    resultado.push({
+      numero_poliza_raw:   poliza,
+      nombre_tomador:      asegurado.trim(),
+      valor_prima:         parseNum(importe),
+      porcentaje_comision: parseNum(pct),
+      valor_comision:      parseNum(comision),
+    })
+  }
+
+  if (resultado.length === 0) {
+    return { ok: false, error: 'No se encontraron líneas ACN en el PDF de Quálitas' }
+  }
+
+  return { ok: true, lineas: resultado }
+}
+
 export async function parseQualitas(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    const text = await extraerTextoPdf(buffer)
-
-    const lines = text.split('\n').map((l: string) => `${l.trim()} `)
-
-    const resultado: ColillaLineaRaw[] = []
-
-    for (const line of lines) {
-      const match = line.match(FILA_ACN_RE)
-      if (!match) continue
-
-      const [, poliza, asegurado, importe, pct, comision] = match
-      if (!poliza || poliza === '0' || /^0+$/.test(poliza)) continue
-
-      resultado.push({
-        numero_poliza_raw:   poliza,
-        nombre_tomador:      asegurado.trim(),
-        valor_prima:         parseNum(importe),
-        porcentaje_comision: parseNum(pct),
-        valor_comision:      parseNum(comision),
-      })
-    }
-
-    if (resultado.length === 0) {
-      return { ok: false, error: 'No se encontraron líneas ACN en el PDF de Quálitas' }
-    }
-
-    return { ok: true, lineas: resultado }
+    return parseQualitasText(await extraerTextoPdf(buffer))
   } catch (e) {
     return { ok: false, error: `Error parsing Quálitas: ${String(e)}` }
   }

@@ -18,35 +18,38 @@ function parseNum(raw: string): number {
 
 const MONTO_RE = /\d{1,3}(?:\.\d{3})+/g
 
+/** Lógica pura: parsea el texto ya extraído del PDF. Testeable sin pdf-parse. */
+export function parseExpertosText(text: string): ParseResult {
+  const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
+
+  const resultado: ColillaLineaRaw[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const headerMatch = lines[i].match(/^(\d{5,})\s+(\S+)\s+(.+)$/)
+    if (!headerMatch) continue
+
+    const [, poliza, , cliente] = headerMatch
+    const montos = (lines[i + 1] ?? '').match(MONTO_RE)
+    if (!montos || montos.length < 3) continue
+
+    resultado.push({
+      numero_poliza_raw: poliza,
+      nombre_tomador:    cliente.trim(),
+      valor_prima:       parseNum(montos[0]),
+      valor_comision:    parseNum(montos[2]),
+    })
+  }
+
+  if (resultado.length === 0) {
+    return { ok: false, error: 'No se encontraron líneas en el PDF de Expertos' }
+  }
+
+  return { ok: true, lineas: resultado }
+}
+
 export async function parseExpertos(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    const text = await extraerTextoPdf(buffer)
-
-    const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
-
-    const resultado: ColillaLineaRaw[] = []
-
-    for (let i = 0; i < lines.length; i++) {
-      const headerMatch = lines[i].match(/^(\d{5,})\s+(\S+)\s+(.+)$/)
-      if (!headerMatch) continue
-
-      const [, poliza, , cliente] = headerMatch
-      const montos = (lines[i + 1] ?? '').match(MONTO_RE)
-      if (!montos || montos.length < 3) continue
-
-      resultado.push({
-        numero_poliza_raw: poliza,
-        nombre_tomador:    cliente.trim(),
-        valor_prima:       parseNum(montos[0]),
-        valor_comision:    parseNum(montos[2]),
-      })
-    }
-
-    if (resultado.length === 0) {
-      return { ok: false, error: 'No se encontraron líneas en el PDF de Expertos' }
-    }
-
-    return { ok: true, lineas: resultado }
+    return parseExpertosText(await extraerTextoPdf(buffer))
   } catch (e) {
     return { ok: false, error: `Error parsing Expertos: ${String(e)}` }
   }
