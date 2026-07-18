@@ -30,48 +30,51 @@ function parseDate(raw: string): string {
 const FILA_RE =
   /^(\d{6,})\s+(.+?)\s+\d+\s+\d+\s+\d+\s+([\d.,]+)\s+([\d.,]+)\s+(\d{8})\s+[\d,.]+/
 
+/** Lógica pura: parsea el texto ya extraído del PDF. Testeable sin pdf-parse. */
+export function parseAxaText(text: string): ParseResult {
+  const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
+
+  const resultado: ColillaLineaRaw[] = []
+  let enTabla = false
+
+  for (const line of lines) {
+    if (/POLIZA/i.test(line) && /TOMADOR/i.test(line) && /COMISION/i.test(line)) {
+      enTabla = true
+      continue
+    }
+    if (!enTabla) continue
+
+    if (/^TOTAL/i.test(line) || /^Página/i.test(line) || /^FIN DEL REPORTE/i.test(line)) {
+      enTabla = false
+      continue
+    }
+
+    const match = line.match(FILA_RE)
+    if (!match) continue
+
+    const [, poliza, tomadorRaw, vrRecaudo, vrComision, fecha] = match
+    // El primer token de tomadorRaw suele ser un código numérico residual de columna, se descarta
+    const tomador = tomadorRaw.replace(/^\d+\s+/, '').trim()
+
+    resultado.push({
+      numero_poliza_raw: poliza,
+      nombre_tomador:    tomador,
+      valor_prima:       parseNum(vrRecaudo),
+      valor_comision:    parseNum(vrComision),
+      fecha_pago:        parseDate(fecha),
+    })
+  }
+
+  if (resultado.length === 0) {
+    return { ok: false, error: 'No se encontraron líneas de comisión en el PDF de AXA' }
+  }
+
+  return { ok: true, lineas: resultado }
+}
+
 export async function parseAxa(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    const text = await extraerTextoPdf(buffer)
-
-    const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
-
-    const resultado: ColillaLineaRaw[] = []
-    let enTabla = false
-
-    for (const line of lines) {
-      if (/POLIZA/i.test(line) && /TOMADOR/i.test(line) && /COMISION/i.test(line)) {
-        enTabla = true
-        continue
-      }
-      if (!enTabla) continue
-
-      if (/^TOTAL/i.test(line) || /^Página/i.test(line) || /^FIN DEL REPORTE/i.test(line)) {
-        enTabla = false
-        continue
-      }
-
-      const match = line.match(FILA_RE)
-      if (!match) continue
-
-      const [, poliza, tomadorRaw, vrRecaudo, vrComision, fecha] = match
-      // El primer token de tomadorRaw suele ser un código numérico residual de columna, se descarta
-      const tomador = tomadorRaw.replace(/^\d+\s+/, '').trim()
-
-      resultado.push({
-        numero_poliza_raw: poliza,
-        nombre_tomador:    tomador,
-        valor_prima:       parseNum(vrRecaudo),
-        valor_comision:    parseNum(vrComision),
-        fecha_pago:        parseDate(fecha),
-      })
-    }
-
-    if (resultado.length === 0) {
-      return { ok: false, error: 'No se encontraron líneas de comisión en el PDF de AXA' }
-    }
-
-    return { ok: true, lineas: resultado }
+    return parseAxaText(await extraerTextoPdf(buffer))
   } catch (e) {
     return { ok: false, error: `Error parsing AXA: ${String(e)}` }
   }

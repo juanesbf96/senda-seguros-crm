@@ -20,37 +20,40 @@ const POLIZA_RE = /(\d{10,})/
 const MONTOS_RE = /\$([\d,]+)\s+\$([\d,]+)\s+\d+\s+\$([\d,]+)/
 const VENTANA_BUSQUEDA = 15
 
+/** Lógica pura: parsea el texto ya extraído del PDF. Testeable sin pdf-parse. */
+export function parseBolivarText(text: string): ParseResult {
+  const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
+
+  const resultado: ColillaLineaRaw[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const polizaMatch = lines[i].match(POLIZA_RE)
+    if (!polizaMatch) continue
+
+    for (let j = i + 1; j < Math.min(i + VENTANA_BUSQUEDA, lines.length); j++) {
+      const montosMatch = lines[j].match(MONTOS_RE)
+      if (!montosMatch) continue
+
+      const [, vlrPri, , vlrCom] = montosMatch
+      resultado.push({
+        numero_poliza_raw: polizaMatch[1],
+        valor_prima:       parseNumUS(vlrPri),
+        valor_comision:    parseNumUS(vlrCom),
+      })
+      break
+    }
+  }
+
+  if (resultado.length === 0) {
+    return { ok: false, error: 'No se encontraron líneas de comisión en el PDF de Bolívar' }
+  }
+
+  return { ok: true, lineas: resultado }
+}
+
 export async function parseBolivar(buffer: ArrayBuffer): Promise<ParseResult> {
   try {
-    const text = await extraerTextoPdf(buffer)
-
-    const lines = text.split('\n').map((l: string) => l.trim()).filter(Boolean)
-
-    const resultado: ColillaLineaRaw[] = []
-
-    for (let i = 0; i < lines.length; i++) {
-      const polizaMatch = lines[i].match(POLIZA_RE)
-      if (!polizaMatch) continue
-
-      for (let j = i + 1; j < Math.min(i + VENTANA_BUSQUEDA, lines.length); j++) {
-        const montosMatch = lines[j].match(MONTOS_RE)
-        if (!montosMatch) continue
-
-        const [, vlrPri, , vlrCom] = montosMatch
-        resultado.push({
-          numero_poliza_raw: polizaMatch[1],
-          valor_prima:       parseNumUS(vlrPri),
-          valor_comision:    parseNumUS(vlrCom),
-        })
-        break
-      }
-    }
-
-    if (resultado.length === 0) {
-      return { ok: false, error: 'No se encontraron líneas de comisión en el PDF de Bolívar' }
-    }
-
-    return { ok: true, lineas: resultado }
+    return parseBolivarText(await extraerTextoPdf(buffer))
   } catch (e) {
     return { ok: false, error: `Error parsing Bolívar: ${String(e)}` }
   }
