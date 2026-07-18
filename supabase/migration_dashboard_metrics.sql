@@ -124,13 +124,13 @@ BEGIN
 
     'tareas_vencidas', (SELECT count(*) FROM tareas WHERE workspace_id = p_ws
       AND completada = false AND fecha_vencimiento < v_hoy
-      AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
     'tareas_hoy', (SELECT count(*) FROM tareas WHERE workspace_id = p_ws
       AND completada = false AND fecha_vencimiento = v_hoy
-      AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
     'tareas_manana', (SELECT count(*) FROM tareas WHERE workspace_id = p_ws
       AND completada = false AND fecha_vencimiento = v_manana
-      AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
 
     'siniestros_pendientes', (SELECT count(*) FROM siniestros
       WHERE workspace_id = p_ws AND estado NOT IN ('cerrado', 'rechazado')),
@@ -144,15 +144,15 @@ BEGIN
       FROM liquidaciones WHERE workspace_id = p_ws AND estado = 'pendiente'),
 
     'sol_nuevas', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
-      AND estado = 'nueva' AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND estado = 'nueva' AND (p_uid IS NULL OR asignado_a = p_uid::text)),
     'sol_activas', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
-      AND estado IN ('nueva', 'en_proceso') AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND estado IN ('nueva', 'en_proceso') AND (p_uid IS NULL OR asignado_a = p_uid::text)),
     'sol_urgentes', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
       AND estado IN ('nueva', 'en_proceso') AND prioridad = 'urgente'
-      AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
     'sol_por_vencer', (SELECT count(*) FROM solicitudes WHERE workspace_id = p_ws
       AND estado IN ('nueva', 'en_proceso') AND fecha_limite <= v_in7
-      AND (p_uid IS NULL OR asignado_a = p_uid)),
+      AND (p_uid IS NULL OR asignado_a = p_uid::text)),
 
     'metas_activas', (SELECT count(*) FROM metas WHERE workspace_id = p_ws
       AND fecha_inicio <= v_hoy AND fecha_fin >= v_hoy),
