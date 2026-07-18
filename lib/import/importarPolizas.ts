@@ -18,6 +18,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ExcelRow, ImportResult } from './types'
+import { comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor, redondear2 } from '@/lib/comisiones'
 
 const LOTE_INSERT = 500
 const LOTE_IN     = 200   // tamaño de chunk para filtros .in() (límite de URL)
@@ -207,10 +208,10 @@ export async function importarPolizas(
     const primaNeta       = r.prima_neta ?? 0
     const pctAgencia      = r.pct_comision_negocio ?? matchTarifa(r.ramo, r.aseguradora) ?? null
     const comisionAgencia = r.comision_agencia
-      ?? (primaNeta && pctAgencia ? Math.round(primaNeta * pctAgencia / 100 * 100) / 100 : null)
+      ?? (primaNeta && pctAgencia ? redondear2(calcComisionAgencia(primaNeta, pctAgencia)) : null)
     // Tratar 0 como null para que el cálculo derivado aplique cuando el Excel trae ceros
     const comisionVendedor = (r.comision_asesor || null)
-      ?? (comisionAgencia && pctVendedor ? Math.round(comisionAgencia * pctVendedor / 100 * 100) / 100 : null)
+      ?? (comisionAgencia && pctVendedor ? redondear2(calcComisionVendedor(comisionAgencia, pctVendedor)) : null)
 
     const polizaData: Record<string, unknown> = {
       workspace_id:                wsId,

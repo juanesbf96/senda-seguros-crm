@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase/client'
 import { Poliza, EstadoPoliza, Cliente, Vendedor } from '@/types'
 import { X, Calculator } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import {
+  pctDe, comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor,
+  comisionIntermediario as calcComisionIntermediario, retencion, comisionNeta, RETENCION_AGENCIA,
+} from '@/lib/comisiones'
 
 /* ────────────────────────────────────────────────────────── */
 /*  Lists                                                     */
@@ -152,19 +156,19 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const pctIva            = n(form.porcentaje_iva)
   const gastos            = n(form.gastos)
   const pctAgencia        = n(form.porcentaje_comision_agencia)
-  const iva               = primaNeta * pctIva / 100
-  const comisionAgencia     = primaNeta * pctAgencia / 100        // bruta (sobre prima neta)
-  const retencionAgencia    = comisionAgencia * 0.10              // retención fija 10%
+  const iva               = pctDe(primaNeta, pctIva)
+  const comisionAgencia     = calcComisionAgencia(primaNeta, pctAgencia)  // bruta (sobre prima neta)
+  const retencionAgencia    = retencion(comisionAgencia, RETENCION_AGENCIA)  // retención fija 10%
   const comisionAgenciaNeta = comisionAgencia - retencionAgencia  // neta a recibir
   const totalPrima          = primaNeta + iva + gastos
   const pctIntermedario     = n(form.pct_comision_int)
-  const comisionIntermedario = comisionAgencia * pctIntermedario / 100
+  const comisionIntermedario = calcComisionIntermediario(comisionAgencia, pctIntermedario)
   const pctVendedor         = n(form.porcentaje_comision_vendedor)
-  const comisionVendedor    = comisionAgencia * pctVendedor / 100
+  const comisionVendedor    = calcComisionVendedor(comisionAgencia, pctVendedor)
   // mensual
   const primaMensual        = n(form.prima_mensual)
-  const comisionMensualBruta = primaMensual * pctAgencia / 100
-  const comisionMensualNeta  = comisionMensualBruta * 0.90
+  const comisionMensualBruta = calcComisionAgencia(primaMensual, pctAgencia)
+  const comisionMensualNeta  = comisionMensualBruta - retencion(comisionMensualBruta, RETENCION_AGENCIA)
 
   /* click-outside para cerrar dropdown de cliente */
   useEffect(() => {
@@ -746,11 +750,11 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 </div>
                 <div className="flex justify-between text-info mt-1">
                   <span>Retención ({form.retencion_vendedor}%)</span>
-                  <span>- $ {fmt(comisionVendedor * n(form.retencion_vendedor) / 100)}</span>
+                  <span>- $ {fmt(retencion(comisionVendedor, n(form.retencion_vendedor)))}</span>
                 </div>
                 <div className="flex justify-between text-info font-semibold border-t border-info/30 pt-1.5 mt-1">
                   <span>Neto a pagar</span>
-                  <span>$ {fmt(comisionVendedor - comisionVendedor * n(form.retencion_vendedor) / 100)}</span>
+                  <span>$ {fmt(comisionNeta(comisionVendedor, n(form.retencion_vendedor)))}</span>
                 </div>
               </div>
             )}
@@ -793,7 +797,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                     </div>
                     <div className="flex justify-between text-ink-400">
                       <span>Retención en la fuente (10%)</span>
-                      <span>- $ {fmt(comisionMensualBruta * 0.10)}</span>
+                      <span>- $ {fmt(retencion(comisionMensualBruta, RETENCION_AGENCIA))}</span>
                     </div>
                     <div className="flex justify-between text-emerald-700 font-semibold border-t border-emerald-200 pt-1.5 mt-1">
                       <span>Comisión neta mensual</span>
