@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Liquidacion, EstadoLiquidacion, Vendedor } from '@/types'
 import { X } from 'lucide-react'
 import { formatCOP } from '@/lib/utils'
+import { pctDe } from '@/lib/comisiones'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface Props {
@@ -47,7 +48,7 @@ export default function LiquidacionModal({ liquidacion, vendedorId, onClose, onS
     if (!v) return
     const primas = parseFloat(form.total_primas)
     if (!isNaN(primas)) {
-      const comision = (primas * v.porcentaje_comision) / 100
+      const comision = pctDe(primas, v.porcentaje_comision)
       setForm(f => ({ ...f, total_comision: comision.toFixed(2) }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

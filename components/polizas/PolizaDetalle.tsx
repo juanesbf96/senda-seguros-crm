@@ -5,6 +5,7 @@ import { Poliza, Cliente, Archivo } from '@/types'
 import AfiliadosTab from '@/components/afiliados/AfiliadosTab'
 import AfiliadosPorPlan from '@/components/afiliados/AfiliadosPorPlan'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
+import { comisionVendedor as calcComisionVendedor, retencion, comisionNeta } from '@/lib/comisiones'
 import {
   ArrowLeft, Pencil, AlertTriangle, FileText, Shield,
   Calendar, DollarSign, User, Building2, RefreshCw,
@@ -299,7 +300,7 @@ export default function PolizaDetalle({ id }: { id: string }) {
             const base = poliza.comision_agencia
             const bruta = (poliza.comision_vendedor && poliza.comision_vendedor > 0)
               ? poliza.comision_vendedor
-              : (base && pct ? Math.round(base * pct / 100) : null)
+              : (base && pct ? Math.round(calcComisionVendedor(base, pct)) : null)
             const ret = poliza.retencion_vendedor ?? 10
             return (<>
               <div>
@@ -311,13 +312,13 @@ export default function PolizaDetalle({ id }: { id: string }) {
               <div>
                 <p className="text-xs text-ink-400 mb-0.5">Retención ({ret}%)</p>
                 <p className="text-sm font-medium text-ink-700">
-                  {bruta != null ? formatCOP(bruta * ret / 100) : '—'}
+                  {bruta != null ? formatCOP(retencion(bruta, ret)) : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-ink-400 mb-0.5">Comisión neta</p>
                 <p className="text-sm font-semibold text-primary-700">
-                  {bruta != null ? formatCOP(bruta * (1 - ret / 100)) : '—'}
+                  {bruta != null ? formatCOP(comisionNeta(bruta, ret)) : '—'}
                 </p>
               </div>
             </>)
