@@ -5,14 +5,7 @@
 
 ---
 
-## Fase 11 — Auditorías competitivas + Fundaciones (julio 2026)
-
-Se auditaron a fondo dos plataformas para orientar el roadmap de Senda:
-
-- **Guro** (guro.co) — SaaS colombiano de seguros con sincronización directa de portales de aseguradoras y motor de IA BYOK (el cliente trae su llave de DeepSeek/OpenAI/Claude/Gemini; los tokens se cobran a su cuenta). Diferenciadores: sync de 11 aseguradoras, cartera con aging buckets, WhatsApp integrado, ventas cruzadas con IA, extractor y caché de análisis 30 días.
-- **Cider** (cidersure.zohoplatform.com) — vertical de seguros sobre **Zoho CRM** donde **Ríos Agencia opera hoy en producción** (2,231 pólizas, 3,996 operaciones). Es el sistema que Senda busca reemplazar. Hallazgos clave: modelo de datos profundo (tomador ≠ asegurados, riesgos, coberturas, certificados, técnico ≠ vendedor), "Operaciones de Producción" unificando renovación/cobro-cuota/cancelación, churn como ciudadano de primera clase (motivo de cancelación + no-renovación), creación de pólizas vía **Extractor PDF** de carátulas.
-
-**Entregable:** `PLAN_EJECUCION_AUDITORIAS.md` — plan de 6 fases (calidad → retención/cartera → paridad de modelo de datos → operaciones de producción → automatización/IA → WhatsApp), con 15 PRs sugeridos en orden y criterios de aceptación. Rama `docs/plan-ejecucion-auditorias` (PR pendiente de merge).
+## Fase 11 — Fundaciones técnicas (julio 2026)
 
 ### Estado de ejecución del plan
 
@@ -24,7 +17,7 @@ Se auditaron a fondo dos plataformas para orientar el roadmap de Senda:
 | 1.1 | Motivo de cancelación / no-renovación | ⬜ Pendiente |
 | 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
 | 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
-| 2.x | Paridad de modelo de datos con Cider | ⬜ Pendiente |
+| 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
 | 3.x | Operaciones de Producción | ⬜ Pendiente |
 | 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
 | 5.x | WhatsApp | ⬜ Pendiente |
