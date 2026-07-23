@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Cobro, EstadoCobro, TipoCobro, Cliente, Poliza } from '@/types'
+import { Cobro, TipoCobro, Cliente, Poliza } from '@/types'
 import { X } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
@@ -11,10 +11,6 @@ interface Props {
   activeTab?: TipoCobro
   onClose: () => void
   onSaved: () => void
-}
-
-const ESTADO_LABELS: Record<EstadoCobro, string> = {
-  pendiente: 'Pendiente', pagado: 'Pagado', vencido: 'Vencido', anulado: 'Anulado',
 }
 
 const TIPO_LABELS: Record<TipoCobro, string> = {
@@ -35,16 +31,14 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
   const [polizas, setPolizas]           = useState<Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>[]>([])
   const [aseguradoras, setAseguradoras] = useState<string[]>([])
 
+  // `client_id` es solo ayuda de UI para filtrar pólizas; cobros se vincula por poliza_id.
+  const [clienteSel, setClienteSel] = useState<string>(clienteId || '')
   const [form, setForm] = useState({
-    client_id:           cobro?.client_id          || clienteId || '',
     poliza_id:           cobro?.poliza_id           || '',
     tipo:                (cobro?.tipo               || activeTab || 'por_cobrar') as TipoCobro,
-    concepto:            cobro?.concepto            || '',
-    valor:               cobro?.valor?.toString()   || '',
-    fecha_vencimiento:   cobro?.fecha_vencimiento   || '',
+    prima_total:         cobro?.prima_total?.toString()   || '',
+    compromiso_pago:     cobro?.compromiso_pago     || '',
     fecha_emision:       cobro?.fecha_emision       || '',
-    estado:              (cobro?.estado             || 'pendiente') as EstadoCobro,
-    notas:               cobro?.notas               || '',
     aseguradora:         cobro?.aseguradora         || '',
     ramo:                cobro?.ramo                || '',
     numero_poliza:       cobro?.numero_poliza       || '',
@@ -75,33 +69,32 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
   }, [clienteId, currentWorkspace])
 
   useEffect(() => {
-    const cid = form.client_id
+    const cid = clienteSel
     if (!cid) { setPolizas([]); return }
     supabase.from('polizas').select('id, numero_poliza, aseguradora, ramo')
       .eq('client_id', cid).eq('eliminada', false)
       .then(({ data }) => setPolizas(data || []))
-  }, [form.client_id])
+  }, [clienteSel])
 
   async function save() {
-    if (!form.concepto.trim()) { setError('El concepto es obligatorio'); return }
-    if (!form.valor || isNaN(parseFloat(form.valor))) { setError('Ingresa un valor válido'); return }
+    if (!form.prima_total || isNaN(parseFloat(form.prima_total))) { setError('Ingresa una prima total válida'); return }
     setSaving(true); setError('')
-    const payload = {
-      client_id:           form.client_id    || null,
+    const prima = parseFloat(form.prima_total)
+    // El estado de pago es derivado: en un cobro nuevo el saldo pendiente parte igual a la prima.
+    const payload: Record<string, unknown> = {
       poliza_id:           form.poliza_id    || null,
       tipo:                form.tipo,
-      concepto:            form.concepto.trim(),
-      valor:               parseFloat(form.valor),
-      fecha_vencimiento:   form.fecha_vencimiento || null,
+      estado:              form.tipo,              // columna `estado` guarda el mismo enum de categoría
+      prima_total:         prima,
+      compromiso_pago:     form.compromiso_pago || null,
       fecha_emision:       form.fecha_emision     || null,
-      estado:              form.estado,
-      notas:               form.notas.trim()      || null,
       aseguradora:         form.aseguradora.trim()       || null,
       ramo:                form.ramo.trim()               || null,
       numero_poliza:       form.numero_poliza.trim()      || null,
       porcentaje_comision: form.porcentaje_comision ? parseFloat(form.porcentaje_comision) : null,
       workspace_id:        currentWorkspace?.id,
     }
+    if (!cobro) payload.saldo_pendiente = prima  // solo al crear; no re-escribir saldo al editar
     const { error: err } = cobro
       ? await supabase.from('cobros').update(payload).eq('id', cobro.id)
       : await supabase.from('cobros').insert(payload)
@@ -128,8 +121,8 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
 
           {/* Cliente (no requerido para tipo aseguradora) */}
           {!clienteId && (
-            <Field label={isAseguradoraTab ? 'Cliente (opcional)' : 'Cliente *'}>
-              <select value={form.client_id} onChange={e => set('client_id', e.target.value)} className={cls}>
+            <Field label="Cliente (para elegir póliza)">
+              <select value={clienteSel} onChange={e => { setClienteSel(e.target.value); set('poliza_id', '') }} className={cls}>
                 <option value="">Sin cliente específico</option>
                 {clientes.map(c => <option key={c.id} value={c.id}>{c.nombre}</option>)}
               </select>
@@ -168,18 +161,13 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
             </div>
           )}
 
-          <Field label="Concepto *">
-            <input value={form.concepto} onChange={e => set('concepto', e.target.value)}
-              placeholder="Ej: Prima póliza vida · Comisión enero..." className={cls} />
-          </Field>
-
           <div className="grid grid-cols-2 gap-4">
-            <Field label="Valor (COP) *">
-              <input type="number" min="0" value={form.valor} onChange={e => set('valor', e.target.value)}
+            <Field label="Prima total (COP) *">
+              <input type="number" min="0" value={form.prima_total} onChange={e => set('prima_total', e.target.value)}
                 placeholder="0" className={cls} />
             </Field>
-            <Field label="Fecha vencimiento">
-              <input type="date" value={form.fecha_vencimiento} onChange={e => set('fecha_vencimiento', e.target.value)} className={cls} />
+            <Field label="Compromiso de pago">
+              <input type="date" value={form.compromiso_pago} onChange={e => set('compromiso_pago', e.target.value)} className={cls} />
             </Field>
           </div>
 
@@ -197,28 +185,10 @@ export default function CobrosModal({ cobro, clienteId, activeTab, onClose, onSa
             </Field>
           )}
 
-          {/* Estado */}
-          <Field label="Estado">
-            <div className="grid grid-cols-4 gap-2">
-              {(Object.entries(ESTADO_LABELS) as [EstadoCobro, string][]).map(([k, v]) => (
-                <button key={k} type="button" onClick={() => set('estado', k)}
-                  className={[
-                    'py-2 px-2 rounded-lg text-xs font-medium border transition-colors',
-                    form.estado === k
-                      ? k === 'pagado' ? 'bg-primary-500 border-primary-500 text-white'
-                        : k === 'vencido' ? 'bg-error border-error text-white'
-                        : k === 'anulado' ? 'bg-ink-400 border-ink-400 text-white'
-                        : 'bg-warning border-warning text-white'
-                      : 'bg-white border-ink-200 text-ink-500 hover:border-ink-400',
-                  ].join(' ')}>{v}</button>
-              ))}
-            </div>
-          </Field>
-
-          <Field label="Notas">
-            <textarea value={form.notas} onChange={e => set('notas', e.target.value)}
-              placeholder="Observaciones..." rows={2} className={cls} />
-          </Field>
+          <p className="text-xs text-ink-400">
+            El estado de pago (pendiente / vencido / pagado) se calcula automáticamente a partir del
+            saldo pendiente y el compromiso de pago. Los pagos se registran desde Caja (recibos).
+          </p>
 
           {error && <p className="text-sm text-error bg-error-soft rounded-lg px-3 py-2">{error}</p>}
         </div>

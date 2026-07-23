@@ -31,7 +31,7 @@ const FORMA_REQUIERE_BANCO: FormaPago[] = ['transferencia', 'cheque', 'consignac
 export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onSaved }: Props) {
   const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
-  const [cobros, setCobros] = useState<Pick<Cobro, 'id' | 'concepto' | 'valor'>[]>([])
+  const [cobros, setCobros] = useState<Pick<Cobro, 'id' | 'numero_cobro' | 'ramo' | 'saldo_pendiente' | 'prima_total'>[]>([])
   const [form, setForm] = useState({
     client_id:          recibo?.client_id || clienteId || '',
     cobro_id:           recibo?.cobro_id || '',
@@ -56,21 +56,23 @@ export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onS
       supabase.from('clientes').select('id, nombre').order('nombre').then(({ data }) => setClientes(data || []))
   }, [clienteId])
 
-  // Load pending cobros for the client
+  // Cobros pendientes del cliente: cobros no tiene client_id → se une vía poliza_id → polizas.client_id
   useEffect(() => {
     const cid = form.client_id
     if (!cid) { setCobros([]); return }
-    supabase.from('cobros').select('id, concepto, valor')
-      .eq('client_id', cid).eq('estado', 'pendiente')
-      .then(({ data }) => setCobros(data || []))
+    supabase.from('cobros')
+      .select('id, numero_cobro, ramo, saldo_pendiente, prima_total, poliza:polizas!inner(client_id)')
+      .eq('poliza.client_id', cid)
+      .then(({ data }) => setCobros(((data || []) as unknown as Pick<Cobro, 'id' | 'numero_cobro' | 'ramo' | 'saldo_pendiente' | 'prima_total'>[])
+        .filter(c => (c.saldo_pendiente ?? 0) > 0)))
   }, [form.client_id])
 
-  // Auto-fill concepto and valor when cobro is selected
+  // Auto-fill concepto y valor cuando se selecciona un cobro (ramo y saldo pendiente)
   useEffect(() => {
     if (!form.cobro_id) return
     const cobro = cobros.find(c => c.id === form.cobro_id)
-    if (cobro) set('concepto', cobro.concepto)
-    if (cobro) set('valor', cobro.valor.toString())
+    if (cobro) set('concepto', cobro.ramo || `Cobro #${cobro.numero_cobro ?? ''}`.trim())
+    if (cobro) set('valor', (cobro.saldo_pendiente ?? cobro.prima_total ?? 0).toString())
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.cobro_id])
 
@@ -99,9 +101,10 @@ export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onS
       ? await supabase.from('recibos').update(payload).eq('id', recibo.id)
       : await supabase.from('recibos').insert(payload)
 
-    // If linked to a cobro, mark it as pagado
+    // Si está vinculado a un cobro, saldarlo (estado de pago derivado: saldo 0 + fecha de pago).
+    // NOTA: asume liquidación total del cobro; el pago parcial es una regla de negocio a definir.
     if (!err && form.cobro_id && !recibo) {
-      await supabase.from('cobros').update({ estado: 'pagado' }).eq('id', form.cobro_id)
+      await supabase.from('cobros').update({ saldo_pendiente: 0, fecha_pago: form.fecha_pago }).eq('id', form.cobro_id)
     }
 
     if (err) { setError(err.message); setSaving(false); return }
@@ -132,7 +135,7 @@ export default function ReciboModal({ recibo, clienteId, activeTab, onClose, onS
               <select value={form.cobro_id} onChange={e => set('cobro_id', e.target.value)} className={inputCls}>
                 <option value="">Sin cobro específico</option>
                 {cobros.map(c => (
-                  <option key={c.id} value={c.id}>{c.concepto} — {formatCOP(c.valor)}</option>
+                  <option key={c.id} value={c.id}>{c.ramo || `Cobro #${c.numero_cobro ?? ''}`} — {formatCOP(c.saldo_pendiente ?? 0)}</option>
                 ))}
               </select>
             </Field>

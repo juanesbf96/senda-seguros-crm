@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Cliente, ClienteHistorial, Poliza, Actividad, TipoActividad, Cobro, Remision } from '@/types'
+import { Cliente, ClienteHistorial, Poliza, Actividad, TipoActividad, Cobro, Remision, estadoPagoCobro } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   ArrowLeft, Phone, Mail, MapPin, Pencil, AlertTriangle,
@@ -88,12 +88,13 @@ function ClienteCobros({ id }: { id: string }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // cobros no tiene client_id: se une al cliente vía poliza_id → polizas.client_id
     supabase
       .from('cobros')
-      .select('*')
-      .eq('client_id', id)
-      .order('fecha_vencimiento', { ascending: true })
-      .then(({ data }) => { setCobros(data || []); setLoading(false) })
+      .select('*, poliza:polizas!inner(id, numero_poliza, aseguradora, ramo, client_id)')
+      .eq('poliza.client_id', id)
+      .order('compromiso_pago', { ascending: true })
+      .then(({ data }) => { setCobros((data || []) as Cobro[]); setLoading(false) })
   }, [id])
 
   if (loading) return (
@@ -102,8 +103,9 @@ function ClienteCobros({ id }: { id: string }) {
     </div>
   )
 
-  const totalPendiente = cobros.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0)
-  const totalPagado    = cobros.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.valor, 0)
+  // El estado de pago es derivado (no columna); el monto mostrado es prima_total.
+  const totalPendiente = cobros.filter(c => estadoPagoCobro(c) !== 'pagado').reduce((s, c) => s + (c.saldo_pendiente ?? 0), 0)
+  const totalPagado    = cobros.filter(c => estadoPagoCobro(c) === 'pagado').reduce((s, c) => s + (c.prima_total ?? 0), 0)
 
   return (
     <div className="p-6">
@@ -118,31 +120,34 @@ function ClienteCobros({ id }: { id: string }) {
           <table className="w-full text-sm">
             <thead className="bg-cream-100 border-b border-ink-200">
               <tr className="text-left text-xs text-ink-400">
-                <th className="px-4 py-3 font-medium">Concepto</th>
+                <th className="px-4 py-3 font-medium">Póliza / Ramo</th>
                 <th className="px-4 py-3 font-medium hidden sm:table-cell">Tipo</th>
-                <th className="px-4 py-3 font-medium">Valor</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">Vencimiento</th>
+                <th className="px-4 py-3 font-medium">Prima total</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Compromiso pago</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
               </tr>
             </thead>
             <tbody>
-              {cobros.map(c => (
+              {cobros.map(c => {
+                const ep = estadoPagoCobro(c)
+                return (
                 <tr key={c.id} className="border-b border-cream-200 hover:bg-cream-100 transition-colors">
-                  <td className="px-4 py-3 text-ink-600 font-medium">{c.concepto}</td>
+                  <td className="px-4 py-3 text-ink-600 font-medium">{c.ramo || c.numero_poliza || '—'}</td>
                   <td className="px-4 py-3 text-ink-400 hidden sm:table-cell text-xs">
                     {COBRO_TIPO_LABELS[c.tipo] ?? c.tipo}
                   </td>
-                  <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.valor)}</td>
+                  <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.prima_total ?? 0)}</td>
                   <td className="px-4 py-3 text-ink-400 hidden md:table-cell text-xs">
-                    {c.fecha_vencimiento ? formatDate(c.fecha_vencimiento) : '—'}
+                    {c.compromiso_pago ? formatDate(c.compromiso_pago) : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COBRO_ESTADO_COLORS[c.estado] ?? 'bg-cream-200 text-ink-500'}`}>
-                      {c.estado}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${COBRO_ESTADO_COLORS[ep] ?? 'bg-cream-200 text-ink-500'}`}>
+                      {ep}
                     </span>
                   </td>
                 </tr>
-              ))}
+                )
+              })}
             </tbody>
             <tfoot className="bg-cream-100 border-t border-ink-200">
               <tr className="text-xs text-ink-400">
@@ -239,7 +244,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
   const [polizas,      setPolizas]    = useState<Poliza[]>([])
   const [actividades,  setActividades]= useState<Actividad[]>([])
   const [historial,    setHistorial]  = useState<ClienteHistorial[]>([])
-  const [cobrosPendientes, setCobrosPendientes] = useState<{ id: string; valor: number; estado: string }[]>([])
+  const [cobrosPendientes, setCobrosPendientes] = useState<Pick<Cobro, 'id' | 'saldo_pendiente' | 'compromiso_pago' | 'fecha_pago'>[]>([])
   const [loading,      setLoading]    = useState(true)
   const [activeTab,    setActiveTab]  = useState<TabKey>('datos')
 
@@ -258,7 +263,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
       supabase.from('clientes').select('*').eq('id', id).single(),
       supabase.from('polizas').select('*').eq('client_id', id).eq('eliminada', false).order('created_at', { ascending: false }),
       supabase.from('actividades').select('*').eq('client_id', id).order('fecha', { ascending: false }),
-      supabase.from('cobros').select('id, valor, estado').eq('client_id', id).eq('estado', 'pendiente'),
+      supabase.from('cobros').select('id, saldo_pendiente, compromiso_pago, fecha_pago, poliza:polizas!inner(client_id)').eq('poliza.client_id', id),
       supabase.from('clientes_historial').select('*').eq('cliente_id', id).order('created_at', { ascending: false }),
     ])
     setCliente(c)
@@ -311,7 +316,9 @@ export default function ClienteDetalle({ id }: { id: string }) {
     .filter(p => p.fecha_fin)
     .sort((a, b) => (a.fecha_fin! > b.fecha_fin! ? 1 : -1))[0]
 
-  const totalCobrosPendientes = cobrosPendientes.reduce((s, c) => s + c.valor, 0)
+  const totalCobrosPendientes = cobrosPendientes
+    .filter(c => estadoPagoCobro(c) !== 'pagado')
+    .reduce((s, c) => s + (c.saldo_pendiente ?? 0), 0)
 
   const esColectivo = cliente?.tipo_cliente === 'empresa' || cliente?.tipo_cliente === 'grupo_familiar'
   const tienePolizaColectiva = polizas.some(p => p.es_colectiva)
