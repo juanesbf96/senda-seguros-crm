@@ -12,7 +12,7 @@
 | Fase | Tarea | Estado |
 |------|-------|--------|
 | 0.1 | Tests del parser (Excel + colillas) con fixtures | ✅ Hecho (PR #19 mergeado — `test/colillas-parsers`) + fix de schema drift (PR #18) |
-| 0.2 | **Supabase CLI + ambiente de staging** | 🟡 En curso — ver detalle abajo |
+| 0.2 | **Supabase CLI + ambiente de staging** | ✅ Hecho — staging replica prod (42 tablas, 32 RPCs, 75 políticas RLS verificadas) |
 | 0.3 | Trazabilidad (`origen_creacion` + cronología) | ⬜ Pendiente |
 | 1.1 | Motivo de cancelación / no-renovación | ⬜ Pendiente |
 | 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
@@ -34,12 +34,13 @@
 - `ONBOARDING.md` actualizado (reemplaza "no hay CLI, todo manual").
 - `Colima` + `docker` instalados como runtime local para el CLI.
 
-**Falta para cerrar la fase:**
-- **Aplicar el baseline en `senda-staging`** (`supabase db push` vía pooler): bloqueado por autenticación del password de la BD de staging — pendiente de resetear el password a uno alfanumérico y reintentar (el script ya reintenta en bucle).
-- Verificar que staging tenga todas las tablas y RPCs de producción.
-- Revisar el baseline contra drift histórico (comparar con los `migration_*.sql`).
-- Crear `supabase/seed.sql` (seed mínimo anonimizado — no copiar datos reales de clientes).
+- **Baseline aplicado en `senda-staging`** vía pooler IPv4. `scripts/finish-staging.sh` — finalizador mínimo (pide password una vez, guarda, push, verifica).
+- **Verificación de paridad ✅**: staging = 42 tablas public, 32 funciones/RPCs, 75 políticas RLS, 37 tablas con RLS — coincide exacto con el baseline volcado de prod. Tablas críticas (clientes, pólizas, cobros, liquidaciones, workspaces, members) y RPCs de workspace/permisos presentes.
+
+**Falta (menor, no bloquea el plan):**
+- Crear `supabase/seed.sql` (seed mínimo anonimizado — no copiar datos reales de clientes). Se hará cuando se necesite data de prueba.
 - Mergear el PR de `infra/supabase-cli-staging` y el de `docs/plan-ejecucion-auditorias`.
+- **Rotar el password de prod a uno fuerte** (quedó uno temporal débil visible en pantalla durante el setup) — hacerlo con cuidado de re-linkear el CLI después.
 
 > **Nota operativa:** el password de la BD de producción se rotó durante este setup. La app (Vercel + local) usa las API keys, no ese password, así que no hubo impacto en el servicio. Pendiente: rotar de nuevo el de prod a uno fuerte una vez cerrada la fase (quedó uno temporal débil visible en pantalla durante el proceso).
 
