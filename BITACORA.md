@@ -13,7 +13,7 @@
 |------|-------|--------|
 | 0.1 | Tests del parser (Excel + colillas) con fixtures | ✅ Hecho (PR #19 mergeado — `test/colillas-parsers`) + fix de schema drift (PR #18) |
 | 0.2 | **Supabase CLI + ambiente de staging** | ✅ Hecho — staging replica prod (42 tablas, 32 RPCs, 75 políticas RLS verificadas) |
-| 0.3 | Trazabilidad (`origen_creacion` + cronología) | ⬜ Pendiente |
+| 0.3 | Trazabilidad (`origen_creacion` + cronología) | ✅ Hecho — migración probada en staging; PR `feat/trazabilidad-origen-cronologia` |
 | 1.1 | Motivo de cancelación / no-renovación | ⬜ Pendiente |
 | 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
 | 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
@@ -39,8 +39,19 @@
 
 **Falta (menor, no bloquea el plan):**
 - Crear `supabase/seed.sql` (seed mínimo anonimizado — no copiar datos reales de clientes). Se hará cuando se necesite data de prueba.
-- Mergear el PR de `infra/supabase-cli-staging` y el de `docs/plan-ejecucion-auditorias`.
+- Mergear los PRs: `infra/supabase-cli-staging`, `docs/plan-ejecucion-auditorias`, `feat/trazabilidad-origen-cronologia`.
 - **Rotar el password de prod a uno fuerte** (quedó uno temporal débil visible en pantalla durante el setup) — hacerlo con cuidado de re-linkear el CLI después.
+- **Arreglar `.env.local` corrupto**: la línea de `SUPABASE_DB_PASSWORD` (prod) quedó concatenada con un password de staging viejo por un salto de línea faltante, así que el valor de prod guardado es inválido (no afecta la app ni staging, que usan otras credenciales). Corregir al rotar el password de prod.
+
+### Fase 0.3 — Trazabilidad (rama `feat/trazabilidad-origen-cronologia`)
+
+Respuesta directa a la lección del desastre del import: no había forma de saber de dónde vino un registro ni quién/qué lo cambió.
+
+- `polizas.origen_creacion` (manual | import_excel | colilla | extractor_pdf | api) — seteado en los 2 únicos caminos de creación (import server-side → `import_excel`, PolizaModal → `manual`). En updates del import no se relabela el origen existente.
+- Tabla `registro_cambios` + `registrar_cambio()` (SECURITY DEFINER) + triggers AFTER INSERT/UPDATE/DELETE en `polizas`, `clientes`, `cobros`, `liquidaciones`. **Auditoría a nivel de BD** — captura todo cambio, incluso los hechos por fuera de la app (a diferencia de `clientes_historial`, que es poblado por la app). RLS: miembros del workspace leen; solo el trigger escribe.
+- UI: chip de origen en `PolizaDetalle` + componente reutilizable `components/ui/Cronologia.tsx` (timeline con diff antes/después por campo, usuario y fecha).
+- **Probado en staging**: test SQL de insert/update/delete confirmó que el trigger registra los cambios reales (`{antes: "Sura", despues: "Bolivar"}`) y omite los updates que no cambian nada. tsc limpio, build OK, 19 tests pasan.
+- Nota: la verificación visual en navegador quedó pendiente porque staging no tiene datos ni usuarios de auth; se verá al llegar la migración a prod.
 
 > **Nota operativa:** el password de la BD de producción se rotó durante este setup. La app (Vercel + local) usa las API keys, no ese password, así que no hubo impacto en el servicio. Pendiente: rotar de nuevo el de prod a uno fuerte una vez cerrada la fase (quedó uno temporal débil visible en pantalla durante el proceso).
 
