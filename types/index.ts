@@ -56,6 +56,8 @@ export interface Cliente {
 }
 
 export type OrigenCreacion = 'manual' | 'import_excel' | 'colilla' | 'extractor_pdf' | 'api'
+export type MotivoCancelacion = 'por_no_pago' | 'por_peticion_cliente' | 'por_cambio_intermediario' | 'otro'
+export type MotivoNoRenovacion = 'por_no_pago' | 'por_peticion_cliente' | 'por_cambio_intermediario' | 'precio' | 'competencia' | 'otro'
 
 export interface RegistroCambio {
   id: string
@@ -79,6 +81,9 @@ export interface Poliza {
   fecha_inicio: string | null
   fecha_fin: string | null
   estado: EstadoPoliza
+  motivo_cancelacion: MotivoCancelacion | null
+  motivo_cancelacion_otro: string | null
+  fecha_cancelacion: string | null
   notas: string | null
   tipo_poliza: string | null
   riesgo: string | null
@@ -302,6 +307,7 @@ export interface GestionRenovacion {
   poliza_id: string
   estado: EstadoGestion
   notas: string | null
+  motivo_no_renovacion: MotivoNoRenovacion | null
   fecha: string
 }
 

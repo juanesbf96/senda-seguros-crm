@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Poliza, GestionRenovacion, EstadoGestion, CampanaRenovacion } from '@/types'
+import { Poliza, GestionRenovacion, EstadoGestion, CampanaRenovacion, MotivoNoRenovacion } from '@/types'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
@@ -14,6 +14,46 @@ import Link from 'next/link'
 /* ── Types ─────────────────────────────────────────────────── */
 type PolizaConCliente = Poliza & {
   cliente: { id: string; nombre: string; telefono: string | null } | null
+}
+
+const MOTIVO_NO_RENOV_OPCIONES: { value: string; label: string }[] = [
+  { value: 'por_no_pago',              label: 'Por no pago' },
+  { value: 'por_peticion_cliente',     label: 'Por petición del cliente' },
+  { value: 'por_cambio_intermediario', label: 'Por cambio de intermediario' },
+  { value: 'precio',                   label: 'Precio / prima muy alta' },
+  { value: 'competencia',              label: 'Se fue a la competencia' },
+  { value: 'otro',                     label: 'Otro' },
+]
+
+/** Modal para capturar el motivo cuando una póliza se marca "No renueva". */
+function MotivoNoRenovacionModal({ onConfirm, onClose }: {
+  onConfirm: (motivo: string) => void
+  onClose: () => void
+}) {
+  const [motivo, setMotivo] = useState('')
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-5 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-2">
+          <ArchiveX className="w-5 h-5 text-error" />
+          <h3 className="font-semibold text-ink-700">¿Por qué no renueva?</h3>
+        </div>
+        <p className="text-sm text-ink-500">Registrar el motivo ayuda a medir la retención y por qué se pierden clientes.</p>
+        <select value={motivo} onChange={e => setMotivo(e.target.value)}
+          className="w-full px-3 py-2.5 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400">
+          <option value="">Seleccionar motivo…</option>
+          {MOTIVO_NO_RENOV_OPCIONES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm rounded-lg border border-ink-200 text-ink-600 hover:bg-cream-100">Cancelar</button>
+          <button onClick={() => motivo && onConfirm(motivo)} disabled={!motivo}
+            className="px-4 py-2 text-sm rounded-lg bg-error text-white hover:opacity-90 disabled:opacity-50">
+            Marcar como no renovada
+          </button>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 type MainTab = 'activas' | 'cerradas' | 'polizas'
@@ -315,16 +355,27 @@ function CampanaCard({
     setExpanded(e => !e)
   }
 
-  async function changeEstado(polizaId: string, estado: EstadoGestion) {
+  const [pendingNoRenueva, setPendingNoRenueva] = useState<string | null>(null)
+
+  async function persistGestion(polizaId: string, estado: EstadoGestion, motivo?: string) {
     setSavingId(polizaId)
     const nota = notas[polizaId]?.trim() || null
-    await supabase.from('gestiones_renovacion').insert({ poliza_id: polizaId, estado, notas: nota, workspace_id: currentWorkspace?.id })
+    await supabase.from('gestiones_renovacion').insert({
+      poliza_id: polizaId, estado, notas: nota,
+      motivo_no_renovacion: estado === 'no_renueva' ? (motivo ?? null) : null,
+      workspace_id: currentWorkspace?.id,
+    })
     setGestiones(prev => ({
       ...prev,
-      [polizaId]: { id: '', poliza_id: polizaId, estado, notas: nota, fecha: new Date().toISOString() },
+      [polizaId]: { id: '', poliza_id: polizaId, estado, notas: nota, motivo_no_renovacion: estado === 'no_renueva' ? (motivo ?? null) as MotivoNoRenovacion | null : null, fecha: new Date().toISOString() },
     }))
     setNotas(prev => ({ ...prev, [polizaId]: '' }))
     setSavingId(null)
+  }
+
+  function changeEstado(polizaId: string, estado: EstadoGestion) {
+    if (estado === 'no_renueva') { setPendingNoRenueva(polizaId); return }
+    persistGestion(polizaId, estado)
   }
 
   // Stats
@@ -493,6 +544,12 @@ function CampanaCard({
           )}
         </div>
       )}
+      {pendingNoRenueva && (
+        <MotivoNoRenovacionModal
+          onConfirm={m => { persistGestion(pendingNoRenueva, 'no_renueva', m); setPendingNoRenueva(null) }}
+          onClose={() => setPendingNoRenueva(null)}
+        />
+      )}
     </div>
   )
 }
@@ -529,16 +586,27 @@ function Polizas60View() {
 
   useEffect(() => { load() }, [load])
 
-  async function changeEstado(polizaId: string, estado: EstadoGestion) {
+  const [pendingNoRenueva, setPendingNoRenueva] = useState<string | null>(null)
+
+  async function persistGestion(polizaId: string, estado: EstadoGestion, motivo?: string) {
     setSavingId(polizaId)
     const nota = notas[polizaId]?.trim() || null
-    await supabase.from('gestiones_renovacion').insert({ poliza_id: polizaId, estado, notas: nota, workspace_id: currentWorkspace?.id })
+    await supabase.from('gestiones_renovacion').insert({
+      poliza_id: polizaId, estado, notas: nota,
+      motivo_no_renovacion: estado === 'no_renueva' ? (motivo ?? null) : null,
+      workspace_id: currentWorkspace?.id,
+    })
     setGestiones(prev => ({
       ...prev,
-      [polizaId]: { id: '', poliza_id: polizaId, estado, notas: nota, fecha: new Date().toISOString() },
+      [polizaId]: { id: '', poliza_id: polizaId, estado, notas: nota, motivo_no_renovacion: estado === 'no_renueva' ? (motivo ?? null) as MotivoNoRenovacion | null : null, fecha: new Date().toISOString() },
     }))
     setNotas(prev => ({ ...prev, [polizaId]: '' }))
     setSavingId(null)
+  }
+
+  function changeEstado(polizaId: string, estado: EstadoGestion) {
+    if (estado === 'no_renueva') { setPendingNoRenueva(polizaId); return }
+    persistGestion(polizaId, estado)
   }
 
   const urgente   = polizas.filter(p => daysUntil(p.fecha_fin!) <= 15).length
@@ -604,6 +672,12 @@ function Polizas60View() {
             />
           ))}
         </div>
+      )}
+      {pendingNoRenueva && (
+        <MotivoNoRenovacionModal
+          onConfirm={m => { persistGestion(pendingNoRenueva, 'no_renueva', m); setPendingNoRenueva(null) }}
+          onClose={() => setPendingNoRenueva(null)}
+        />
       )}
     </div>
   )

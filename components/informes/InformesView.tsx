@@ -23,6 +23,15 @@ const PERIODO_LABELS: Record<Periodo, string> = {
 
 const RAMO_COLORS = ['#10b981','#3b82f6','#8b5cf6','#f59e0b','#ef4444','#14b8a6','#ec4899','#64748b']
 
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MOTIVO_LABELS: Record<string, string> = {
+  por_no_pago:              'Por no pago',
+  por_peticion_cliente:     'Petición del cliente',
+  por_cambio_intermediario: 'Cambio intermediario',
+  otro:                     'Otro',
+  sin_motivo:               'Sin motivo',
+}
+
 function MetricCard({ label, value, sub, icon: Icon, color }: {
   label: string; value: string; sub?: string; icon: React.ElementType; color: string
 }) {
@@ -57,6 +66,8 @@ export default function InformesView() {
   const [polizasPorRamo, setPolizasPorRamo]   = useState<{ ramo: string; total: number }[]>([])
   const [prospectosPorEtapa, setProspectosPorEtapa] = useState<{ etapa: string; total: number }[]>([])
   const [comisionesPorVendedor, setComisionesPorVendedor] = useState<{ nombre: string; comision: number }[]>([])
+  const [cancelacionesPorMotivo, setCancelacionesPorMotivo] = useState<{ motivo: string; cantidad: number }[]>([])
+  const [renovacionesResumen, setRenovacionesResumen]       = useState<{ mes: string; renovadas: number; noRenovadas: number }[]>([])
 
   function getDateFrom(p: Periodo): Date {
     const now = new Date()
@@ -171,6 +182,22 @@ export default function InformesView() {
       Object.entries(byVendedor)
         .sort((a, b) => b[1] - a[1])
         .map(([nombre, comision]) => ({ nombre, comision }))
+    )
+
+    // ── Churn: cancelaciones por motivo + renovadas vs no-renovadas ──
+    const anio = new Date().getFullYear()
+    const [cancRes, renovRes] = await Promise.all([
+      supabase.rpc('get_cancelaciones_por_motivo', { p_workspace_id: wid, p_anio: anio }),
+      supabase.rpc('get_renovaciones_resumen',     { p_workspace_id: wid, p_anio: anio }),
+    ])
+    const cancByMotivo: Record<string, number> = {}
+    for (const r of (cancRes.data || []) as { motivo: string; cantidad: number }[]) {
+      cancByMotivo[MOTIVO_LABELS[r.motivo] ?? r.motivo] = (cancByMotivo[MOTIVO_LABELS[r.motivo] ?? r.motivo] || 0) + Number(r.cantidad)
+    }
+    setCancelacionesPorMotivo(Object.entries(cancByMotivo).map(([motivo, cantidad]) => ({ motivo, cantidad })).sort((a, b) => b.cantidad - a.cantidad))
+    setRenovacionesResumen(
+      ((renovRes.data || []) as { mes: number; renovadas: number; no_renovadas: number }[])
+        .map(r => ({ mes: MESES[r.mes - 1] ?? String(r.mes), renovadas: Number(r.renovadas), noRenovadas: Number(r.no_renovadas) }))
     )
 
     setLoading(false)
@@ -326,6 +353,47 @@ export default function InformesView() {
           </ResponsiveContainer>
         </div>
       )}
+
+      {/* Churn: retención */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Cancelaciones por motivo (año actual) */}
+        <div className="bg-white border border-ink-200 rounded-xl p-5">
+          <h3 className="font-semibold text-ink-700 mb-4">Cancelaciones por motivo · {new Date().getFullYear()}</h3>
+          {cancelacionesPorMotivo.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={cancelacionesPorMotivo} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                <YAxis type="category" dataKey="motivo" width={130} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="cantidad" fill="#ef4444" radius={[0,4,4,0]} name="Pólizas" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-ink-400 text-sm">Sin cancelaciones este año</div>
+          )}
+        </div>
+
+        {/* Renovadas vs no renovadas por mes */}
+        <div className="bg-white border border-ink-200 rounded-xl p-5">
+          <h3 className="font-semibold text-ink-700 mb-4">Renovadas vs no renovadas · {new Date().getFullYear()}</h3>
+          {renovacionesResumen.length > 0 ? (
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={renovacionesResumen} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                <XAxis dataKey="mes" tick={{ fontSize: 11 }} />
+                <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="renovadas"   stackId="a" fill="#10b981" radius={[0,0,0,0]} name="Renovadas" />
+                <Bar dataKey="noRenovadas" stackId="a" fill="#ef4444" radius={[4,4,0,0]} name="No renovadas" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-[220px] text-ink-400 text-sm">Sin gestiones de renovación</div>
+          )}
+        </div>
+      </div>
 
     </div>
   )

@@ -99,6 +99,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     tipo_modalidad:(poliza?.tipo_modalidad || 'individual') as TipoModalidad,
     numero_poliza: poliza?.numero_poliza || '',
     estado:        (poliza?.estado      || 'activa') as EstadoPoliza,
+    motivo_cancelacion:      poliza?.motivo_cancelacion      || '',
+    motivo_cancelacion_otro: poliza?.motivo_cancelacion_otro || '',
+    fecha_cancelacion:       poliza?.fecha_cancelacion       || '',
     // fechas
     fecha_expedicion: poliza?.fecha_expedicion || '',
     fecha_recepcion:  poliza?.fecha_recepcion  || '',
@@ -286,6 +289,12 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   async function save() {
     if (!form.aseguradora || !form.ramo) { setError('Aseguradora y ramo son obligatorios'); return }
     if (!form.client_id)                  { setError('Debes seleccionar un cliente'); return }
+    if (form.estado === 'cancelada') {
+      if (!form.motivo_cancelacion) { setError('Indica el motivo de cancelación'); return }
+      if (form.motivo_cancelacion === 'otro' && !form.motivo_cancelacion_otro.trim()) {
+        setError('Describe el motivo de cancelación'); return
+      }
+    }
     setSaving(true); setError('')
 
     const payload: Record<string, unknown> = {
@@ -297,6 +306,10 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       riesgo:        form.riesgo.trim() || null,
       numero_poliza: form.numero_poliza || null,
       estado:        form.estado,
+      // cancelación (solo se persiste el motivo cuando el estado es cancelada)
+      motivo_cancelacion:      form.estado === 'cancelada' ? form.motivo_cancelacion : null,
+      motivo_cancelacion_otro: form.estado === 'cancelada' && form.motivo_cancelacion === 'otro' ? form.motivo_cancelacion_otro.trim() : null,
+      fecha_cancelacion:       form.estado === 'cancelada' ? (form.fecha_cancelacion || null) : null,
       // fechas
       fecha_expedicion: form.fecha_expedicion || null,
       fecha_recepcion:  form.fecha_recepcion  || null,
@@ -503,6 +516,32 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 </select>
               </Field>
             </div>
+
+            {/* Motivo de cancelación — obligatorio al cancelar */}
+            {form.estado === 'cancelada' && (
+              <div className="grid grid-cols-2 gap-4 rounded-lg border border-warning/40 bg-warning-soft/40 p-4">
+                <Field label="Motivo de cancelación *">
+                  <select value={form.motivo_cancelacion} onChange={e => set('motivo_cancelacion', e.target.value)} className={cls}>
+                    <option value="">Seleccionar…</option>
+                    <option value="por_no_pago">Por no pago</option>
+                    <option value="por_peticion_cliente">Por petición del cliente</option>
+                    <option value="por_cambio_intermediario">Por cambio de intermediario</option>
+                    <option value="otro">Otro</option>
+                  </select>
+                </Field>
+                <Field label="Fecha de cancelación">
+                  <input type="date" value={form.fecha_cancelacion} onChange={e => set('fecha_cancelacion', e.target.value)} className={cls} />
+                </Field>
+                {form.motivo_cancelacion === 'otro' && (
+                  <div className="col-span-2">
+                    <Field label="¿Cuál motivo? *">
+                      <input value={form.motivo_cancelacion_otro} onChange={e => set('motivo_cancelacion_otro', e.target.value)}
+                        placeholder="Describe el motivo" className={cls} />
+                    </Field>
+                  </div>
+                )}
+              </div>
+            )}
 
             <Field label="Nombre del tomador (en la póliza)">
               <input value={form.nombre_tomador} onChange={e => set('nombre_tomador', e.target.value)}
