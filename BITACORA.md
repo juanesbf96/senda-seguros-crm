@@ -15,6 +15,8 @@
 | 0.2 | **Supabase CLI + ambiente de staging** | ✅ Hecho — staging replica prod (42 tablas, 32 RPCs, 75 políticas RLS verificadas) |
 | 0.3 | Trazabilidad (`origen_creacion` + cronología) | ✅ Hecho — migración probada en staging; PR `feat/trazabilidad-origen-cronologia` |
 | 1.1 | Motivo de cancelación / no-renovación | ✅ Hecho — migración probada en staging; PR `feat/motivos-cancelacion-no-renovacion` |
+| — | **Fix schema drift Cobros (bug: módulo en ceros)** | ✅ Hecho — PR `fix/finanzas-schema-drift`. Frontend leía columnas fantasma; reconciliado a columnas reales + estado de pago derivado |
+| — | Reconciliar recibos/caja (mismo drift, roto en runtime) | ⬜ Pendiente — tarea aparte, requiere decisiones de negocio (campos sin equivalente real) |
 | 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
 | 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
 | 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
@@ -58,6 +60,16 @@ Respuesta directa a la lección del desastre del import: no había forma de sabe
 - Migración: `polizas.motivo_cancelacion` (+ `_otro`, `fecha_cancelacion`) con CHECK; `gestiones_renovacion.motivo_no_renovacion` con CHECK. RPCs `get_cancelaciones_por_motivo` y `get_renovaciones_resumen` (esta toma el último estado por póliza del append-log).
 - UI: `PolizaModal` exige motivo al cancelar; `Renovaciones` abre modal de motivo al marcar "No renueva" (en sus 2 vistas); `InformesView` tiene 2 gráficos nuevos (cancelaciones por motivo, renovadas vs no renovadas).
 - Probado en staging: constraint rechaza motivos inválidos; la RPC de renovaciones cuenta bien el último estado (no_renueva→renovado = renovada). tsc/build/tests OK.
+
+### Fix — Schema drift en Cobros (rama `fix/finanzas-schema-drift`, commit `240cafe`)
+
+**El bug:** el módulo de Cobros mostraba **todo en ceros**. Causa raíz: schema drift. La tabla `cobros` fue reestructurada en el servidor (colillas/comisiones) pero el frontend nunca se reconcilió — leía columnas fantasma (`concepto`, `valor`, `fecha_vencimiento`, `client_id`, `estado` = pendiente/pagado) que ya no existen. Verificado por 3 fuentes: dump baseline, query en staging, y API REST de prod (`cobros.fecha_vencimiento` → *column does not exist*).
+
+**Esquema real de `cobros`:** montos en `prima_total`/`saldo_pendiente`/`prima_neta`; fechas en `compromiso_pago`/`fecha_pago`; **sin `client_id`** (se une al cliente por `poliza_id → polizas.client_id`); `estado` y `tipo` guardan la **categoría** (`por_cobrar`, `por_pagar`, …), no el estado de pago. El **estado de pago es derivado** (`estadoPagoCobro()`: saldo_pendiente + compromiso_pago + fecha_pago → pendiente/vencido/pagado).
+
+**Arreglado:** tipos (`Cobro`, `Recibo.cobro`), `CobrosList`, `ClienteDetalle` (cobros vía join a póliza), `CobrosModal` (alta mapeada a columnas reales), y las interacciones con cobros de `ReciboModal` (marcar pagado = saldar). tsc limpio, build OK, 19 tests, queries validadas contra el esquema real. El monto mostrado es `prima_total` (decisión del owner).
+
+**Pendiente (tarea aparte):** la tabla **`recibos`** tiene el mismo drift y está **rota en runtime** (query de CajaView hace 400: `recibos.concepto does not exist`). Reconciliarla requiere decisiones de negocio (campos sin equivalente real: `numero_recibo`, `banco`, `referencia`, `concepto`; el tab `certificado` viola el CHECK) — no es port mecánico. Ver tarea "Reconciliar recibos/caja con esquema real".
 
 > **⚠️ Orden de merge de las ramas de fundaciones.** Cada rama se apiló sobre la anterior, así que cada una contiene los commits de las previas:
 > `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → (siguiente).
