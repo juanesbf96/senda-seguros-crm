@@ -60,9 +60,18 @@ function getRamoIcon(ramo: string | null): React.ReactNode {
 import Link from 'next/link'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
+import Cronologia from '@/components/ui/Cronologia'
 
 
 type PolizaConCliente = Poliza & { cliente: Cliente | null }
+
+const ORIGEN_LABEL: Record<string, string> = {
+  manual:        'Creada manual',
+  import_excel:  'Importada de Excel',
+  colilla:       'Desde colilla',
+  extractor_pdf: 'Extraída de PDF',
+  api:           'Vía API',
+}
 
 const ESTADO_COLORS = {
   activa:    'bg-primary-100 text-primary-700',
@@ -190,6 +199,12 @@ export default function PolizaDetalle({ id }: { id: string }) {
                 {poliza.es_renovacion && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-cream-200 text-ink-500">
                     <RefreshCw className="w-3 h-3" /> Renovación
+                  </span>
+                )}
+                {poliza.origen_creacion && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-cream-200 text-ink-500"
+                    title={`Origen: ${ORIGEN_LABEL[poliza.origen_creacion] ?? poliza.origen_creacion}`}>
+                    {ORIGEN_LABEL[poliza.origen_creacion] ?? poliza.origen_creacion}
                   </span>
                 )}
                 {urgent && (
@@ -480,6 +495,9 @@ export default function PolizaDetalle({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {/* ── Cronología de cambios ── */}
+      <Cronologia tabla="polizas" registroId={poliza.id} />
 
       {showEdit && (
         <PolizaModal

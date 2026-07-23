@@ -55,9 +55,23 @@ export interface Cliente {
   updated_at: string
 }
 
+export type OrigenCreacion = 'manual' | 'import_excel' | 'colilla' | 'extractor_pdf' | 'api'
+
+export interface RegistroCambio {
+  id: string
+  workspace_id: string
+  tabla: string
+  registro_id: string
+  usuario_id: string | null
+  accion: 'insert' | 'update' | 'delete'
+  campos_cambiados: Record<string, { antes: unknown; despues: unknown }> | null
+  created_at: string
+}
+
 export interface Poliza {
   id: string
   client_id: string
+  origen_creacion: OrigenCreacion | null
   numero_poliza: string | null
   aseguradora: string
   ramo: string

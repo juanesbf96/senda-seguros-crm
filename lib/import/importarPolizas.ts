@@ -216,6 +216,7 @@ export async function importarPolizas(
     const polizaData: Record<string, unknown> = {
       workspace_id:                wsId,
       client_id:                   clienteId,
+      origen_creacion:             'import_excel',
       aseguradora:                 r.aseguradora || 'Sin asignar',
       ramo:                        r.ramo || 'Sin ramo',
       numero_poliza:               r.numero_poliza || null,
@@ -266,6 +267,7 @@ export async function importarPolizas(
       const updateData = { ...polizaData }
       if (!r.aseguradora || BAD_VALUES.has(r.aseguradora.toLowerCase().trim())) delete updateData.aseguradora
       if (!r.ramo      || BAD_VALUES.has(r.ramo.toLowerCase().trim()))      delete updateData.ramo
+      delete updateData.origen_creacion  // no relabelar el origen de una póliza ya existente
       updatesPorId.set(existenteId, { data: updateData, fila: i + 2 })
     } else {
       // Clave de dedupe: el número de póliza; sin número, cada fila es única

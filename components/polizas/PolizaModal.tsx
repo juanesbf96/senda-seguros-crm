@@ -352,7 +352,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
     const { error: err } = poliza?.id
       ? await supabase.from('polizas').update(payload).eq('id', poliza.id)
-      : await supabase.from('polizas').insert(payload)
+      : await supabase.from('polizas').insert({ ...payload, origen_creacion: 'manual' })
 
     if (err) { setError(err.message); setSaving(false); return }
     onSaved()
