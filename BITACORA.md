@@ -16,7 +16,7 @@
 | 0.3 | Trazabilidad (`origen_creacion` + cronología) | ✅ Hecho — migración probada en staging; PR `feat/trazabilidad-origen-cronologia` |
 | 1.1 | Motivo de cancelación / no-renovación | ✅ Hecho — migración probada en staging; PR `feat/motivos-cancelacion-no-renovacion` |
 | — | **Fix schema drift Cobros (bug: módulo en ceros)** | ✅ Hecho — PR `fix/finanzas-schema-drift`. Frontend leía columnas fantasma; reconciliado a columnas reales + estado de pago derivado |
-| — | Reconciliar recibos/caja (mismo drift, roto en runtime) | ⬜ Pendiente — tarea aparte, requiere decisiones de negocio (campos sin equivalente real) |
+| — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
 | 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
 | 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
 | 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
@@ -69,7 +69,21 @@ Respuesta directa a la lección del desastre del import: no había forma de sabe
 
 **Arreglado:** tipos (`Cobro`, `Recibo.cobro`), `CobrosList`, `ClienteDetalle` (cobros vía join a póliza), `CobrosModal` (alta mapeada a columnas reales), y las interacciones con cobros de `ReciboModal` (marcar pagado = saldar). tsc limpio, build OK, 19 tests, queries validadas contra el esquema real. El monto mostrado es `prima_total` (decisión del owner).
 
-**Pendiente (tarea aparte):** la tabla **`recibos`** tiene el mismo drift y está **rota en runtime** (query de CajaView hace 400: `recibos.concepto does not exist`). Reconciliarla requiere decisiones de negocio (campos sin equivalente real: `numero_recibo`, `banco`, `referencia`, `concepto`; el tab `certificado` viola el CHECK) — no es port mecánico. Ver tarea "Reconciliar recibos/caja con esquema real".
+### Fix — Schema drift en recibos/caja + RPC de pago (misma rama, commit `e02d07a`)
+
+**El bug:** Caja no cargaba (query 400: `recibos.concepto does not exist`). Mismo drift que Cobros. Como los inserts venían fallando, esos campos **nunca se persistieron** — quitarlos de la UI no pierde datos guardados.
+
+**Esquema real de `recibos`:** `cobro_id`, `poliza_id`, `tipo`, `valor_recaudado`, `fecha`, `forma_pago`, `usuario`, `observacion`, `numero_certificado`, `anulado_por`, `fecha_anulacion`. Sin `client_id` (el cliente se resuelve por la póliza). El CHECK de `tipo` solo admite `anticipo/activo/pago_directo/anulado` → el tab **"Certificados"** pasa a ser el subconjunto con `numero_certificado` diligenciado, en vez de un tipo inválido.
+
+**RPC nueva `registrar_pago_cobro(p_cobro_id, p_valor, p_fecha)`** — SECURITY DEFINER, bloquea la fila y aplica el recaudo al cobro de forma atómica descontándolo del saldo. Resuelve pago total y parcial sin tener que elegir entre ambos:
+- recaudado ≥ saldo → saldo 0 + `fecha_pago` (pagado)
+- recaudado < saldo → saldo baja, sin `fecha_pago` (sigue pendiente)
+
+Valida membresía del workspace y rechaza valores ≤ 0. Reemplaza el update directo que dejaba `saldo_pendiente=0` siempre.
+
+**Probado en staging** (transacción revertida): parcial 1M→700k sin fecha; total →0 con fecha; sobrepago nunca negativo; valor negativo rechazado; usuario de otro workspace bloqueado. tsc limpio, build OK, 19 tests.
+
+> ⚠️ Esta migración **aún no está en producción**. Al mergear hay que aplicarla (`supabase db push` con link a prod, o Dashboard → SQL Editor).
 
 > **⚠️ Orden de merge de las ramas de fundaciones.** Cada rama se apiló sobre la anterior, así que cada una contiene los commits de las previas:
 > `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → (siguiente).
