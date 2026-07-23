@@ -14,7 +14,7 @@
 | 0.1 | Tests del parser (Excel + colillas) con fixtures | ✅ Hecho (PR #19 mergeado — `test/colillas-parsers`) + fix de schema drift (PR #18) |
 | 0.2 | **Supabase CLI + ambiente de staging** | ✅ Hecho — staging replica prod (42 tablas, 32 RPCs, 75 políticas RLS verificadas) |
 | 0.3 | Trazabilidad (`origen_creacion` + cronología) | ✅ Hecho — migración probada en staging; PR `feat/trazabilidad-origen-cronologia` |
-| 1.1 | Motivo de cancelación / no-renovación | ⬜ Pendiente |
+| 1.1 | Motivo de cancelación / no-renovación | ✅ Hecho — migración probada en staging; PR `feat/motivos-cancelacion-no-renovacion` |
 | 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
 | 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
 | 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
@@ -52,6 +52,16 @@ Respuesta directa a la lección del desastre del import: no había forma de sabe
 - UI: chip de origen en `PolizaDetalle` + componente reutilizable `components/ui/Cronologia.tsx` (timeline con diff antes/después por campo, usuario y fecha).
 - **Probado en staging**: test SQL de insert/update/delete confirmó que el trigger registra los cambios reales (`{antes: "Sura", despues: "Bolivar"}`) y omite los updates que no cambian nada. tsc limpio, build OK, 19 tests pasan.
 - Nota: la verificación visual en navegador quedó pendiente porque staging no tiene datos ni usuarios de auth; se verá al llegar la migración a prod.
+
+### Fase 1.1 — Retención: motivos de cancelación y no-renovación (rama `feat/motivos-cancelacion-no-renovacion`)
+
+- Migración: `polizas.motivo_cancelacion` (+ `_otro`, `fecha_cancelacion`) con CHECK; `gestiones_renovacion.motivo_no_renovacion` con CHECK. RPCs `get_cancelaciones_por_motivo` y `get_renovaciones_resumen` (esta toma el último estado por póliza del append-log).
+- UI: `PolizaModal` exige motivo al cancelar; `Renovaciones` abre modal de motivo al marcar "No renueva" (en sus 2 vistas); `InformesView` tiene 2 gráficos nuevos (cancelaciones por motivo, renovadas vs no renovadas).
+- Probado en staging: constraint rechaza motivos inválidos; la RPC de renovaciones cuenta bien el último estado (no_renueva→renovado = renovada). tsc/build/tests OK.
+
+> **⚠️ Orden de merge de las ramas de fundaciones.** Cada rama se apiló sobre la anterior, así que cada una contiene los commits de las previas:
+> `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → (siguiente).
+> Mergear **en ese orden** (o mergear solo la última, que las contiene a todas). Cada migración nueva ya está aplicada en staging; al mergear hay que aplicarlas en **producción** (Dashboard → SQL Editor, o `supabase db push` con link a prod).
 
 > **Nota operativa:** el password de la BD de producción se rotó durante este setup. La app (Vercel + local) usa las API keys, no ese password, así que no hubo impacto en el servicio. Pendiente: rotar de nuevo el de prod a uno fuerte una vez cerrada la fase (quedó uno temporal débil visible en pantalla durante el proceso).
 
