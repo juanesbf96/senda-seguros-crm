@@ -28,21 +28,29 @@ const FORMA_COLORS: Record<FormaPago, string> = {
   consignacion:  'bg-warning-soft text-ink-700',
 }
 
-type RecibosTab = TipoRecibo | 'cuadre'
+// 'certificados' no es un tipo de recibo (viola el CHECK): es el subconjunto
+// de recibos que tienen numero_certificado diligenciado.
+type RecibosTab = TipoRecibo | 'certificados' | 'cuadre'
 
 const RECIBO_TABS: { key: RecibosTab; label: string; icon: React.ElementType }[] = [
   { key: 'anticipo',    label: 'Anticipo',     icon: Wallet       },
   { key: 'activo',      label: 'Activos',      icon: CheckCircle2 },
   { key: 'pago_directo',label: 'Pago Directo', icon: PayDirect    },
   { key: 'anulado',     label: 'Anulados',     icon: Ban          },
-  { key: 'certificado', label: 'Certificados', icon: Award        },
+  { key: 'certificados',label: 'Certificados', icon: Award        },
   { key: 'cuadre',      label: 'Cuadre de caja', icon: BarChart3  },
 ]
+
+/** Descripción legible de un recibo: observación propia o el ramo del cobro vinculado. */
+function reciboConcepto(r: Recibo) {
+  return r.observacion || r.cobro?.ramo || r.poliza?.ramo ||
+    (r.cobro?.numero_cobro ? `Cobro #${r.cobro.numero_cobro}` : '—')
+}
 
 function groupByDate(recibos: Recibo[]) {
   const map = new Map<string, Recibo[]>()
   for (const r of recibos) {
-    const d = r.fecha_pago
+    const d = r.fecha || '—'
     if (!map.has(d)) map.set(d, [])
     map.get(d)!.push(r)
   }
@@ -65,10 +73,10 @@ export default function CajaView() {
     if (!currentWorkspace) return
     const { data } = await supabase
       .from('recibos')
-      .select('*, cliente:clientes(id, nombre), cobro:cobros(id, concepto, valor), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .select('*, cobro:cobros(id, numero_cobro, ramo, prima_total, saldo_pendiente), poliza:polizas(id, numero_poliza, aseguradora, ramo, client_id, cliente:clientes(id, nombre))')
       .eq('workspace_id', currentWorkspace.id)
-      .order('fecha_pago', { ascending: false })
-    setRecibos((data || []) as Recibo[])
+      .order('fecha', { ascending: false })
+    setRecibos((data || []) as unknown as Recibo[])
     setLoading(false)
   }
 
@@ -82,27 +90,28 @@ export default function CajaView() {
 
   // Tab data
   const isCuadreTab = activeTab === 'cuadre'
-  const tabRecibos  = isCuadreTab ? recibos : recibos.filter(r => r.tipo === activeTab)
+  const matchTab = (r: Recibo, tab: RecibosTab) =>
+    tab === 'cuadre' ? true : tab === 'certificados' ? !!r.numero_certificado : r.tipo === tab
+  const tabRecibos = recibos.filter(r => matchTab(r, activeTab))
 
   const filtered = tabRecibos.filter(r => {
     const q = search.toLowerCase()
     const matchSearch = !search ||
-      r.cliente?.nombre?.toLowerCase().includes(q) ||
-      r.concepto.toLowerCase().includes(q) ||
-      r.numero_recibo?.toLowerCase().includes(q) ||
-      r.referencia?.toLowerCase().includes(q) ||
-      r.numero_certificado?.toLowerCase().includes(q)
+      r.poliza?.cliente?.nombre?.toLowerCase().includes(q) ||
+      reciboConcepto(r).toLowerCase().includes(q) ||
+      r.numero_certificado?.toLowerCase().includes(q) ||
+      r.poliza?.numero_poliza?.toLowerCase().includes(q)
     const matchForma = filterForma === 'all' || r.forma_pago === filterForma
-    const matchFrom  = !dateFrom || r.fecha_pago >= dateFrom
-    const matchTo    = !dateTo   || r.fecha_pago <= dateTo
+    const matchFrom  = !dateFrom || (r.fecha ?? '') >= dateFrom
+    const matchTo    = !dateTo   || (r.fecha ?? '') <= dateTo
     return matchSearch && matchForma && matchFrom && matchTo
   })
 
-  const totalFiltrado = filtered.reduce((s, r) => s + r.valor, 0)
+  const totalFiltrado = filtered.reduce((s, r) => s + (r.valor_recaudado ?? 0), 0)
   const grouped       = groupByDate(filtered)
 
   const tabCounts = RECIBO_TABS.reduce((acc, t) => {
-    acc[t.key] = t.key === 'cuadre' ? recibos.length : recibos.filter(r => r.tipo === t.key).length
+    acc[t.key] = recibos.filter(r => matchTab(r, t.key)).length
     return acc
   }, {} as Record<RecibosTab, number>)
 
@@ -119,7 +128,7 @@ export default function CajaView() {
         <div>
           <h1 className="text-2xl font-bold text-ink-700">Caja</h1>
           <p className="text-ink-400 text-sm mt-1">
-            {recibos.length} recibos · Total: {formatCOP(recibos.reduce((s, r) => s + r.valor, 0))}
+            {recibos.length} recibos · Total: {formatCOP(recibos.reduce((s, r) => s + (r.valor_recaudado ?? 0), 0))}
           </p>
         </div>
         <button onClick={() => { setEditing(undefined); setShowModal(true) }}
@@ -183,41 +192,37 @@ export default function CajaView() {
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium">Cliente</th>
                 <th className="px-4 py-3 font-medium">Concepto</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">N° Recibo</th>
-                {activeTab === 'certificado' && (
-                  <th className="px-4 py-3 font-medium hidden md:table-cell">N° Certificado</th>
-                )}
-                <th className="px-4 py-3 font-medium">Valor</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Póliza</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">N° Certificado</th>
+                <th className="px-4 py-3 font-medium">Recaudado</th>
                 <th className="px-4 py-3 font-medium hidden sm:table-cell">Forma</th>
-                <th className="px-4 py-3 font-medium hidden lg:table-cell">Referencia</th>
                 <th className="px-4 py-3 font-medium text-right">Acciones</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(r => {
-                const FormaIcon = FORMA_ICONS[r.forma_pago]
+                const FormaIcon = r.forma_pago ? FORMA_ICONS[r.forma_pago] : null
                 return (
                   <tr key={r.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${r.tipo === 'anulado' ? 'opacity-60' : ''}`}>
-                    <td className="px-4 py-3 text-ink-400 text-xs whitespace-nowrap">{formatDate(r.fecha_pago)}</td>
+                    <td className="px-4 py-3 text-ink-400 text-xs whitespace-nowrap">{r.fecha ? formatDate(r.fecha) : '—'}</td>
                     <td className="px-4 py-3">
-                      {r.client_id
-                        ? <Link href={`/clientes/${r.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{r.cliente?.nombre || '—'}</Link>
+                      {r.poliza?.client_id
+                        ? <Link href={`/clientes/${r.poliza.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{r.poliza.cliente?.nombre || '—'}</Link>
                         : <span className="text-ink-400">—</span>}
                     </td>
                     <td className="px-4 py-3 text-ink-600 max-w-[180px]">
-                      <span className="line-clamp-1">{r.concepto}</span>
+                      <span className="line-clamp-1">{reciboConcepto(r)}</span>
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{r.numero_recibo || '—'}</td>
-                    {activeTab === 'certificado' && (
-                      <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{r.numero_certificado || '—'}</td>
-                    )}
-                    <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(r.valor)}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{r.poliza?.numero_poliza || '—'}</td>
+                    <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">{r.numero_certificado || '—'}</td>
+                    <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(r.valor_recaudado ?? 0)}</td>
                     <td className="px-4 py-3 hidden sm:table-cell">
-                      <span className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-xs font-medium ${FORMA_COLORS[r.forma_pago]}`}>
-                        <FormaIcon className="w-3 h-3" />{FORMA_LABELS[r.forma_pago]}
-                      </span>
+                      {r.forma_pago && FormaIcon ? (
+                        <span className={`flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-xs font-medium ${FORMA_COLORS[r.forma_pago]}`}>
+                          <FormaIcon className="w-3 h-3" />{FORMA_LABELS[r.forma_pago]}
+                        </span>
+                      ) : <span className="text-ink-400 text-xs">—</span>}
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-ink-400 text-xs">{r.referencia || r.banco || '—'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-2">
                         <button onClick={() => { setEditing(r); setShowModal(true) }} className="text-ink-400 hover:text-ink-600 transition-colors"><Pencil className="w-4 h-4" /></button>
@@ -246,7 +251,7 @@ export default function CajaView() {
             <h2 className="text-sm font-semibold text-ink-600 mb-3">Resumen por forma de pago</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
               {(Object.keys(FORMA_LABELS) as FormaPago[]).map(f => {
-                const total = filtered.filter(r => r.forma_pago === f).reduce((s, r) => s + r.valor, 0)
+                const total = filtered.filter(r => r.forma_pago === f).reduce((s, r) => s + (r.valor_recaudado ?? 0), 0)
                 const count = filtered.filter(r => r.forma_pago === f).length
                 const Icon  = FORMA_ICONS[f]
                 return (
@@ -280,7 +285,7 @@ export default function CajaView() {
                   <p className="text-sm">Sin movimientos en el período</p>
                 </div>
               ) : grouped.map(([date, items]) => {
-                const dayTotal = items.reduce((s, r) => s + r.valor, 0)
+                const dayTotal = items.reduce((s, r) => s + (r.valor_recaudado ?? 0), 0)
                 return (
                   <div key={date} className="bg-white border border-ink-200 rounded-xl overflow-hidden">
                     <div className="flex items-center justify-between px-4 py-2.5 bg-cream-100 border-b border-cream-200">
@@ -289,17 +294,17 @@ export default function CajaView() {
                     </div>
                     <div className="divide-y divide-cream-100">
                       {items.map(r => {
-                        const Icon = FORMA_ICONS[r.forma_pago]
+                        const Icon = r.forma_pago ? FORMA_ICONS[r.forma_pago] : Receipt
                         return (
                           <div key={r.id} className="flex items-center justify-between px-4 py-2.5 text-sm">
                             <div className="flex items-center gap-2 min-w-0">
                               <Icon className="w-3.5 h-3.5 text-ink-400 flex-shrink-0" />
-                              <span className="text-ink-600 truncate">{r.concepto}</span>
-                              {r.cliente && (
-                                <span className="text-ink-400 text-xs hidden md:inline">· {r.cliente.nombre}</span>
+                              <span className="text-ink-600 truncate">{reciboConcepto(r)}</span>
+                              {r.poliza?.cliente && (
+                                <span className="text-ink-400 text-xs hidden md:inline">· {r.poliza.cliente.nombre}</span>
                               )}
                             </div>
-                            <span className="font-medium text-ink-700 flex-shrink-0 ml-4">{formatCOP(r.valor)}</span>
+                            <span className="font-medium text-ink-700 flex-shrink-0 ml-4">{formatCOP(r.valor_recaudado ?? 0)}</span>
                           </div>
                         )
                       })}
@@ -313,7 +318,8 @@ export default function CajaView() {
       )}
 
       {showModal && (
-        <ReciboModal recibo={editing} activeTab={activeTab !== 'cuadre' ? activeTab : 'activo'}
+        <ReciboModal recibo={editing}
+          activeTab={activeTab === 'cuadre' || activeTab === 'certificados' ? 'activo' : activeTab}
           onClose={() => setShowModal(false)}
           onSaved={() => { setShowModal(false); load() }} />
       )}

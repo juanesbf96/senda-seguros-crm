@@ -353,7 +353,9 @@ export interface Solicitud {
 export type EstadoCobro = 'pendiente' | 'pagado' | 'vencido' | 'anulado'
 export type TipoCobro = 'por_cobrar' | 'por_pagar' | 'comision_por_cobrar' | 'comision_recibida'
 export type FormaPago = 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'consignacion'
-export type TipoRecibo = 'anticipo' | 'activo' | 'pago_directo' | 'anulado' | 'certificado'
+// CHECK real de recibos.tipo — 'certificado' NO es un tipo válido:
+// los certificados son recibos con numero_certificado diligenciado.
+export type TipoRecibo = 'anticipo' | 'activo' | 'pago_directo' | 'anulado'
 
 // Estado de pago DERIVADO (no es columna): se calcula de saldo_pendiente + compromiso_pago.
 export type EstadoPagoCobro = 'pendiente' | 'vencido' | 'pagado'
@@ -404,23 +406,24 @@ export function estadoPagoCobro(c: Pick<Cobro, 'saldo_pendiente' | 'compromiso_p
 
 export interface Recibo {
   id: string
-  client_id: string | null
   cobro_id: string | null
   poliza_id: string | null
-  numero_recibo: string | null
-  numero_certificado: string | null
-  concepto: string
-  valor: number
-  fecha_pago: string
-  forma_pago: FormaPago
   tipo: TipoRecibo
-  banco: string | null
-  referencia: string | null
-  notas: string | null
+  valor_recaudado: number | null
+  fecha: string | null
+  forma_pago: FormaPago | null
+  usuario: string | null
+  observacion: string | null
+  numero_certificado: string | null
+  anulado_por: string | null
+  fecha_anulacion: string | null
   created_at: string
-  cliente?: Pick<Cliente, 'id' | 'nombre'>
   cobro?: Pick<Cobro, 'id' | 'numero_cobro' | 'ramo' | 'prima_total' | 'saldo_pendiente'>
-  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+  // El cliente de un recibo se resuelve por la póliza (recibos no tiene client_id).
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'> & {
+    client_id?: string
+    cliente?: Pick<Cliente, 'id' | 'nombre'>
+  }
 }
 
 // ── S7: Siniestros / Facturas / Diligencias ──────────────────────────────────
