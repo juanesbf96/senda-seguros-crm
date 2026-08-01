@@ -356,6 +356,27 @@ export interface GestionRenovacion {
   fecha: string
 }
 
+// ─── Operaciones de Producción (fase 3) ───────────────────────────────────────
+export type TipoOperacion  = 'renovacion' | 'cobro' | 'cancelacion' | 'modificacion' | 'expedicion'
+export type EstadoCartera   = 'pendiente' | 'pagada' | 'anulada'
+
+export interface Operacion {
+  id: string
+  workspace_id: string
+  poliza_id: string
+  tipo: TipoOperacion
+  numero_cuota: number | null
+  estado_cartera: EstadoCartera
+  valor: number | null
+  fecha_programada: string | null
+  fecha_pago: string | null
+  responsable_id: string | null
+  origen: string | null
+  notas: string | null
+  created_at: string
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'> & { cliente?: Pick<Cliente, 'id' | 'nombre'> }
+}
+
 export type EstadoRemision = 'borrador' | 'enviada' | 'recibida' | 'aprobada' | 'rechazada' | 'anulada'
 
 export interface Remision {
