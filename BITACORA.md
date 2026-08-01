@@ -19,10 +19,11 @@
 | — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
-| 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
-| 3.x | Operaciones de Producción | ⬜ Pendiente |
+| 2.x | Paridad de modelo de datos (referencia externa) | 🔵 En curso — Carril B (Santiago, `feat/modelo-polizas-v2`): schema v2 hecho (coberturas, certificados, técnico) |
+| 3.x | Operaciones de Producción | 🟡 Backbone hecho — PR #28 mergeado y desplegado (tabla `operaciones` + generador de cuotas + vista `/operaciones`). Timeline en PolizaDetalle diferido (coordinar con fase 2) |
 | 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
-| 5.x | WhatsApp | ⬜ Pendiente |
+| 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
+| 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
 
 ### Fase 0.2 — Supabase CLI + staging (rama `infra/supabase-cli-staging`)
 
@@ -102,6 +103,25 @@ El dashboard ya mostraba un delta mes-a-mes, pero comparaba el mes **parcial** e
 - **Dashboard:** los deltas de pólizas y prima usan la comparación justa; se agrega delta a la **comisión** emitida en el mes (antes sin comparación); y caption **"Mes pasado: $X · Año pasado: $Y"** bajo cada KPI de producción.
 - No toca `get_dashboard_metrics` (hot, 170 líneas) — la comparación va en un RPC **separado y aditivo**. Si la RPC no está, el dashboard degrada solo (no muestra deltas falsos).
 - **Probada en Postgres local y en staging** (ventana justa excluye lo que cae fuera del mismo avance; filtro por vendedor aísla la vista de agente). RPC aplicada en prod (SQL Editor, 1-ago). tsc/build/19 tests OK.
+
+### Fase 5.1 — WhatsApp ligero: recordatorio de pago (rama `feat/whatsapp-ligero-cobros`, PR #27) ✅ mergeado y desplegado
+
+Botón de WhatsApp en cada cobro `por_cobrar` no pagado (con teléfono del cliente) → abre `wa.me` con una plantilla de recordatorio.
+
+- **`lib/whatsapp.ts`** (helper compartido): `normalizarTelefono` (antepone indicativo Colombia 57), `whatsappLink` (mensaje url-encoded), `plantillaRecordatorioPago` (tono distinto vencido vs próximo, firma de la agencia). 10 tests.
+- **CobrosList**: `telefono` en el join de cliente; botón en la fila. Tipos: `telefono` en los picks de cliente de `Cobro`.
+- **Acotada a Cobros (Carril A).** El plan (5.1) también pone botones en `PolizaDetalle`/`ClienteDetalle`, pero esos son archivos de fase 2 (Santiago) → diferidos para no colisionar. El helper queda listo para reutilizar ahí.
+- Sin migración. tsc/build OK, 29 tests (19 previos + 10 nuevos).
+
+### Fase 3 — Operaciones de Producción: backbone (rama `feat/operaciones-produccion`, PR #28) ✅ mergeado y desplegado
+
+Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovación / cancelación / modificación / expedición), cada uno con **estado de cartera**. Convive con los Cobros actuales; no se migran datos históricos.
+
+- **Migración:** tabla `operaciones` + RLS (espejo de `cobros`: `finanzas_cobros_ver` / `_registrar` / admin) + índices por `(workspace, poliza)` y `(workspace, estado_cartera, fecha_programada)`.
+- **Generador `generar_operaciones_cuotas(p_poliza_id)`** (SECURITY DEFINER): crea las N cuotas `cobro` con fechas por periodicidad (mensual→anual), leyendo la financiación desde la propia póliza (`num_cuotas`, `prima_periodica`/`prima_mensual`, `periodicidad_pago`, `fecha_inicio`). Anti-duplicado + chequeo de permiso.
+- **Vista `/operaciones`** (sidebar → Finanzas): lista con filtros por tipo/estado y resumen de cartera pendiente/pagada. Tipos `Operacion` / `TipoOperacion` / `EstadoCartera`.
+- **Probada en staging:** 4 cuotas trimestrales con fechas correctas (ene/abr/jul/oct), anti-duplicado y bloqueo de usuario ajeno OK. Migración aplicada en prod (SQL Editor, 1-ago). tsc/build/29 tests OK.
+- **DIFERIDO (coordinar con fase 2 de Santiago):** timeline de operaciones dentro de `PolizaDetalle`, enganche del generador con la UI de financiación, y creación de operaciones `renovacion` (cron) y `cancelacion` (fase 1.1). Todo eso toca `PolizaDetalle`/`PolizaModal` (sus archivos).
 
 > **Flujo de trabajo en paralelo (1-ago).** Carril A (finanzas/cartera: `cobros/`, `caja/`, `Dashboard.tsx`, `informes/`) cerró fase 1. Carril B (Santiago, rama `feat/modelo-polizas-v2`: `polizas/`, `clientes/`, tablas nuevas) arrancó fase 2.x. Regla para no chocar: **un dueño por archivo**; único compartido `types/index.ts` (adiciones, conflicto trivial). Toda migración: crear → probar en staging → aplicar en prod **antes** del deploy que la consume.
 
@@ -638,4 +658,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 1 de agosto de 2026. Fase 1 (retención y cartera) cerrada y desplegada en producción (PRs #22, #23, #24). Carril B (fase 2.x) en curso por Santiago.*
+*Última actualización: 1 de agosto de 2026. Fase 1 cerrada (PRs #22-24). WhatsApp ligero 5.1 (#27) y backbone de fase 3 Operaciones (#28) desplegados. Carril B (fase 2.x) en curso por Santiago.*
