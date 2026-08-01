@@ -19,6 +19,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ExcelRow, ImportResult } from './types'
 import { comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor, redondear2 } from '@/lib/comisiones'
+import { normalizarNumeroPoliza, mapaPorNumeroNormalizado } from '@/lib/polizas/numeroPoliza'
 
 const LOTE_INSERT = 500
 const LOTE_IN     = 200   // tamaño de chunk para filtros .in() (límite de URL)
@@ -179,6 +180,45 @@ export async function importarPolizas(
       .in('numero_poliza', lote)
     for (const p of data ?? []) {
       if (p.numero_poliza) polizaIdPorNumero.set(p.numero_poliza, p.id)
+    }
+  }
+
+  // ── 4b. Fallback por número NORMALIZADO (fase 2.5) ────────────────
+  // El Excel y la BD pueden traer el mismo número con distinto formato (ceros
+  // a la izquierda). Sin esto se crearían pólizas DUPLICADAS en vez de
+  // actualizar la existente. El match exacto de arriba siempre tiene prioridad.
+  //
+  // Conservador a propósito: si un número normalizado apunta a más de una
+  // póliza, NO se usa (se deja que la fila se inserte). Actualizar la póliza
+  // equivocada es peor que crear un duplicado, y este import ya corrompió
+  // producción antes.
+  const faltantes = numerosPoliza.filter(n => !polizaIdPorNumero.has(n!)) as string[]
+  if (faltantes.length > 0) {
+    const clavesNorm = [...new Set(
+      faltantes.map(normalizarNumeroPoliza).filter((v): v is string => v !== null)
+    )]
+    for (const lote of chunks(clavesNorm, LOTE_IN)) {
+      const { data } = await supabase
+        .from('polizas')
+        .select('id, numero_poliza_recortado')
+        .eq('workspace_id', wsId)
+        .in('numero_poliza_recortado', lote)
+
+      const { mapa, ambiguos } = mapaPorNumeroNormalizado(
+        (data ?? []) as { id: string; numero_poliza_recortado: string | null }[]
+      )
+      for (const clave of ambiguos) {
+        result.errores.push(
+          `Número "${clave}" (normalizado) coincide con varias pólizas: se omite el match automático para no actualizar la equivocada.`
+        )
+      }
+      // Se indexa por el número ORIGINAL del Excel para que el lookup de más
+      // abajo (por r.numero_poliza) funcione sin cambios.
+      for (const original of faltantes) {
+        const clave = normalizarNumeroPoliza(original)
+        const id    = clave ? mapa.get(clave) : undefined
+        if (id) polizaIdPorNumero.set(original, id)
+      }
     }
   }
 
