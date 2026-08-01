@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import type { ColillaLineaRaw } from './parsers/types'
+import { normalizarNumeroPoliza, mapaPorNumeroNormalizado } from '@/lib/polizas/numeroPoliza'
 
 export interface PolizaSugerida {
   id:             string
@@ -49,6 +50,44 @@ export async function reconciliarLineas(
       estado_conciliacion: polizaId ? ('conciliada' as const) : ('no_encontrada' as const),
     }
   })
+
+  // ── Paso 1b: match por número NORMALIZADO (fase 2.5) ───────────────
+  // Las aseguradoras escriben el mismo número con distinto formato: la colilla
+  // de AXA trae '000000108969' y la BD guarda '108969'. Se compara contra la
+  // columna generada `numero_poliza_recortado`. Es un FALLBACK: el match exacto
+  // del paso 1 siempre gana, y solo se aceptan normalizados no ambiguos.
+  const pendientesNorm = reconciled
+    .map((l, i) => ({ l, i }))
+    .filter(({ l }) => l.estado_conciliacion === 'no_encontrada' && !l.requiere_mapeo_manual)
+
+  if (pendientesNorm.length > 0) {
+    const clavesNorm = [...new Set(
+      pendientesNorm
+        .map(({ l }) => normalizarNumeroPoliza(l.numero_poliza_raw))
+        .filter((v): v is string => v !== null)
+    )]
+
+    if (clavesNorm.length > 0) {
+      const { data: porNorm } = await supabase
+        .from('polizas')
+        .select('id, numero_poliza_recortado')
+        .eq('workspace_id', workspaceId)
+        .in('numero_poliza_recortado', clavesNorm)
+
+      const { mapa: mapaNorm } = mapaPorNumeroNormalizado(
+        (porNorm ?? []) as { id: string; numero_poliza_recortado: string | null }[]
+      )
+
+      for (const { l, i } of pendientesNorm) {
+        const clave = normalizarNumeroPoliza(l.numero_poliza_raw)
+        const id    = clave ? mapaNorm.get(clave) : undefined
+        if (!id) continue
+        // Un número igual salvo formato es la misma póliza: se marca conciliada,
+        // no 'probable' (que exigiría confirmación manual innecesaria).
+        reconciled[i] = { ...l, poliza_id: id, estado_conciliacion: 'conciliada' as const }
+      }
+    }
+  }
 
   // ── Paso 2: match probable por nombre del tomador ──────────────────
   const sinMatch = reconciled.filter(l => l.estado_conciliacion === 'no_encontrada' && l.nombre_tomador)
