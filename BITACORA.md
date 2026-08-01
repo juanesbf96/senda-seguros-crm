@@ -109,7 +109,9 @@ El dashboard ya mostraba un delta mes-a-mes, pero comparaba el mes **parcial** e
 > `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → `fix/finanzas-schema-drift` (última, contiene todo).
 > Mergear **en ese orden** (o mergear solo la última). Cada migración nueva ya está aplicada en staging; al mergear hay que aplicarlas en **producción** (Dashboard → SQL Editor, o `supabase db push` con link a prod).
 >
-> **Migraciones pendientes de aplicar en prod (3):** `trazabilidad_origen_cronologia`, `motivos_cancelacion_no_renovacion`, `registrar_pago_cobro`. Las tres probadas en staging.
+> ~~**Migraciones pendientes de aplicar en prod (3):** `trazabilidad_origen_cronologia`, `motivos_cancelacion_no_renovacion`, `registrar_pago_cobro`.~~
+> **✅ Ya aplicadas en producción** (verificado 01-ago contra la API REST de prod): existen `polizas.origen_creacion`, `registro_cambios`, `polizas.motivo_cancelacion`, `gestiones_renovacion.motivo_no_renovacion` y responden las RPCs `get_cancelaciones_por_motivo`, `get_renovaciones_resumen` y `registrar_pago_cobro`. No re-aplicar.
+> _(Ojo al verificar: llamar una RPC sin sus parámetros devuelve 404 por desajuste de firma, no porque falte la función.)_
 >
 > **Recomendación (23-jul):** mergear y desplegar YA — `fix/finanzas-schema-drift` arregla dos módulos caídos en producción (Cobros en ceros, Caja sin cargar). Con 4 ramas apiladas y otro sistema commiteando en paralelo, cada rama nueva aumenta el riesgo de conflicto. Fase 1.2 (aging) queda desbloqueada pero conviene arrancarla sobre `main` limpio.
 
