@@ -75,6 +75,8 @@ export interface Poliza {
   client_id: string
   origen_creacion: OrigenCreacion | null
   numero_poliza: string | null
+  /** Derivada en BD (columna generada) desde numero_poliza: sin separadores ni ceros a la izquierda. Solo lectura. */
+  numero_poliza_recortado: string | null
   aseguradora: string
   ramo: string
   prima: number | null
@@ -110,9 +112,18 @@ export interface Poliza {
   comision_agencia: number | null
   total_prima: number | null
   vendedor_id: string | null
+  /** Usuario que GESTIONA la póliza (técnico) — distinto de vendedor_id, que la vendió. */
+  tecnico_id: string | null
   porcentaje_comision_vendedor: number | null
   retencion_vendedor: number | null
   comision_vendedor: number | null
+  // ── Campos financieros finos (Fase 2.5) ──
+  pct_sobrecomision: number | null
+  pct_retorno: number | null
+  gastos_expedicion: number | null
+  /** Si la carátula discrimina IVA. null = desconocido (filas históricas). */
+  iva_caratula: boolean | null
+  tasa_runt: number | null
   periodicidad_pago: string | null
   forma_pago: string | null
   medio_pago: string | null
@@ -201,6 +212,40 @@ export interface PolizaPlan {
   nombre: string
   valor_cobertura: number | null
   prima_plan: number | null         // calculada: SUM(prima_individual activos)
+  created_at: string
+  updated_at: string
+}
+
+/** Amparo/cobertura de una póliza (Fase 2.3). El extractor PDF la poblará en fase 4. */
+export interface Cobertura {
+  id: string
+  workspace_id: string
+  poliza_id: string
+  nombre: string
+  valor_asegurado: number | null
+  deducible: number | null
+  valor_prima: number | null
+  valor_extraprima: number | null
+  orden: number
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EstadoCertificado = 'activo' | 'vencido' | 'cancelado'
+
+/** Certificado de una póliza de cumplimiento/colectiva (Fase 2.4). */
+export interface Certificado {
+  id: string
+  workspace_id: string
+  poliza_id: string
+  numero: string | null
+  fecha_inicio: string | null
+  fecha_fin: string | null
+  valor: number | null
+  estado: EstadoCertificado
+  notas: string | null
+  created_by: string | null
   created_at: string
   updated_at: string
 }
