@@ -19,7 +19,7 @@
 | — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
-| 2.x | Paridad de modelo de datos (referencia externa) | 🔵 En curso — Carril B (Santiago, `feat/modelo-polizas-v2`): schema v2 hecho (coberturas, certificados, técnico) |
+| 2.x | Paridad de modelo de datos (referencia externa) | 🔵 5 de 6 ítems — schema (#25) y matching (#29) mergeados y aplicados en prod; **UI #31 ABIERTO**. Falta 2.6 (PR-09) y la alerta de certificados en el cron (bloqueador documentado) |
 | 3.x | Operaciones de Producción | 🟡 Backbone hecho — PR #28 mergeado y desplegado (tabla `operaciones` + generador de cuotas + vista `/operaciones`). Timeline en PolizaDetalle diferido (coordinar con fase 2) |
 | 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
@@ -122,6 +122,74 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 - **Vista `/operaciones`** (sidebar → Finanzas): lista con filtros por tipo/estado y resumen de cartera pendiente/pagada. Tipos `Operacion` / `TipoOperacion` / `EstadoCartera`.
 - **Probada en staging:** 4 cuotas trimestrales con fechas correctas (ene/abr/jul/oct), anti-duplicado y bloqueo de usuario ajeno OK. Migración aplicada en prod (SQL Editor, 1-ago). tsc/build/29 tests OK.
 - **DIFERIDO (coordinar con fase 2 de Santiago):** timeline de operaciones dentro de `PolizaDetalle`, enganche del generador con la UI de financiación, y creación de operaciones `renovacion` (cron) y `cancelacion` (fase 1.1). Todo eso toca `PolizaDetalle`/`PolizaModal` (sus archivos).
+
+### Fase 2 — Paridad de modelo de datos (Carril B) — 1-ago
+
+**Estado: 5 de 6 ítems cerrados.** PR #25 y #29 mergeados y aplicados en prod; **PR #31 abierto, pendiente de review/merge**.
+
+| Ítem | Estado |
+|------|--------|
+| 2.1 Técnico asignado | ✅ schema (#25) + UI (#31) |
+| 2.2 Tomador vs Asegurados | ✅ UI (#31) — no necesitó schema |
+| 2.3 Coberturas | ✅ schema (#25) + UI (#31) |
+| 2.4 Certificados | ✅ schema (#25) + UI (#31) · ⬜ **alerta en cron — ver bloqueador abajo** |
+| 2.5 Matching por número normalizado | ✅ schema (#25) + uso real (#29) |
+| 2.6 Catálogo ramos-aseguradora | ⬜ **pendiente (PR-09)** |
+
+#### PR #25 — schema v2 ✅ mergeado · migración aplicada en staging **y producción**
+
+`20260801163626_modelo_polizas_v2.sql`: `polizas.tecnico_id`, tablas `coberturas` y `certificados` (RLS: lectura = miembro del workspace; escritura = `has_permission('polizas_editar')`, porque una cobertura es parte de la póliza), campos financieros finos (`pct_sobrecomision`, `pct_retorno`, `gastos_expedicion`, `iva_caratula`, `tasa_runt`) y `numero_poliza_recortado`.
+
+**Dos desviaciones del plan, deliberadas:**
+1. `tecnico_id` referencia `auth.users`, **no** `workspace_members` como decía el plan — es la convención del schema (`clientes.assigned_to`, `polizas.created_by`), y así la póliza no pierde el técnico si cambia la membresía.
+2. `numero_poliza_recortado` es **columna GENERADA**, no trigger: no se puede desincronizar ni saltar con un `UPDATE` directo (verificado: Postgres rechaza escribirla a mano).
+
+**El supuesto del plan sobre el matching estaba equivocado.** El plan hablaba de "número sin prefijos de sucursal"; revisando 400 números reales de producción, **cero** traen guiones/slashes/espacios. La falla real son los **ceros a la izquierda** (colilla AXA `000000108969` vs BD `108969`). Regla implementada: mayúsculas → quitar no-alfanuméricos → quitar ceros a la izquierda. Verificado sobre 1.000 pólizas de prod: **0 colisiones**, por eso el índice no es único (dos aseguradoras pueden repetir número).
+
+#### PR #29 — matching normalizado en colillas e import ✅ mergeado (sin migración)
+
+La columna del #25 **no la usaba nadie**: conciliación e import seguían haciendo match exacto. Esta es la segunda mitad de 2.5, sin la cual la columna no servía de nada.
+
+**Impacto medido con las colillas reales contra las 1.000 pólizas de prod:** 18 de 85 líneas (21%) caían en "sin match" solo por formato. Verificado end-to-end después del cambio: **SURA VIDA 1 → 16 conciliadas, QUÁLITAS 0 → 2, AXA 0 → 1**.
+
+- `lib/polizas/numeroPoliza.ts` — helper que replica la función SQL. **⚠️ Si alguien cambia una de las dos implementaciones sin la otra, el matching falla en silencio** (el TS normalizaría distinto a la columna generada y nada coincidiría). Hay un test con la misma tabla de casos que el SQL; además se verificaron 6 casos contra la función real de prod.
+- Es **fallback**: el match exacto siempre gana. Un número igual salvo formato se marca `conciliada` (no `probable`, que exigiría confirmación manual y anularía el beneficio).
+- **En el import es conservador a propósito:** si un número normalizado apunta a varias pólizas NO se usa el match y la fila se inserta. Actualizar la póliza equivocada es peor que duplicar — este import ya corrompió producción dos veces. La ambigüedad se reporta en los errores del resultado.
+
+#### PR #31 — UI 🔵 **ABIERTO, pendiente de review/merge** (no requiere migración)
+
+`SubTablaPoliza` (tabla editable inline reutilizable: coberturas y certificados son el mismo widget con distintas columnas), secciones de Coberturas y Certificados en `PolizaDetalle`, selector de técnico en `PolizaModal`, y **2.2: se quita el gate `es_colectiva`** para que cualquier póliza pueda tener N asegurados.
+
+> **🐛 BUG DE CORRUPCIÓN EVITADO — leer antes de tocar `components/afiliados/`.**
+> `AfiliadosTab` y `AfiliadoModal` recalculan `polizas.prima` como **la suma de los afiliados**. Es correcto en una colectiva (su prima *es* esa suma), pero al des-restringir asegurados a pólizas individuales habría **sobrescrito la prima real con 0** en cuanto alguien agregara un asegurado.
+> Se agregó la prop `recalcularPrima` (default `true`, así colectivas y modo-cliente no cambian en absoluto) y `PolizaDetalle` pasa `recalcularPrima={!!poliza.es_colectiva}`.
+
+#### ⚠️ Bloqueador documentado: alerta de vencimiento de certificados en el cron (parte de 2.4)
+
+No se implementó **a propósito**. El log de dedup `notificaciones_renovacion` tiene clave `(poliza_id, dias_alerta)` y **no tiene dónde registrar el certificado**, así que alertar por certificado exige **migrar esa tabla** — no es un cambio de UI, y meterlo a medias en una ruta que manda correos arriesga duplicados. Necesita su propio PR con validación en staging.
+**Urgencia hoy: nula** — hay **0 certificados en producción** (`content-range: */0`).
+
+#### ✅ Verificaciones ya hechas (no repetir)
+
+- Migración #25 aplicada y verificada **en producción** contra la API REST: columnas y tablas existen, `numero_poliza_recortado` se autocompletó en las pólizas existentes, **0 colisiones** en 1.000 filas reales.
+- Función `normalizar_numero_poliza` en prod: `000000108969` → `108969` ✅. TS vs SQL: 6/6 casos idénticos.
+- Columna generada: se autocompleta, se recalcula en `UPDATE` y **rechaza escritura manual** (probado en Postgres local).
+- Ningún `insert/update` de pólizas hace spread del objeto completo, así que la columna generada no rompe escrituras existentes (revisado en `PolizaModal`, `importarPolizas`, afiliados, colillas).
+- `tsc`, 42 tests y `build` limpios.
+
+#### ⬜ Verificaciones PENDIENTES (no se pudieron hacer: la app pide sesión y esa máquina no tenía credenciales)
+
+Al revisar el **PR #31** en el navegador, comprobar:
+1. Agregar/editar/eliminar una **cobertura** y un **certificado**; que los totales por columna cuadren.
+2. **Crítico:** agregar un asegurado a una póliza **individual** → su `prima` **NO** debe cambiar.
+3. **Crítico:** en una póliza **colectiva**, agregar/inactivar un afiliado → la prima **sí** se sigue recalculando como antes (que no haya regresión).
+4. Un usuario **sin** `polizas_editar` no ve los botones de editar/eliminar en coberturas/certificados (y si intenta, RLS lo rechaza).
+5. El selector de **técnico** lista los miembros del workspace y el nombre se muestra en `PolizaDetalle`.
+
+#### ⬜ Siguiente paso del carril: **PR-09 (2.6)**
+
+Tabla `ramos_aseguradora(workspace_id, aseguradora, ramo, pct_comision_default, activo)` + tab Comisiones en Configuración; el import y `PolizaModal` leerían de ahí el % por defecto. **Dato útil ya verificado:** el JSON `comisiones_tarifas` en `configuracion` está **vacío** en producción → la tabla arranca limpia, sin migración de datos.
+**Coordinación:** PR-09 toca `ConfiguracionView.tsx`; si Carril A hace 4.3 (card "Motor de IA", mismo archivo), definir orden de merge.
 
 > **Flujo de trabajo en paralelo (1-ago).** Carril A (finanzas/cartera: `cobros/`, `caja/`, `Dashboard.tsx`, `informes/`) cerró fase 1. Carril B (Santiago, rama `feat/modelo-polizas-v2`: `polizas/`, `clientes/`, tablas nuevas) arrancó fase 2.x. Regla para no chocar: **un dueño por archivo**; único compartido `types/index.ts` (adiciones, conflicto trivial). Toda migración: crear → probar en staging → aplicar en prod **antes** del deploy que la consume.
 
