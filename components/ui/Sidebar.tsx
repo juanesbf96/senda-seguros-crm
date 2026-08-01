@@ -8,7 +8,7 @@ import {
   LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
   BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
-  Target, Bot, Settings, Building2, Check, ChevronsUpDown, FileDown,
+  Target, Bot, Settings, Building2, Check, ChevronsUpDown, FileDown, PiggyBank,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -46,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Finanzas',
     items: [
       { href: '/cobros',        label: 'Cobros',        icon: DollarSign,  perm: 'finanzas_cobros_ver' },
+      { href: '/cartera',       label: 'Cartera',       icon: PiggyBank,   perm: 'finanzas_cobros_ver' },
       { href: '/caja',          label: 'Caja',          icon: Receipt,     perm: ['finanzas_caja_ver_propias', 'finanzas_caja_ver_todas'] },
       { href: '/liquidaciones', label: 'Liquidaciones', icon: Calculator,  perm: 'finanzas_liquidaciones_ver' },
       { href: '/colillas',      label: 'Colillas',      icon: FileDown },
