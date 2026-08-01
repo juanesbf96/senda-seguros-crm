@@ -18,6 +18,9 @@ interface Props {
   clienteId?: string
   clienteTipo: TipoCliente
   workspaceId: string
+  /** Recalcular la prima de la póliza como suma de afiliados. Solo colectivas: en
+   *  una póliza individual sobrescribiría la prima real (ver recalcularPrimaPoliza). */
+  recalcularPrima?: boolean
 }
 
 type AfiliadoConPoliza = PolizaAfiliado & {
@@ -54,7 +57,7 @@ async function recalcularPrimaPoliza(polizaId: string) {
   }
 }
 
-export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspaceId }: Props) {
+export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspaceId, recalcularPrima = true }: Props) {
   const { can } = usePermissions()
   const [afiliados, setAfiliados]       = useState<AfiliadoConPoliza[]>([])
   const [loading, setLoading]           = useState(true)
@@ -151,7 +154,7 @@ export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspace
 
     // Recalcular primas de cada póliza afectada
     const polizaIds = [...new Set(visibles.filter(a => selected.has(a.id)).map(a => a.poliza_id))]
-    await Promise.all(polizaIds.map(pid => recalcularPrimaPoliza(pid)))
+    if (recalcularPrima) await Promise.all(polizaIds.map(pid => recalcularPrimaPoliza(pid)))
 
     setSelected(new Set())
     setInactivando(false)
@@ -163,7 +166,7 @@ export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspace
       .from('poliza_afiliados')
       .update({ activo: true, fecha_retiro: null })
       .eq('id', afil.id)
-    await recalcularPrimaPoliza(afil.poliza_id)
+    if (recalcularPrima) await recalcularPrimaPoliza(afil.poliza_id)
     load()
   }
 
@@ -173,7 +176,7 @@ export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspace
       .from('poliza_afiliados')
       .update({ activo: false, fecha_retiro: hoy })
       .eq('id', afil.id)
-    await recalcularPrimaPoliza(afil.poliza_id)
+    if (recalcularPrima) await recalcularPrimaPoliza(afil.poliza_id)
     load()
   }
 
@@ -427,6 +430,7 @@ export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspace
           clienteTipo={clienteTipo}
           workspaceId={workspaceId}
           afiliado={editando}
+          recalcularPrima={recalcularPrima}
           onClose={() => { setModalOpen(false); setEditando(null) }}
           onSaved={() => { setModalOpen(false); setEditando(null); load() }}
         />

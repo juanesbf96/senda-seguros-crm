@@ -34,12 +34,23 @@ interface Props {
   clienteTipo: TipoCliente
   workspaceId: string
   afiliado?: PolizaAfiliado | null
+  /** Recalcular la prima de la póliza con la suma de afiliados. Solo colectivas (ver recalcularPrimas). */
+  recalcularPrima?: boolean
   onClose: () => void
   onSaved: () => void
 }
 
 /* ── Helpers ── */
 
+/**
+ * Recalcula la prima del plan y la de la póliza a partir de los afiliados.
+ *
+ * ⚠️ Solo tiene sentido en pólizas COLECTIVAS, donde la prima ES la suma de sus
+ * afiliados. En una póliza individual sobrescribiría la prima real con la suma
+ * de sus asegurados (que normalmente es 0) — por eso el caller decide con
+ * `recalcularPrima`. Ver PolizaDetalle: los asegurados se muestran en cualquier
+ * póliza (fase 2.2), pero solo las colectivas recalculan.
+ */
 async function recalcularPrimas(polizaId: string, planId?: string | null) {
   // 1. Recalcular prima del plan (si aplica)
   if (planId) {
@@ -66,7 +77,7 @@ async function recalcularPrimas(polizaId: string, planId?: string | null) {
 
 export default function AfiliadoModal({
   polizaFija, clienteId, planInicial, clienteTipo, workspaceId,
-  afiliado, onClose, onSaved,
+  afiliado, recalcularPrima = true, onClose, onSaved,
 }: Props) {
   const esGrupoFamiliar = clienteTipo === 'grupo_familiar'
 
@@ -183,7 +194,7 @@ export default function AfiliadoModal({
     }
 
     // Recalcular primas en cascada
-    await recalcularPrimas(polizaSeleccionada.id, planNuevo ?? planAnterior)
+    if (recalcularPrima) await recalcularPrimas(polizaSeleccionada.id, planNuevo ?? planAnterior)
 
     setSaving(false)
     onSaved()

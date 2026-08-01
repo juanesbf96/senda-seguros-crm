@@ -61,6 +61,7 @@ import Link from 'next/link'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
 import Cronologia from '@/components/ui/Cronologia'
+import SubTablaPoliza from './SubTablaPoliza'
 
 
 type PolizaConCliente = Poliza & { cliente: Cliente | null }
@@ -114,6 +115,7 @@ export default function PolizaDetalle({ id }: { id: string }) {
   const [showEdit,      setShowEdit]      = useState(false)
   const [archivos,      setArchivos]      = useState<Archivo[]>([])
   const [vendedorNombre, setVendedorNombre] = useState<string | null>(null)
+  const [tecnicoNombre,  setTecnicoNombre]  = useState<string | null>(null)
 
   async function load() {
     if (!currentWorkspace) return
@@ -129,6 +131,16 @@ export default function PolizaDetalle({ id }: { id: string }) {
     if (p?.vendedor_id) {
       supabase.from('vendedores').select('nombre').eq('id', p.vendedor_id).maybeSingle()
         .then(({ data: v }) => setVendedorNombre(v?.nombre ?? null))
+    }
+    // El técnico es un usuario (auth.users), que no se puede leer directo desde
+    // el cliente: se resuelve con el RPC de miembros del workspace.
+    if (p?.tecnico_id && currentWorkspace) {
+      supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
+        .then(({ data }) => {
+          const m = ((data ?? []) as { user_id: string; nombre: string; email: string }[])
+            .find(x => x.user_id === p.tecnico_id)
+          setTecnicoNombre(m ? (m.nombre || m.email) : null)
+        })
     }
   }
 
@@ -296,12 +308,16 @@ export default function PolizaDetalle({ id }: { id: string }) {
       <div className="bg-white rounded-xl border border-ink-200 p-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-primary-500"><User className="w-4 h-4" /></span>
-          <h3 className="font-semibold text-ink-700 text-sm">Vendedor</h3>
+          <h3 className="font-semibold text-ink-700 text-sm">Vendedor y técnico</h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div>
             <p className="text-xs text-ink-400 mb-0.5">Vendedor</p>
             <p className="text-sm font-medium text-ink-700">{vendedorNombre || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs text-ink-400 mb-0.5">Técnico (gestiona)</p>
+            <p className="text-sm font-medium text-ink-700">{tecnicoNombre || '—'}</p>
           </div>
           <div>
             <p className="text-xs text-ink-400 mb-0.5">% Comisión</p>
@@ -437,13 +453,54 @@ export default function PolizaDetalle({ id }: { id: string }) {
         </div>
       )}
 
-      {/* ── Afiliados (solo pólizas colectivas) ── */}
-      {poliza.es_colectiva && poliza.cliente && currentWorkspace && (
+      {/* ── Coberturas (fase 2.3) ── */}
+      {currentWorkspace && (
+        <SubTablaPoliza
+          tabla="coberturas"
+          polizaId={poliza.id}
+          workspaceId={currentWorkspace.id}
+          titulo="Coberturas / Amparos"
+          vacio="Esta póliza no tiene coberturas registradas."
+          campos={[
+            { key: 'nombre',           label: 'Amparo',      tipo: 'texto',  requerido: true },
+            { key: 'valor_asegurado',  label: 'Valor aseg.', tipo: 'moneda', sumar: true },
+            { key: 'deducible',        label: 'Deducible',   tipo: 'moneda', claseCelda: 'hidden md:table-cell' },
+            { key: 'valor_prima',      label: 'Prima',       tipo: 'moneda', sumar: true },
+            { key: 'valor_extraprima', label: 'Extraprima',  tipo: 'moneda', claseCelda: 'hidden lg:table-cell' },
+          ]}
+        />
+      )}
+
+      {/* ── Certificados (fase 2.4) ── */}
+      {currentWorkspace && (
+        <SubTablaPoliza
+          tabla="certificados"
+          polizaId={poliza.id}
+          workspaceId={currentWorkspace.id}
+          titulo="Certificados"
+          vacio="Esta póliza no tiene certificados registrados."
+          defaults={{ estado: 'activo' }}
+          campos={[
+            { key: 'numero',       label: 'Número', tipo: 'texto' },
+            { key: 'fecha_inicio', label: 'Inicio', tipo: 'fecha', claseCelda: 'hidden sm:table-cell' },
+            { key: 'fecha_fin',    label: 'Fin',    tipo: 'fecha' },
+            { key: 'valor',        label: 'Valor',  tipo: 'moneda', sumar: true },
+            { key: 'estado',       label: 'Estado', tipo: 'select', opciones: [
+              { valor: 'activo', label: 'Activo' },
+              { valor: 'vencido', label: 'Vencido' },
+              { valor: 'cancelado', label: 'Cancelado' },
+            ] },
+          ]}
+        />
+      )}
+
+      {/* ── Asegurados (fase 2.2: ya no solo colectivas) ── */}
+      {poliza.cliente && currentWorkspace && (
         <div className="bg-white rounded-xl border border-ink-200 overflow-hidden">
           <div className="px-5 pt-5 pb-0 border-b border-ink-100">
-            <h3 className="font-semibold text-ink-700 text-sm pb-4">Afiliados</h3>
+            <h3 className="font-semibold text-ink-700 text-sm pb-4">Asegurados</h3>
           </div>
-          {poliza.ramo?.toLowerCase() === 'vida grupo' ? (
+          {poliza.es_colectiva && poliza.ramo?.toLowerCase() === 'vida grupo' ? (
             <AfiliadosPorPlan
               poliza={poliza}
               clienteTipo={poliza.cliente.tipo_cliente}
@@ -454,6 +511,9 @@ export default function PolizaDetalle({ id }: { id: string }) {
               poliza={poliza}
               clienteTipo={poliza.cliente.tipo_cliente}
               workspaceId={currentWorkspace.id}
+              /* Solo las colectivas derivan su prima de los asegurados; en una
+                 individual recalcular sobrescribiría la prima real con 0. */
+              recalcularPrima={!!poliza.es_colectiva}
             />
           )}
         </div>
