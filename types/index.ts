@@ -437,8 +437,8 @@ export interface Cobro {
   vendedor_id: string | null
   periodo: string | null
   created_at: string
-  cliente?: Pick<Cliente, 'id' | 'nombre'>
-  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'> & { cliente?: Pick<Cliente, 'id' | 'nombre'> }
+  cliente?: Pick<Cliente, 'id' | 'nombre' | 'telefono'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'> & { cliente?: Pick<Cliente, 'id' | 'nombre' | 'telefono'> }
 }
 
 /** Estado de pago derivado de un cobro (no hay columna de estado de pago en la BD). */
