@@ -97,6 +97,15 @@ export default function Dashboard() {
     produccion_asesores: { id: string; nombre: string; count: number; prima: number; comision: number }[]
   }
   const [m, setM] = useState<DashMetrics | null>(null)
+
+  // KPIs comparativos justos (fase 1.3): mismo avance de mes vs mes anterior y año anterior.
+  type CompBloque = { polizas: number; prima: number; comision: number }
+  interface DashComparativos {
+    mes_actual: CompBloque
+    mes_ant_a_fecha: CompBloque
+    anio_ant_a_fecha: CompBloque
+  }
+  const [comp, setComp] = useState<DashComparativos | null>(null)
   const [siniestrosPendientes, setSiniestrosPendientes] = useState(0)
   const [tareasHoy,     setTareasHoy]     = useState(0)
   const [tareasVencidas,setTareasVencidas]= useState(0)
@@ -136,10 +145,12 @@ export default function Dashboard() {
 
       // Un solo RPC con todos los agregados calculados en Postgres
       // (ver supabase/migration_dashboard_metrics.sql)
-      const { data, error } = await supabase.rpc('get_dashboard_metrics', {
-        p_ws:  wsId,
-        p_uid: !isGlobal && uid ? uid : null,
-      })
+      const p_uid = !isGlobal && uid ? uid : null
+      const [{ data, error }, { data: compData }] = await Promise.all([
+        supabase.rpc('get_dashboard_metrics',      { p_ws: wsId, p_uid }),
+        supabase.rpc('get_dashboard_comparativos', { p_ws: wsId, p_uid }),
+      ])
+      setComp((compData as DashComparativos | null) ?? null)
       if (error || !data) {
         console.error('Dashboard: error cargando métricas', error)
         setLoading(false)
@@ -213,18 +224,26 @@ export default function Dashboard() {
 
   const mesPolizas        = m?.mes.polizas ?? 0
   const mesComision       = m?.mes.comision ?? 0
-  const mesPasadoPolizas  = m?.mes_pasado.polizas ?? 0
   const primaMes          = m?.mes.prima ?? 0
-  const primaMesPasado    = m?.mes_pasado.prima ?? 0
   const clientesMes       = m?.clientes_mes ?? 0
   const clientesMesPasado = m?.clientes_mes_pasado ?? 0
+
+  // Comparación JUSTA (mismo avance de mes) — fase 1.3. Cae a los valores del RPC
+  // comparativo; si aún no cargó, previous = current para no mostrar deltas falsos.
+  const cMesAnt  = comp?.mes_ant_a_fecha
+  const cAnioAnt = comp?.anio_ant_a_fecha
+  const polizasMesAnt   = cMesAnt?.polizas  ?? mesPolizas
+  const primaMesAnt     = cMesAnt?.prima    ?? primaMes
+  const comisionMesAnt  = cMesAnt?.comision ?? mesComision
+  const polizasAnioAnt  = cAnioAnt?.polizas  ?? 0
+  const primaAnioAnt    = cAnioAnt?.prima    ?? 0
+  const comisionAnioAnt = cAnioAnt?.comision ?? 0
 
   const produccionAsesores = isGlobal ? (m?.produccion_asesores ?? []) : []
 
   const porEtapa = (e: Etapa) => m?.clientes_por_etapa[e] ?? 0
   const polizasActivas    = m?.polizas_activas ?? 0
   const primaTotal        = m?.prima_total ?? 0
-  const comisionTotal     = m?.comision_total ?? 0
   const renovaciones30    = m?.renov_30 ?? 0
   const renovaciones60    = m?.renov_60 ?? 0
   const totalRenovaciones90 = renovaciones30 + renovaciones60
@@ -297,10 +316,11 @@ export default function Dashboard() {
               <span className="text-base text-ink-300 tabular-nums">/ {totalPolizas}</span>
               <Badge variant="success" size="sm" dot className="ml-auto">{pctActivas}%</Badge>
             </div>
-            <div className="flex items-center gap-2 mb-2.5">
+            <div className="flex items-center gap-2 mb-0.5">
               <span className="text-xs text-ink-400 tabular-nums">{mesPolizas} nuevas este mes</span>
-              <ChgBadge current={mesPolizas} previous={mesPasadoPolizas} />
+              <ChgBadge current={mesPolizas} previous={polizasMesAnt} />
             </div>
+            <CompareCaption prev={polizasMesAnt} prevYear={polizasAnioAnt} className="mb-2.5" />
 
             {totalPolizas > 0 && (
               <>
@@ -345,13 +365,16 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 mt-2">
               <span className="text-xs text-ink-400">Emitida este mes:</span>
               <span className="text-xs font-semibold text-ink-700 tabular-nums">{formatCOP(primaMes)}</span>
-              <ChgBadge current={primaMes} previous={primaMesPasado} />
+              <ChgBadge current={primaMes} previous={primaMesAnt} />
             </div>
+            <CompareCaption prev={primaMesAnt} prevYear={primaAnioAnt} format={formatCOP} />
             <div className="flex items-center gap-2 mt-2 pt-2 border-t border-cream-100">
               <Percent className="w-3 h-3 text-primary-700" />
-              <span className="text-xs text-ink-400">Comisión:</span>
-              <span className="text-xs font-semibold text-primary-700 ml-auto tabular-nums">{formatCOP(comisionTotal)}</span>
+              <span className="text-xs text-ink-400">Comisión este mes:</span>
+              <span className="text-xs font-semibold text-primary-700 tabular-nums">{formatCOP(mesComision)}</span>
+              <ChgBadge current={mesComision} previous={comisionMesAnt} />
             </div>
+            <CompareCaption prev={comisionMesAnt} prevYear={comisionAnioAnt} format={formatCOP} />
           </ClickCard>
 
           <ClickCard href="/clientes" className="p-5">
@@ -567,7 +590,7 @@ export default function Dashboard() {
             <div className="flex items-center gap-2 text-xs text-ink-500">
               <span className="font-semibold text-ink-700 tabular-nums">{mesPolizas}</span>
               <span>pólizas nuevas</span>
-              <ChgBadge current={mesPolizas} previous={mesPasadoPolizas} />
+              <ChgBadge current={mesPolizas} previous={polizasMesAnt} />
             </div>
           </div>
           <div className="overflow-x-auto -mx-5 px-5">
@@ -816,6 +839,20 @@ function ChgBadge({ current, previous }: { current: number; previous: number }) 
       {up ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
       {up ? '+' : ''}{pct}%
     </span>
+  )
+}
+
+// Caption comparativa (fase 1.3): valor del mes pasado y del año pasado, a igual
+// avance de mes. El año pasado se omite si no hay dato (arranque del CRM).
+function CompareCaption({ prev, prevYear, format, className }: {
+  prev: number; prevYear: number; format?: (n: number) => string; className?: string
+}) {
+  const f = format ?? ((n: number) => String(n))
+  return (
+    <p className={cn('text-[10px] text-ink-400 tabular-nums', className)}>
+      Mes pasado: <span className="text-ink-500 font-medium">{f(prev)}</span>
+      {prevYear > 0 && <> · Año pasado: <span className="text-ink-500 font-medium">{f(prevYear)}</span></>}
+    </p>
   )
 }
 
