@@ -1,6 +1,6 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 23 de julio de 2026  
+> Última actualización: 1 de agosto de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
 
 ---
@@ -17,8 +17,8 @@
 | 1.1 | Motivo de cancelación / no-renovación | ✅ Hecho — migración probada en staging; PR `feat/motivos-cancelacion-no-renovacion` |
 | — | **Fix schema drift Cobros (bug: módulo en ceros)** | ✅ Hecho — PR `fix/finanzas-schema-drift`. Frontend leía columnas fantasma; reconciliado a columnas reales + estado de pago derivado |
 | — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
-| 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
-| 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
+| 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
+| 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
 | 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
 | 3.x | Operaciones de Producción | ⬜ Pendiente |
 | 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
@@ -83,7 +83,27 @@ Valida membresía del workspace y rechaza valores ≤ 0. Reemplaza el update dir
 
 **Probado en staging** (transacción revertida): parcial 1M→700k sin fecha; total →0 con fecha; sobrepago nunca negativo; valor negativo rechazado; usuario de otro workspace bloqueado. tsc limpio, build OK, 19 tests.
 
-> ⚠️ Esta migración **aún no está en producción**. Al mergear hay que aplicarla (`supabase db push` con link a prod, o Dashboard → SQL Editor).
+> ✅ Aplicada en producción (SQL Editor, 1-ago) junto con las de trazabilidad y motivos, antes del deploy del PR #22.
+
+### Fase 1.2 — Aging de cartera (rama `feat/aging-cartera`, PR #23) ✅ mergeado y desplegado
+
+Nueva vista **Cartera** (`/cartera`, sidebar → Finanzas): agrupa la cartera **por cobrar** pendiente en buckets de mora (por vencer · 1–30 · 31–60 · 61–90 · +90 días · sin fecha).
+
+- **RPC `get_cartera_aging(p_workspace_id)`** (SECURITY DEFINER). Calcula los días vencidos **en vivo** (`current_date - compromiso_pago`), no usa `dias_vencidos` (puede quedar obsoleto). Filtra `tipo='por_cobrar'` con `saldo_pendiente > 0` y `fecha_pago IS NULL`. Devuelve `(bucket, aseguradora)` con # y $ → total por bucket + desglose por aseguradora.
+- **UI:** resumen (total pendiente, cartera vencida, % vencido), barras por antigüedad y tabla pivote por aseguradora. Tipos `CarteraBucket` / `CarteraAgingRow`.
+- Construida sobre el esquema real de cobros (post reconciliación de finanzas): `saldo_pendiente` + `compromiso_pago`.
+- **Probada en Postgres local y en staging** (buckets correctos; excluye pagados, saldo 0, `por_pagar` y otro workspace). RPC aplicada en prod (SQL Editor, 1-ago). tsc/build/19 tests OK.
+
+### Fase 1.3 — KPIs comparativos del Dashboard (rama `feat/dashboard-kpis-comparativos`, PR #24) ✅ mergeado y desplegado
+
+El dashboard ya mostraba un delta mes-a-mes, pero comparaba el mes **parcial** en curso contra el mes anterior **completo** → a mitad de mes el delta siempre "caía". Se corrige y se amplía.
+
+- **RPC `get_dashboard_comparativos(p_ws, p_uid)`**: producción (pólizas, `prima_neta`, comisión) en 3 ventanas alineadas al **mismo avance de mes**: mes actual (día 1→hoy), mes anterior *a la fecha*, y **año anterior** *a la fecha*. Respeta el filtro por vendedor. SECURITY DEFINER con chequeo de membresía.
+- **Dashboard:** los deltas de pólizas y prima usan la comparación justa; se agrega delta a la **comisión** emitida en el mes (antes sin comparación); y caption **"Mes pasado: $X · Año pasado: $Y"** bajo cada KPI de producción.
+- No toca `get_dashboard_metrics` (hot, 170 líneas) — la comparación va en un RPC **separado y aditivo**. Si la RPC no está, el dashboard degrada solo (no muestra deltas falsos).
+- **Probada en Postgres local y en staging** (ventana justa excluye lo que cae fuera del mismo avance; filtro por vendedor aísla la vista de agente). RPC aplicada en prod (SQL Editor, 1-ago). tsc/build/19 tests OK.
+
+> **Flujo de trabajo en paralelo (1-ago).** Carril A (finanzas/cartera: `cobros/`, `caja/`, `Dashboard.tsx`, `informes/`) cerró fase 1. Carril B (Santiago, rama `feat/modelo-polizas-v2`: `polizas/`, `clientes/`, tablas nuevas) arrancó fase 2.x. Regla para no chocar: **un dueño por archivo**; único compartido `types/index.ts` (adiciones, conflicto trivial). Toda migración: crear → probar en staging → aplicar en prod **antes** del deploy que la consume.
 
 > **⚠️ Orden de merge de las ramas de fundaciones.** Cada rama se apiló sobre la anterior, así que cada una contiene los commits de las previas:
 > `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → `fix/finanzas-schema-drift` (última, contiene todo).
@@ -616,4 +636,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 23 de julio de 2026. Total de commits en `main`: ~145+ (fixes de finanzas aún en rama `fix/finanzas-schema-drift`, sin mergear).*
+*Última actualización: 1 de agosto de 2026. Fase 1 (retención y cartera) cerrada y desplegada en producción (PRs #22, #23, #24). Carril B (fase 2.x) en curso por Santiago.*
