@@ -1,6 +1,6 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 18 de julio de 2026  
+> Última actualización: 23 de julio de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
 
 ---
@@ -86,8 +86,12 @@ Valida membresía del workspace y rechaza valores ≤ 0. Reemplaza el update dir
 > ⚠️ Esta migración **aún no está en producción**. Al mergear hay que aplicarla (`supabase db push` con link a prod, o Dashboard → SQL Editor).
 
 > **⚠️ Orden de merge de las ramas de fundaciones.** Cada rama se apiló sobre la anterior, así que cada una contiene los commits de las previas:
-> `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → (siguiente).
-> Mergear **en ese orden** (o mergear solo la última, que las contiene a todas). Cada migración nueva ya está aplicada en staging; al mergear hay que aplicarlas en **producción** (Dashboard → SQL Editor, o `supabase db push` con link a prod).
+> `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → `fix/finanzas-schema-drift` (última, contiene todo).
+> Mergear **en ese orden** (o mergear solo la última). Cada migración nueva ya está aplicada en staging; al mergear hay que aplicarlas en **producción** (Dashboard → SQL Editor, o `supabase db push` con link a prod).
+>
+> **Migraciones pendientes de aplicar en prod (3):** `trazabilidad_origen_cronologia`, `motivos_cancelacion_no_renovacion`, `registrar_pago_cobro`. Las tres probadas en staging.
+>
+> **Recomendación (23-jul):** mergear y desplegar YA — `fix/finanzas-schema-drift` arregla dos módulos caídos en producción (Cobros en ceros, Caja sin cargar). Con 4 ramas apiladas y otro sistema commiteando en paralelo, cada rama nueva aumenta el riesgo de conflicto. Fase 1.2 (aging) queda desbloqueada pero conviene arrancarla sobre `main` limpio.
 
 > **Nota operativa:** el password de la BD de producción se rotó durante este setup. La app (Vercel + local) usa las API keys, no ese password, así que no hubo impacto en el servicio. Pendiente: rotar de nuevo el de prod a uno fuerte una vez cerrada la fase (quedó uno temporal débil visible en pantalla durante el proceso).
 
@@ -612,4 +616,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 18 de julio de 2026. Total de commits en `main`: ~145+.*
+*Última actualización: 23 de julio de 2026. Total de commits en `main`: ~145+ (fixes de finanzas aún en rama `fix/finanzas-schema-drift`, sin mergear).*
