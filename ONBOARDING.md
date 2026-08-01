@@ -297,8 +297,13 @@ await supabase.from('configuracion').upsert({
 
 ### Nuevas migraciones SQL
 
-Guardar en `/supabase/migration_NOMBRE.sql` y aplicar manualmente en **Supabase → SQL Editor**.
-No hay CLI de Supabase configurado — todo es manual por ahora.
+**Hay Supabase CLI configurado con ambiente de staging.** Toda migración nueva se crea con
+`npm run db:new nombre` (queda en `supabase/migrations/`), se prueba primero en el proyecto
+`senda-staging` con `npm run db:push:staging`, y solo después se aplica en producción.
+Flujo completo, setup y reglas: **`supabase/STAGING.md`**.
+
+Los archivos históricos `supabase/migration_*.sql` ya están aplicados en producción y quedan
+solo como referencia — no re-aplicarlos.
 
 ---
 

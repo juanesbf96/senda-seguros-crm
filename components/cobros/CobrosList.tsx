@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Cobro, EstadoCobro, TipoCobro } from '@/types'
+import { Cobro, EstadoPagoCobro, TipoCobro, estadoPagoCobro } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Plus, Search, Pencil, Trash2, AlertTriangle, DollarSign,
@@ -13,15 +13,18 @@ import ImportColillasModal from '@/components/colillas/ImportColillasModal'
 import PolizaQuickView from '@/components/polizas/PolizaQuickView'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
-const ESTADO_COLORS: Record<EstadoCobro, string> = {
+const ESTADO_COLORS: Record<EstadoPagoCobro, string> = {
   pendiente: 'bg-warning-soft text-ink-700',
   pagado:    'bg-primary-100 text-primary-700',
   vencido:   'bg-error-soft text-error',
-  anulado:   'bg-cream-200 text-ink-400',
 }
-const ESTADO_LABELS: Record<EstadoCobro, string> = {
-  pendiente: 'Pendiente', pagado: 'Pagado', vencido: 'Vencido', anulado: 'Anulado',
+const ESTADO_LABELS: Record<EstadoPagoCobro, string> = {
+  pendiente: 'Pendiente', pagado: 'Pagado', vencido: 'Vencido',
 }
+// Monto que se muestra como "Valor" (decisión de negocio: prima total).
+const cobroValor = (c: Cobro): number => c.prima_total ?? 0
+// Nombre del cliente asociado (cobros se relaciona a cliente vía póliza).
+const cobroCliente = (c: Cobro) => c.poliza?.cliente ?? c.cliente ?? null
 
 type Tab = TipoCobro
 
@@ -37,7 +40,7 @@ export default function CobrosList() {
   const [cobros, setCobros]         = useState<Cobro[]>([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
-  const [filterEstado, setFilterEstado] = useState<EstadoCobro | 'all'>('all')
+  const [filterEstado, setFilterEstado] = useState<EstadoPagoCobro | 'all'>('all')
   const [activeTab, setActiveTab]   = useState<Tab>('por_cobrar')
   const [showModal, setShowModal]   = useState(false)
   const [editing, setEditing]       = useState<Cobro | undefined>()
@@ -50,9 +53,9 @@ export default function CobrosList() {
     if (!currentWorkspace) return
     const { data } = await supabase
       .from('cobros')
-      .select('*, cliente:clientes(id, nombre), poliza:polizas(id, numero_poliza, aseguradora, ramo)')
+      .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo, cliente:clientes(id, nombre))')
       .eq('workspace_id', currentWorkspace.id)
-      .order('fecha_vencimiento', { ascending: true, nullsFirst: false })
+      .order('compromiso_pago', { ascending: true, nullsFirst: false })
     setCobros((data || []) as Cobro[])
     setLoading(false)
   }
@@ -70,23 +73,25 @@ export default function CobrosList() {
   const q = search.toLowerCase()
   const filtered = tabCobros.filter(c => {
     const match = !search ||
-      c.cliente?.nombre?.toLowerCase().includes(q) ||
-      c.concepto.toLowerCase().includes(q) ||
+      cobroCliente(c)?.nombre?.toLowerCase().includes(q) ||
+      c.ramo?.toLowerCase().includes(q) ||
+      c.anexo?.toLowerCase().includes(q) ||
       c.aseguradora?.toLowerCase().includes(q) ||
       c.numero_poliza?.includes(q) ||
       String(c.numero_cobro || '').includes(q)
-    return match && (filterEstado === 'all' || c.estado === filterEstado)
+    return match && (filterEstado === 'all' || estadoPagoCobro(c) === filterEstado)
   })
 
-  // Summary totals per tab
+  // Summary totals per tab (estado de pago derivado)
+  const pendCount = (tipo: Tab) => cobros.filter(c => c.tipo === tipo && estadoPagoCobro(c) === 'pendiente').length
   const counts: Record<Tab, { pending: number; total: number }> = {
-    por_cobrar:          { pending: cobros.filter(c => c.tipo === 'por_cobrar'          && c.estado === 'pendiente').length, total: cobros.filter(c => c.tipo === 'por_cobrar').length },
-    por_pagar:           { pending: cobros.filter(c => c.tipo === 'por_pagar'           && c.estado === 'pendiente').length, total: cobros.filter(c => c.tipo === 'por_pagar').length },
-    comision_por_cobrar: { pending: cobros.filter(c => c.tipo === 'comision_por_cobrar' && c.estado === 'pendiente').length, total: cobros.filter(c => c.tipo === 'comision_por_cobrar').length },
-    comision_recibida:   { pending: cobros.filter(c => c.tipo === 'comision_recibida'   && c.estado === 'pendiente').length, total: cobros.filter(c => c.tipo === 'comision_recibida').length },
+    por_cobrar:          { pending: pendCount('por_cobrar'),          total: cobros.filter(c => c.tipo === 'por_cobrar').length },
+    por_pagar:           { pending: pendCount('por_pagar'),           total: cobros.filter(c => c.tipo === 'por_pagar').length },
+    comision_por_cobrar: { pending: pendCount('comision_por_cobrar'), total: cobros.filter(c => c.tipo === 'comision_por_cobrar').length },
+    comision_recibida:   { pending: pendCount('comision_recibida'),   total: cobros.filter(c => c.tipo === 'comision_recibida').length },
   }
 
-  const totalPendiente = filtered.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0)
+  const totalPendiente = filtered.filter(c => estadoPagoCobro(c) === 'pendiente').reduce((s, c) => s + cobroValor(c), 0)
 
   /* ── Pagination ── */
   const PAGE_SIZE = 50
@@ -111,7 +116,7 @@ export default function CobrosList() {
         <div>
           <h1 className="text-2xl font-bold text-ink-700">Cobros</h1>
           <p className="text-ink-400 text-sm mt-1">
-            {filtered.filter(c => c.estado === 'pendiente').length} pendientes · {formatCOP(totalPendiente)}
+            {filtered.filter(c => estadoPagoCobro(c) === 'pendiente').length} pendientes · {formatCOP(totalPendiente)}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -168,18 +173,18 @@ export default function CobrosList() {
       <div className="grid grid-cols-3 gap-4 mb-5">
         <div className="bg-white border border-warning/30 rounded-xl p-4">
           <p className="text-xs text-ink-700 font-medium mb-1">Pendiente</p>
-          <p className="text-xl font-bold text-ink-700">{formatCOP(filtered.filter(c => c.estado === 'pendiente').reduce((s, c) => s + c.valor, 0))}</p>
-          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => c.estado === 'pendiente').length} cobros</p>
+          <p className="text-xl font-bold text-ink-700">{formatCOP(filtered.filter(c => estadoPagoCobro(c) === 'pendiente').reduce((s, c) => s + cobroValor(c), 0))}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => estadoPagoCobro(c) === 'pendiente').length} cobros</p>
         </div>
         <div className="bg-white border border-error/30 rounded-xl p-4">
           <p className="text-xs text-error font-medium mb-1 flex items-center gap-1"><AlertTriangle className="w-3 h-3" /> Vencidos</p>
-          <p className="text-xl font-bold text-error">{formatCOP(filtered.filter(c => c.estado === 'vencido').reduce((s, c) => s + c.valor, 0))}</p>
-          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => c.estado === 'vencido').length} cobros</p>
+          <p className="text-xl font-bold text-error">{formatCOP(filtered.filter(c => estadoPagoCobro(c) === 'vencido').reduce((s, c) => s + cobroValor(c), 0))}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => estadoPagoCobro(c) === 'vencido').length} cobros</p>
         </div>
         <div className="bg-white border border-primary-200 rounded-xl p-4">
           <p className="text-xs text-primary-500 font-medium mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3" /> Pagado</p>
-          <p className="text-xl font-bold text-primary-700">{formatCOP(filtered.filter(c => c.estado === 'pagado').reduce((s, c) => s + c.valor, 0))}</p>
-          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => c.estado === 'pagado').length} cobros</p>
+          <p className="text-xl font-bold text-primary-700">{formatCOP(filtered.filter(c => estadoPagoCobro(c) === 'pagado').reduce((s, c) => s + cobroValor(c), 0))}</p>
+          <p className="text-xs text-ink-400 mt-0.5">{filtered.filter(c => estadoPagoCobro(c) === 'pagado').length} cobros</p>
         </div>
       </div>
 
@@ -191,10 +196,10 @@ export default function CobrosList() {
             placeholder="Buscar por cliente, concepto, N° póliza..."
             className="w-full pl-9 pr-4 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400" />
         </div>
-        <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as EstadoCobro | 'all')}
+        <select value={filterEstado} onChange={e => setFilterEstado(e.target.value as EstadoPagoCobro | 'all')}
           className="px-3 py-2 text-sm border border-ink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400">
           <option value="all">Todos los estados</option>
-          {(Object.entries(ESTADO_LABELS) as [EstadoCobro, string][]).map(([k, v]) => (
+          {(Object.entries(ESTADO_LABELS) as [EstadoPagoCobro, string][]).map(([k, v]) => (
             <option key={k} value={k}>{v}</option>
           ))}
         </select>
@@ -219,20 +224,22 @@ export default function CobrosList() {
           </thead>
           <tbody>
             {paginated.map(c => {
-              const days = c.fecha_vencimiento ? daysUntil(c.fecha_vencimiento) : null
-              const overdue = days !== null && days < 0 && c.estado === 'pendiente'
+              const estadoPago = estadoPagoCobro(c)
+              const days = c.compromiso_pago ? daysUntil(c.compromiso_pago) : null
+              const overdue = estadoPago === 'vencido'
+              const cli = cobroCliente(c)
               return (
                 <tr key={c.id} className={`border-b border-cream-200 hover:bg-cream-100 transition-colors ${overdue ? 'bg-error-soft/30' : ''}`}>
                   <td className="px-4 py-3 text-ink-400 text-xs font-mono">
                     {c.numero_cobro ? `#${c.numero_cobro}` : '—'}
                   </td>
                   <td className="px-4 py-3">
-                    {c.client_id
-                      ? <Link href={`/clientes/${c.client_id}`} className="font-medium text-ink-700 hover:text-primary-500">{c.cliente?.nombre || '—'}</Link>
+                    {cli
+                      ? <Link href={`/clientes/${cli.id}`} className="font-medium text-ink-700 hover:text-primary-500">{cli.nombre}</Link>
                       : <span className="text-ink-400">—</span>}
                   </td>
                   <td className="px-4 py-3 text-ink-600 max-w-[180px]">
-                    <span className="line-clamp-1">{c.concepto}</span>
+                    <span className="line-clamp-1">{[c.ramo, c.anexo, c.cuota ? `Cuota ${c.cuota}` : null].filter(Boolean).join(' · ') || '—'}</span>
                   </td>
                   {isAseguradoraTab && (
                     <td className="px-4 py-3 hidden md:table-cell text-ink-400 text-xs">
@@ -258,16 +265,16 @@ export default function CobrosList() {
                       : <span className="text-ink-400">{c.numero_poliza || '—'}</span>
                     }
                   </td>
-                  <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(c.valor)}</td>
+                  <td className="px-4 py-3 font-semibold text-ink-700">{formatCOP(cobroValor(c))}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className={`text-xs ${overdue ? 'text-error font-medium' : 'text-ink-400'}`}>
-                      {formatDate(c.fecha_vencimiento)}
-                      {overdue && <span className="ml-1">(vencido)</span>}
+                      {c.compromiso_pago ? formatDate(c.compromiso_pago) : '—'}
+                      {overdue && days !== null && <span className="ml-1">({Math.abs(days)}d vencido)</span>}
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[c.estado]}`}>
-                      {ESTADO_LABELS[c.estado]}
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[estadoPago]}`}>
+                      {ESTADO_LABELS[estadoPago]}
                     </span>
                   </td>
                   <td className="px-4 py-3">

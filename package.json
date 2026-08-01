@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:pull": "supabase db pull",
+    "db:push:staging": "supabase db push",
+    "db:diff": "supabase db diff -f",
+    "db:new": "supabase migration new"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

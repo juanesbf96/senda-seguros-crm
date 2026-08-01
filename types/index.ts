@@ -55,9 +55,25 @@ export interface Cliente {
   updated_at: string
 }
 
+export type OrigenCreacion = 'manual' | 'import_excel' | 'colilla' | 'extractor_pdf' | 'api'
+export type MotivoCancelacion = 'por_no_pago' | 'por_peticion_cliente' | 'por_cambio_intermediario' | 'otro'
+export type MotivoNoRenovacion = 'por_no_pago' | 'por_peticion_cliente' | 'por_cambio_intermediario' | 'precio' | 'competencia' | 'otro'
+
+export interface RegistroCambio {
+  id: string
+  workspace_id: string
+  tabla: string
+  registro_id: string
+  usuario_id: string | null
+  accion: 'insert' | 'update' | 'delete'
+  campos_cambiados: Record<string, { antes: unknown; despues: unknown }> | null
+  created_at: string
+}
+
 export interface Poliza {
   id: string
   client_id: string
+  origen_creacion: OrigenCreacion | null
   numero_poliza: string | null
   aseguradora: string
   ramo: string
@@ -65,6 +81,9 @@ export interface Poliza {
   fecha_inicio: string | null
   fecha_fin: string | null
   estado: EstadoPoliza
+  motivo_cancelacion: MotivoCancelacion | null
+  motivo_cancelacion_otro: string | null
+  fecha_cancelacion: string | null
   notas: string | null
   tipo_poliza: string | null
   riesgo: string | null
@@ -288,6 +307,7 @@ export interface GestionRenovacion {
   poliza_id: string
   estado: EstadoGestion
   notas: string | null
+  motivo_no_renovacion: MotivoNoRenovacion | null
   fecha: string
 }
 
@@ -333,49 +353,77 @@ export interface Solicitud {
 export type EstadoCobro = 'pendiente' | 'pagado' | 'vencido' | 'anulado'
 export type TipoCobro = 'por_cobrar' | 'por_pagar' | 'comision_por_cobrar' | 'comision_recibida'
 export type FormaPago = 'efectivo' | 'transferencia' | 'cheque' | 'tarjeta' | 'consignacion'
-export type TipoRecibo = 'anticipo' | 'activo' | 'pago_directo' | 'anulado' | 'certificado'
+// CHECK real de recibos.tipo — 'certificado' NO es un tipo válido:
+// los certificados son recibos con numero_certificado diligenciado.
+export type TipoRecibo = 'anticipo' | 'activo' | 'pago_directo' | 'anulado'
+
+// Estado de pago DERIVADO (no es columna): se calcula de saldo_pendiente + compromiso_pago.
+export type EstadoPagoCobro = 'pendiente' | 'vencido' | 'pagado'
 
 export interface Cobro {
   id: string
-  client_id: string | null
   poliza_id: string | null
-  concepto: string
-  valor: number
-  fecha_vencimiento: string | null
-  fecha_emision: string | null
-  estado: EstadoCobro
+  // Categoría del cobro (columna real `tipo`; la columna `estado` guarda el mismo enum).
   tipo: TipoCobro
-  notas: string | null
+  estado: TipoCobro
+  // Montos reales
+  prima_total: number | null
+  prima_neta: number | null
+  valor_neto: number | null
+  valor_a_pagar: number | null
+  saldo_pendiente: number | null
+  pagado_oficina: number | null
+  pagado_aseguradora: number | null
+  comision_vendedor: number | null
+  porcentaje_comision: number | null
+  // Fechas reales
+  compromiso_pago: string | null
+  fecha_pago: string | null
+  fecha_emision: string | null
+  dias_vencidos: number | null
+  // Identificación
+  cuota: number | null
+  anexo: string | null
   numero_cobro: number | null
   aseguradora: string | null
   ramo: string | null
   numero_poliza: string | null
-  porcentaje_comision: number | null
+  vendedor: string | null
+  vendedor_id: string | null
+  periodo: string | null
   created_at: string
-  updated_at: string
   cliente?: Pick<Cliente, 'id' | 'nombre'>
-  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'> & { cliente?: Pick<Cliente, 'id' | 'nombre'> }
+}
+
+/** Estado de pago derivado de un cobro (no hay columna de estado de pago en la BD). */
+export function estadoPagoCobro(c: Pick<Cobro, 'saldo_pendiente' | 'compromiso_pago' | 'fecha_pago'>): EstadoPagoCobro {
+  const saldo = c.saldo_pendiente ?? 0
+  if (saldo <= 0 || c.fecha_pago) return 'pagado'
+  if (c.compromiso_pago && c.compromiso_pago < new Date().toISOString().slice(0, 10)) return 'vencido'
+  return 'pendiente'
 }
 
 export interface Recibo {
   id: string
-  client_id: string | null
   cobro_id: string | null
   poliza_id: string | null
-  numero_recibo: string | null
-  numero_certificado: string | null
-  concepto: string
-  valor: number
-  fecha_pago: string
-  forma_pago: FormaPago
   tipo: TipoRecibo
-  banco: string | null
-  referencia: string | null
-  notas: string | null
+  valor_recaudado: number | null
+  fecha: string | null
+  forma_pago: FormaPago | null
+  usuario: string | null
+  observacion: string | null
+  numero_certificado: string | null
+  anulado_por: string | null
+  fecha_anulacion: string | null
   created_at: string
-  cliente?: Pick<Cliente, 'id' | 'nombre'>
-  cobro?: Pick<Cobro, 'id' | 'concepto' | 'valor'>
-  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'>
+  cobro?: Pick<Cobro, 'id' | 'numero_cobro' | 'ramo' | 'prima_total' | 'saldo_pendiente'>
+  // El cliente de un recibo se resuelve por la póliza (recibos no tiene client_id).
+  poliza?: Pick<Poliza, 'id' | 'numero_poliza' | 'aseguradora' | 'ramo'> & {
+    client_id?: string
+    cliente?: Pick<Cliente, 'id' | 'nombre'>
+  }
 }
 
 // ── S7: Siniestros / Facturas / Diligencias ──────────────────────────────────

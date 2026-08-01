@@ -1,7 +1,99 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 27 de junio de 2026  
+> Última actualización: 23 de julio de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
+
+---
+
+## Fase 11 — Fundaciones técnicas (julio 2026)
+
+### Estado de ejecución del plan
+
+| Fase | Tarea | Estado |
+|------|-------|--------|
+| 0.1 | Tests del parser (Excel + colillas) con fixtures | ✅ Hecho (PR #19 mergeado — `test/colillas-parsers`) + fix de schema drift (PR #18) |
+| 0.2 | **Supabase CLI + ambiente de staging** | ✅ Hecho — staging replica prod (42 tablas, 32 RPCs, 75 políticas RLS verificadas) |
+| 0.3 | Trazabilidad (`origen_creacion` + cronología) | ✅ Hecho — migración probada en staging; PR `feat/trazabilidad-origen-cronologia` |
+| 1.1 | Motivo de cancelación / no-renovación | ✅ Hecho — migración probada en staging; PR `feat/motivos-cancelacion-no-renovacion` |
+| — | **Fix schema drift Cobros (bug: módulo en ceros)** | ✅ Hecho — PR `fix/finanzas-schema-drift`. Frontend leía columnas fantasma; reconciliado a columnas reales + estado de pago derivado |
+| — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
+| 1.2 | Aging de cartera (buckets de mora) | ⬜ Pendiente |
+| 1.3 | KPIs comparativos en Dashboard | ⬜ Pendiente |
+| 2.x | Paridad de modelo de datos (referencia externa) | ⬜ Pendiente |
+| 3.x | Operaciones de Producción | ⬜ Pendiente |
+| 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
+| 5.x | WhatsApp | ⬜ Pendiente |
+
+### Fase 0.2 — Supabase CLI + staging (rama `infra/supabase-cli-staging`)
+
+**Hecho:**
+- `supabase init` — `config.toml` + directorio `supabase/migrations/` para migraciones versionadas.
+- **Proyecto `senda-staging` creado** en Supabase (ref `xfpezdaacotlyeysuqhs`, región East US).
+- **Baseline volcado desde producción** con `supabase db pull` vía pooler IPv4 → `supabase/migrations/20260718075314_remote_schema.sql` (schema real, registrado en el historial de migraciones de prod).
+- `scripts/setup-staging.sh` — script idempotente que orquesta todo el setup (login, creación de proyecto, pull del baseline, push a staging, guardado de credenciales en `.env.local`). Robustecido tras varios obstáculos reales: login no-TTY, Docker faltante (resuelto con Colima), IPv6-only del host directo (resuelto usando el pooler), passwords con símbolos.
+- `supabase/STAGING.md` — manual del flujo staging-antes-que-prod; reglas ("ningún PR con migración se mergea sin 'Probada en staging: sí'").
+- Scripts npm: `db:new`, `db:push:staging`, `db:pull`, `db:diff`.
+- `ONBOARDING.md` actualizado (reemplaza "no hay CLI, todo manual").
+- `Colima` + `docker` instalados como runtime local para el CLI.
+
+- **Baseline aplicado en `senda-staging`** vía pooler IPv4. `scripts/finish-staging.sh` — finalizador mínimo (pide password una vez, guarda, push, verifica).
+- **Verificación de paridad ✅**: staging = 42 tablas public, 32 funciones/RPCs, 75 políticas RLS, 37 tablas con RLS — coincide exacto con el baseline volcado de prod. Tablas críticas (clientes, pólizas, cobros, liquidaciones, workspaces, members) y RPCs de workspace/permisos presentes.
+
+**Falta (menor, no bloquea el plan):**
+- Crear `supabase/seed.sql` (seed mínimo anonimizado — no copiar datos reales de clientes). Se hará cuando se necesite data de prueba.
+- Mergear los PRs: `infra/supabase-cli-staging`, `docs/plan-ejecucion-auditorias`, `feat/trazabilidad-origen-cronologia`.
+- **Rotar el password de prod a uno fuerte** (quedó uno temporal débil visible en pantalla durante el setup) — hacerlo con cuidado de re-linkear el CLI después.
+- **Arreglar `.env.local` corrupto**: la línea de `SUPABASE_DB_PASSWORD` (prod) quedó concatenada con un password de staging viejo por un salto de línea faltante, así que el valor de prod guardado es inválido (no afecta la app ni staging, que usan otras credenciales). Corregir al rotar el password de prod.
+
+### Fase 0.3 — Trazabilidad (rama `feat/trazabilidad-origen-cronologia`)
+
+Respuesta directa a la lección del desastre del import: no había forma de saber de dónde vino un registro ni quién/qué lo cambió.
+
+- `polizas.origen_creacion` (manual | import_excel | colilla | extractor_pdf | api) — seteado en los 2 únicos caminos de creación (import server-side → `import_excel`, PolizaModal → `manual`). En updates del import no se relabela el origen existente.
+- Tabla `registro_cambios` + `registrar_cambio()` (SECURITY DEFINER) + triggers AFTER INSERT/UPDATE/DELETE en `polizas`, `clientes`, `cobros`, `liquidaciones`. **Auditoría a nivel de BD** — captura todo cambio, incluso los hechos por fuera de la app (a diferencia de `clientes_historial`, que es poblado por la app). RLS: miembros del workspace leen; solo el trigger escribe.
+- UI: chip de origen en `PolizaDetalle` + componente reutilizable `components/ui/Cronologia.tsx` (timeline con diff antes/después por campo, usuario y fecha).
+- **Probado en staging**: test SQL de insert/update/delete confirmó que el trigger registra los cambios reales (`{antes: "Sura", despues: "Bolivar"}`) y omite los updates que no cambian nada. tsc limpio, build OK, 19 tests pasan.
+- Nota: la verificación visual en navegador quedó pendiente porque staging no tiene datos ni usuarios de auth; se verá al llegar la migración a prod.
+
+### Fase 1.1 — Retención: motivos de cancelación y no-renovación (rama `feat/motivos-cancelacion-no-renovacion`)
+
+- Migración: `polizas.motivo_cancelacion` (+ `_otro`, `fecha_cancelacion`) con CHECK; `gestiones_renovacion.motivo_no_renovacion` con CHECK. RPCs `get_cancelaciones_por_motivo` y `get_renovaciones_resumen` (esta toma el último estado por póliza del append-log).
+- UI: `PolizaModal` exige motivo al cancelar; `Renovaciones` abre modal de motivo al marcar "No renueva" (en sus 2 vistas); `InformesView` tiene 2 gráficos nuevos (cancelaciones por motivo, renovadas vs no renovadas).
+- Probado en staging: constraint rechaza motivos inválidos; la RPC de renovaciones cuenta bien el último estado (no_renueva→renovado = renovada). tsc/build/tests OK.
+
+### Fix — Schema drift en Cobros (rama `fix/finanzas-schema-drift`, commit `240cafe`)
+
+**El bug:** el módulo de Cobros mostraba **todo en ceros**. Causa raíz: schema drift. La tabla `cobros` fue reestructurada en el servidor (colillas/comisiones) pero el frontend nunca se reconcilió — leía columnas fantasma (`concepto`, `valor`, `fecha_vencimiento`, `client_id`, `estado` = pendiente/pagado) que ya no existen. Verificado por 3 fuentes: dump baseline, query en staging, y API REST de prod (`cobros.fecha_vencimiento` → *column does not exist*).
+
+**Esquema real de `cobros`:** montos en `prima_total`/`saldo_pendiente`/`prima_neta`; fechas en `compromiso_pago`/`fecha_pago`; **sin `client_id`** (se une al cliente por `poliza_id → polizas.client_id`); `estado` y `tipo` guardan la **categoría** (`por_cobrar`, `por_pagar`, …), no el estado de pago. El **estado de pago es derivado** (`estadoPagoCobro()`: saldo_pendiente + compromiso_pago + fecha_pago → pendiente/vencido/pagado).
+
+**Arreglado:** tipos (`Cobro`, `Recibo.cobro`), `CobrosList`, `ClienteDetalle` (cobros vía join a póliza), `CobrosModal` (alta mapeada a columnas reales), y las interacciones con cobros de `ReciboModal` (marcar pagado = saldar). tsc limpio, build OK, 19 tests, queries validadas contra el esquema real. El monto mostrado es `prima_total` (decisión del owner).
+
+### Fix — Schema drift en recibos/caja + RPC de pago (misma rama, commit `e02d07a`)
+
+**El bug:** Caja no cargaba (query 400: `recibos.concepto does not exist`). Mismo drift que Cobros. Como los inserts venían fallando, esos campos **nunca se persistieron** — quitarlos de la UI no pierde datos guardados.
+
+**Esquema real de `recibos`:** `cobro_id`, `poliza_id`, `tipo`, `valor_recaudado`, `fecha`, `forma_pago`, `usuario`, `observacion`, `numero_certificado`, `anulado_por`, `fecha_anulacion`. Sin `client_id` (el cliente se resuelve por la póliza). El CHECK de `tipo` solo admite `anticipo/activo/pago_directo/anulado` → el tab **"Certificados"** pasa a ser el subconjunto con `numero_certificado` diligenciado, en vez de un tipo inválido.
+
+**RPC nueva `registrar_pago_cobro(p_cobro_id, p_valor, p_fecha)`** — SECURITY DEFINER, bloquea la fila y aplica el recaudo al cobro de forma atómica descontándolo del saldo. Resuelve pago total y parcial sin tener que elegir entre ambos:
+- recaudado ≥ saldo → saldo 0 + `fecha_pago` (pagado)
+- recaudado < saldo → saldo baja, sin `fecha_pago` (sigue pendiente)
+
+Valida membresía del workspace y rechaza valores ≤ 0. Reemplaza el update directo que dejaba `saldo_pendiente=0` siempre.
+
+**Probado en staging** (transacción revertida): parcial 1M→700k sin fecha; total →0 con fecha; sobrepago nunca negativo; valor negativo rechazado; usuario de otro workspace bloqueado. tsc limpio, build OK, 19 tests.
+
+> ⚠️ Esta migración **aún no está en producción**. Al mergear hay que aplicarla (`supabase db push` con link a prod, o Dashboard → SQL Editor).
+
+> **⚠️ Orden de merge de las ramas de fundaciones.** Cada rama se apiló sobre la anterior, así que cada una contiene los commits de las previas:
+> `infra/supabase-cli-staging` → `feat/trazabilidad-origen-cronologia` → `feat/motivos-cancelacion-no-renovacion` → `fix/finanzas-schema-drift` (última, contiene todo).
+> Mergear **en ese orden** (o mergear solo la última). Cada migración nueva ya está aplicada en staging; al mergear hay que aplicarlas en **producción** (Dashboard → SQL Editor, o `supabase db push` con link a prod).
+>
+> **Migraciones pendientes de aplicar en prod (3):** `trazabilidad_origen_cronologia`, `motivos_cancelacion_no_renovacion`, `registrar_pago_cobro`. Las tres probadas en staging.
+>
+> **Recomendación (23-jul):** mergear y desplegar YA — `fix/finanzas-schema-drift` arregla dos módulos caídos en producción (Cobros en ceros, Caja sin cargar). Con 4 ramas apiladas y otro sistema commiteando en paralelo, cada rama nueva aumenta el riesgo de conflicto. Fase 1.2 (aging) queda desbloqueada pero conviene arrancarla sobre `main` limpio.
+
+> **Nota operativa:** el password de la BD de producción se rotó durante este setup. La app (Vercel + local) usa las API keys, no ese password, así que no hubo impacto en el servicio. Pendiente: rotar de nuevo el de prod a uno fuerte una vez cerrada la fase (quedó uno temporal débil visible en pantalla durante el proceso).
 
 ---
 
@@ -524,4 +616,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 27 de junio de 2026. Total de commits en `main`: ~140+.*
+*Última actualización: 23 de julio de 2026. Total de commits en `main`: ~145+ (fixes de finanzas aún en rama `fix/finanzas-schema-drift`, sin mergear).*
