@@ -482,6 +482,22 @@ export interface CarteraAgingRow {
   total: number
 }
 
+// Catálogo ramos-por-aseguradora (fase 2.6).
+export type DisponibleRamo = 'si' | 'no' | 'condicionado'
+
+export interface RamoAseguradora {
+  id: string
+  workspace_id: string
+  aseguradora: string
+  ramo: string
+  disponible: DisponibleRamo
+  nota: string | null
+  pct_comision_default: number | null
+  activo: boolean
+  created_at: string
+  updated_at: string
+}
+
 export interface Recibo {
   id: string
   cobro_id: string | null
