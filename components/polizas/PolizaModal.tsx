@@ -72,6 +72,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const { currentWorkspace } = useWorkspace()
   const [clientes,        setClientes]        = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [vendedores,      setVendedores]      = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
+  // Miembros del workspace para el selector de TÉCNICO (quien gestiona la póliza)
+  const [miembros,        setMiembros]        = useState<{ user_id: string; nombre: string; email: string }[]>([])
   const [aseguradoras,    setAseguradoras]    = useState<string[]>(ASEGURADORAS_DEFAULT)
   const [tarifas,         setTarifas]         = useState<TarifaComision[]>([])
   const [showNuevaTarifa, setShowNuevaTarifa] = useState(false)
@@ -129,6 +131,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     pct_comision_int: poliza?.pct_comision_int?.toString() || '',
     // vendedor
     vendedor_id:                poliza?.vendedor_id                    || '',
+    tecnico_id:                 poliza?.tecnico_id                     || '',
     porcentaje_comision_vendedor:poliza?.porcentaje_comision_vendedor?.toString() || '',
     retencion_vendedor:         (poliza?.retencion_vendedor ?? 10).toString(),
     // pagos
@@ -198,6 +201,11 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     }
     supabase.from('vendedores').select('id, nombre, comisiones_por_anio').eq('activo', true).order('nombre')
       .then(({ data }) => setVendedores((data || []) as Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]))
+
+    if (currentWorkspace) {
+      supabase.rpc('get_workspace_members', { p_workspace_id: currentWorkspace.id })
+        .then(({ data }) => setMiembros((data || []) as { user_id: string; nombre: string; email: string }[]))
+    }
 
     if (currentWorkspace) {
       supabase.from('configuracion')
@@ -340,6 +348,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       comision_intermediario: comisionIntermedario || null,
       // vendedor
       vendedor_id:                  form.vendedor_id || null,
+      tecnico_id:                   form.tecnico_id  || null,
       porcentaje_comision_vendedor: pctVendedor || null,
       retencion_vendedor:           n(form.retencion_vendedor),
       comision_vendedor:            comisionVendedor || null,
@@ -755,12 +764,21 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
             )}
           </Section>
 
-          {/* ── 7. Vendedor ── */}
-          <Section title="Vendedor">
+          {/* ── 7. Vendedor y técnico ── */}
+          <Section title="Vendedor y técnico">
             <Field label="Vendedor">
               <select value={form.vendedor_id} onChange={e => onVendedorChange(e.target.value)} className={cls}>
                 <option value="">Sin vendedor asignado</option>
                 {vendedores.map(v => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+              </select>
+            </Field>
+            {/* Técnico = quien GESTIONA la póliza; distinto de quien la vendió (fase 2.1) */}
+            <Field label="Técnico asignado (gestiona la póliza)">
+              <select value={form.tecnico_id} onChange={e => set('tecnico_id', e.target.value)} className={cls}>
+                <option value="">Sin técnico asignado</option>
+                {miembros.map(m => (
+                  <option key={m.user_id} value={m.user_id}>{m.nombre || m.email}</option>
+                ))}
               </select>
             </Field>
             {form.vendedor_id && (
