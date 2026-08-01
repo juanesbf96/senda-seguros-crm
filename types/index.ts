@@ -404,6 +404,18 @@ export function estadoPagoCobro(c: Pick<Cobro, 'saldo_pendiente' | 'compromiso_p
   return 'pendiente'
 }
 
+// Aging de cartera (fase 1.2) — buckets de mora calculados por la RPC get_cartera_aging.
+export type CarteraBucket = 'por_vencer' | 'd1_30' | 'd31_60' | 'd61_90' | 'd90_mas' | 'sin_fecha'
+
+/** Una fila de la RPC get_cartera_aging: (bucket, aseguradora) con # y $ del saldo pendiente. */
+export interface CarteraAgingRow {
+  bucket: CarteraBucket
+  orden: number
+  aseguradora: string
+  cantidad: number
+  total: number
+}
+
 export interface Recibo {
   id: string
   cobro_id: string | null
