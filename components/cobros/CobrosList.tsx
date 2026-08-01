@@ -5,13 +5,14 @@ import { Cobro, EstadoPagoCobro, TipoCobro, estadoPagoCobro } from '@/types'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Plus, Search, Pencil, Trash2, AlertTriangle, DollarSign,
-  ArrowDownToLine, ArrowUpFromLine, TrendingDown, TrendingUp, Upload,
+  ArrowDownToLine, ArrowUpFromLine, TrendingDown, TrendingUp, Upload, MessageCircle,
 } from 'lucide-react'
 import Link from 'next/link'
 import CobrosModal from './CobrosModal'
 import ImportColillasModal from '@/components/colillas/ImportColillasModal'
 import PolizaQuickView from '@/components/polizas/PolizaQuickView'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { whatsappLink, plantillaRecordatorioPago } from '@/lib/whatsapp'
 
 const ESTADO_COLORS: Record<EstadoPagoCobro, string> = {
   pendiente: 'bg-warning-soft text-ink-700',
@@ -53,7 +54,7 @@ export default function CobrosList() {
     if (!currentWorkspace) return
     const { data } = await supabase
       .from('cobros')
-      .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo, cliente:clientes(id, nombre))')
+      .select('*, poliza:polizas(id, numero_poliza, aseguradora, ramo, cliente:clientes(id, nombre, telefono))')
       .eq('workspace_id', currentWorkspace.id)
       .order('compromiso_pago', { ascending: true, nullsFirst: false })
     setCobros((data || []) as Cobro[])
@@ -279,6 +280,25 @@ export default function CobrosList() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
+                      {c.tipo === 'por_cobrar' && estadoPago !== 'pagado' && cli?.telefono && (
+                        <a
+                          href={whatsappLink(cli.telefono, plantillaRecordatorioPago({
+                            nombre: cli.nombre,
+                            ramo: c.ramo,
+                            aseguradora: c.aseguradora ?? c.poliza?.aseguradora,
+                            valor: formatCOP(c.saldo_pendiente ?? cobroValor(c)),
+                            fecha: c.compromiso_pago ? formatDate(c.compromiso_pago) : null,
+                            vencido: overdue,
+                            agencia: currentWorkspace?.name,
+                          }))}
+                          target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          title="Enviar recordatorio de pago por WhatsApp"
+                          className="text-ink-400 hover:text-emerald-600 transition-colors"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </a>
+                      )}
                       <button onClick={() => { setEditing(c); setShowModal(true) }}
                         className="text-ink-400 hover:text-ink-600 transition-colors">
                         <Pencil className="w-4 h-4" />
