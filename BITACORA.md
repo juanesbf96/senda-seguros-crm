@@ -19,7 +19,7 @@
 | — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
-| 2.x | Paridad de modelo de datos (referencia externa) | 🔵 5 de 6 ítems — schema (#25) y matching (#29) mergeados y aplicados en prod; **UI #31 ABIERTO**. Falta 2.6 (PR-09) y la alerta de certificados en el cron (bloqueador documentado) |
+| 2.x | Paridad de modelo de datos (referencia externa) | 🔵 Casi — schema (#25), matching (#29) y **2.6 ramos-aseguradora (#33)** mergeados y en prod; **UI #31 ABIERTO**. Falta solo cerrar #31 y la alerta de certificados en el cron (bloqueador documentado) |
 | 3.x | Operaciones de Producción | 🟡 Backbone hecho — PR #28 mergeado y desplegado (tabla `operaciones` + generador de cuotas + vista `/operaciones`). Timeline en PolizaDetalle diferido (coordinar con fase 2) |
 | 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
@@ -134,7 +134,7 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 | 2.3 Coberturas | ✅ schema (#25) + UI (#31) |
 | 2.4 Certificados | ✅ schema (#25) + UI (#31) · ⬜ **alerta en cron — ver bloqueador abajo** |
 | 2.5 Matching por número normalizado | ✅ schema (#25) + uso real (#29) |
-| 2.6 Catálogo ramos-aseguradora | ⬜ **pendiente (PR-09)** |
+| 2.6 Catálogo ramos-aseguradora | ✅ tabla + UI (#33, Carril A) — probada en staging + prod |
 
 #### PR #25 — schema v2 ✅ mergeado · migración aplicada en staging **y producción**
 
@@ -186,10 +186,17 @@ Al revisar el **PR #31** en el navegador, comprobar:
 4. Un usuario **sin** `polizas_editar` no ve los botones de editar/eliminar en coberturas/certificados (y si intenta, RLS lo rechaza).
 5. El selector de **técnico** lista los miembros del workspace y el nombre se muestra en `PolizaDetalle`.
 
-#### ⬜ Siguiente paso del carril: **PR-09 (2.6)**
+#### PR #33 — 2.6 catálogo ramos-aseguradora ✅ mergeado · migración en staging **y prod** (Carril A)
 
-Tabla `ramos_aseguradora(workspace_id, aseguradora, ramo, pct_comision_default, activo)` + tab Comisiones en Configuración; el import y `PolizaModal` leerían de ahí el % por defecto. **Dato útil ya verificado:** el JSON `comisiones_tarifas` en `configuracion` está **vacío** en producción → la tabla arranca limpia, sin migración de datos.
-**Coordinación:** PR-09 toca `ConfiguracionView.tsx`; si Carril A hace 4.3 (card "Motor de IA", mismo archivo), definir orden de merge.
+Lo hizo Carril A (nosotros), no Carril B — el owner pasó el Excel `RAMOS POR ASEGURADORA.xlsx` y pidió cerrar el 2.6.
+
+**Desviación del plan (deliberada):** el plan (y la nota de arriba) asumían que 2.6 era de **comisiones** (`pct_comision_default`, leer el JSON `comisiones_tarifas`). Pero el Excel real de la agencia es una **matriz de disponibilidad**: qué ramos maneja cada aseguradora, con notas de condición ("solo privados", "mínimo 3", "solo zonas comunes"). Se modelan **ambas cosas en la misma tabla**: `disponible ('si'|'no'|'condicionado')` + `nota` se pueblan ya; `pct_comision_default` queda **nullable** para el uso futuro del plan (import/`PolizaModal` leerán el % cuando se defina). Una sola tabla, sin rework.
+
+- Migración `20260801235420_ramos_aseguradora.sql`: tabla + `unique(ws,aseg,ramo)` + RLS (lectura = miembro, escritura = **admin**, porque es config) + índice. Probada en staging (admin inserta/lee; no-miembro no ve ni inserta; `unique` y `CHECK` rechazan inválidos).
+- `lib/catalogoRamos.ts`: catálogo base del Excel — **17 ramos × 19 aseguradoras = 165 combinaciones** (87 sí, 69 no, 9 condicionado), con notas.
+- UI: tab **"Ramos × Aseguradora"** en `ConfiguracionView` (componente auto-contenido `RamosAseguradoraTab`, patrón de `PermisosRolesView`) — matriz con colores por disponibilidad, botón admin **"Cargar catálogo base"** (upsert por workspace) y edición por clic (Sí → Cond. → No).
+- **Seed por botón, no por migración** (para atarlo al workspace correcto). ⬜ **Pendiente de verificación visual:** que el botón "Cargar catálogo base" inserte las 165 filas en prod y la matriz se vea bien (requiere login).
+- **Sin colisión con #31:** solo tocó `ConfiguracionView.tsx` (no PolizaModal/PolizaDetalle) y `types/index.ts` (adición `RamoAseguradora`).
 
 > **Flujo de trabajo en paralelo (1-ago).** Carril A (finanzas/cartera: `cobros/`, `caja/`, `Dashboard.tsx`, `informes/`) cerró fase 1. Carril B (Santiago, rama `feat/modelo-polizas-v2`: `polizas/`, `clientes/`, tablas nuevas) arrancó fase 2.x. Regla para no chocar: **un dueño por archivo**; único compartido `types/index.ts` (adiciones, conflicto trivial). Toda migración: crear → probar en staging → aplicar en prod **antes** del deploy que la consume.
 
@@ -726,4 +733,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 1 de agosto de 2026. Fase 1 cerrada (PRs #22-24). WhatsApp ligero 5.1 (#27) y backbone de fase 3 Operaciones (#28) desplegados. Carril B (fase 2.x) en curso por Santiago.*
+*Última actualización: 1 de agosto de 2026. Fase 1 cerrada (PRs #22-24). WhatsApp 5.1 (#27), backbone Operaciones fase 3 (#28) y catálogo ramos-aseguradora 2.6 (#33) desplegados. Fase 2 a falta del PR #31 (UI, Santiago) + alerta de certificados en cron.*
