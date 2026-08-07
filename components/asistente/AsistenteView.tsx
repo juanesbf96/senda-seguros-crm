@@ -238,7 +238,8 @@ ${renovsStr}
         },
         body: JSON.stringify({
           contexto,
-          // Enviamos historial (últimos 10 mensajes) para que Groq recuerde el contexto de la conversación
+          workspaceId: currentWorkspace?.id,
+          // Enviamos historial (últimos 10 mensajes) para que la IA recuerde el contexto de la conversación
           messages: updatedMsgs.slice(-10).map(m => ({
             role: m.role,
             content: m.text,

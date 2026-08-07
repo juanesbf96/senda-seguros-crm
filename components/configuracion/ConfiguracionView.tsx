@@ -1,11 +1,12 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users, ShieldCheck, Lock, Percent, Grid3x3 } from 'lucide-react'
+import { Settings, Building2, List, Save, CheckCircle, Plus, X, GripVertical, Tag, Pencil, Trash2, Check, ToggleLeft, ToggleRight, Users, ShieldCheck, Lock, Percent, Grid3x3, Bot } from 'lucide-react'
 import { ConfigItem } from '@/types'
 import WorkspaceMembersView from '@/components/workspace/WorkspaceMembersView'
 import PermisosRolesView from '@/components/configuracion/PermisosRolesView'
 import RamosAseguradoraTab from '@/components/configuracion/RamosAseguradoraTab'
+import MotorIATab from '@/components/configuracion/MotorIATab'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
 
@@ -599,7 +600,7 @@ function ModulosEditor({ config, onToggle }: {
 }
 
 /* ── Main Component ─────────────────────────────────── */
-type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'comisiones' | 'ramos' | 'workspace' | 'permisos'
+type TabKey = 'agencia' | 'listas' | 'categorias' | 'modulos' | 'comisiones' | 'ramos' | 'ia' | 'workspace' | 'permisos'
 
 export default function ConfiguracionView() {
   const { currentWorkspace, isAdmin } = useWorkspace()
@@ -658,6 +659,7 @@ export default function ConfiguracionView() {
     { key: 'modulos',    label: 'Módulos',                icon: ToggleRight },
     { key: 'comisiones', label: 'Comisiones',             icon: Percent, adminOnly: true },
     { key: 'ramos',      label: 'Ramos × Aseguradora',    icon: Grid3x3 },
+    { key: 'ia',         label: 'Motor de IA',            icon: Bot, adminOnly: true },
     { key: 'permisos',   label: 'Permisos de roles',      icon: ShieldCheck, adminOnly: true },
     { key: 'workspace',  label: 'Workspace & Miembros',   icon: Users },
   ]
@@ -869,6 +871,11 @@ export default function ConfiguracionView() {
       {/* ── Ramos × Aseguradora tab ── */}
       {tab === 'ramos' && (
         <RamosAseguradoraTab isAdmin={isAdmin} />
+      )}
+
+      {/* ── Motor de IA tab ── */}
+      {tab === 'ia' && isAdmin && (
+        <MotorIATab />
       )}
 
       {/* ── Workspace tab ── */}
