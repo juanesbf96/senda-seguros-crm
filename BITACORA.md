@@ -21,7 +21,9 @@
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
 | 3.x | Operaciones de Producción | 🟡 Backbone en prod (#28). **Desbloqueado**: fase 2 cerró y `PolizaDetalle`/`PolizaModal` están libres. Falta timeline, enganche de financiación, y operaciones de renovación/cancelación. ⚠️ Antes de usar las cuotas en operación diaria hay que decidir el solapamiento `operaciones` vs `cobros` (ver sección de fase 3) |
-| 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
+| 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
+| 4.1 | Extractor PDF de carátulas | ⬜ Pendiente (usa el motor 4.3 como fallback) |
+| 4.2 | Ventas cruzadas con scoring | ⬜ Pendiente (usa el motor 4.3 para mensajes) |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
 
@@ -147,6 +149,20 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 >
 > Elegir una y dejarla escrita aquí antes de seguir con el punto 3.
 
+
+### Fase 4.3 — Motor de IA multi-proveedor (rama `feat/motor-ia-multiproveedor`, PR #38) ✅ mergeado y en prod (Carril A)
+
+**Base de fase 4.** El plan ordena 4.3 antes que 4.1/4.2 porque el extractor (fallback) y el cross-sell (mensajes) usan este motor. Antes el asistente tenía **Groq hard-coded**; ahora la IA es configurable por workspace.
+
+- **`lib/ia/motor.ts`:** interfaz única `completar(cfg, opts)` + adaptadores. Groq/OpenAI/DeepSeek hablan formato OpenAI (mismo adaptador, distinto endpoint); Anthropic (`/v1/messages`, header `x-api-key`) y Gemini (`generateContent`, roles `user`/`model`) tienen el suyo. Modelo por defecto por proveedor.
+- **`lib/ia/resolverConfig.ts`** (server-only): resuelve la config con service-role. `groq` usa la llave **compartida** del env (Senda incluido, gratis — gancho comercial); otros exigen BYOK.
+- **`app/api/asistente/route.ts`:** migrado al motor; el frontend pasa `workspaceId`.
+- **UI:** tab "Motor de IA" en Configuración (admin) — proveedor + modelo + llave BYOK opcional.
+
+**🔒 Seguridad de la llave (lo importante):** la llave BYOK **nunca llega al navegador**. Tabla `ia_config` con **RLS default-deny** (sin políticas para `authenticated`) → el cliente no la lee ni escribe directo. La UI usa `get_ia_config` (devuelve proveedor/modelo + `tiene_llave`, **jamás la llave**) y `set_ia_config` (SECURITY DEFINER, admin); el servidor lee la llave con service-role. `set_ia_config` maneja `NULL`=conservar, `''`=borrar. **Nota:** la llave se guarda **en claro at-rest** (acceso server-only); cifrar con pgcrypto es una mejora futura.
+
+- **Probado en staging:** set/get, conservar-con-NULL, borrar-con-'', el cliente `authenticated` no ve la tabla (RLS), no-admin bloqueado. Migración aplicada en prod (SQL Editor, 7-ago). tsc/build/55 tests OK (3 nuevos del motor).
+- **Sin colisión:** solo `app/api/asistente`, `components/asistente/AsistenteView`, `components/configuracion/*` (nuestro). No tocó archivos de Santiago.
 
 ### Fase 2 — Paridad de modelo de datos (Carril B) — 1-ago
 
@@ -758,4 +774,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 1 de agosto de 2026. Fase 1 cerrada (PRs #22-24). WhatsApp 5.1 (#27), backbone Operaciones fase 3 (#28) y catálogo ramos-aseguradora 2.6 (#33) desplegados. Fase 2 a falta del PR #31 (UI, Santiago) + alerta de certificados en cron.*
+*Última actualización: 7 de agosto de 2026. Fase 1 y 2 cerradas. Fase 3 backbone (#28) desbloqueado. WhatsApp 5.1 (#27) y **motor de IA 4.3 (#38, base de fase 4)** en prod.*
