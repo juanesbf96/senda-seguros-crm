@@ -23,7 +23,7 @@
 | 3.x | Operaciones de Producción | 🟡 Backbone en prod (#28). **Desbloqueado**: fase 2 cerró y `PolizaDetalle`/`PolizaModal` están libres. Falta timeline, enganche de financiación, y operaciones de renovación/cancelación. ⚠️ Antes de usar las cuotas en operación diaria hay que decidir el solapamiento `operaciones` vs `cobros` (ver sección de fase 3) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
 | 4.1 | Extractor PDF de carátulas | ⬜ Pendiente (usa el motor 4.3 como fallback) |
-| 4.2 | Ventas cruzadas con scoring | ⬜ Pendiente (usa el motor 4.3 para mensajes) |
+| 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
 
@@ -163,6 +163,18 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 
 - **Probado en staging:** set/get, conservar-con-NULL, borrar-con-'', el cliente `authenticated` no ve la tabla (RLS), no-admin bloqueado. Migración aplicada en prod (SQL Editor, 7-ago). tsc/build/55 tests OK (3 nuevos del motor).
 - **Sin colisión:** solo `app/api/asistente`, `components/asistente/AsistenteView`, `components/configuracion/*` (nuestro). No tocó archivos de Santiago.
+
+### Fase 4.2 — Cross-sell con scoring + mensaje IA (rama `feat/cross-sell-oportunidades`, PR #40) ✅ mergeado y en prod (Carril A)
+
+Vista **Oportunidades** (`/oportunidades`, sidebar → CRM): clientes con póliza activa de una familia de ramo a los que les falta el complementario, con score y mensaje de venta redactado por la IA (motor 4.3).
+
+- **RPC `get_oportunidades_cross_sell`:** el `ramo` es texto libre → se categoriza en familias con ILIKE (AUTOS, VIDA, SALUD, HOGAR, CUMPLIMIENTO, RC, EMPRESARIAL, TRANSPORTE, ACCIDENTES). Matriz X→Y en un `VALUES` (Autos→Vida/Hogar, Salud→Vida, Cumplimiento→RC, Empresarial→RC/Cumplimiento). Score = base por prioridad + prima + antigüedad + # pólizas (tope 100). **Excluye lo que el cliente ya tiene** (`NOT (destino = ANY(familias))`) y solo cuenta pólizas `estado='activa'`.
+- **Tabla `analisis_ia`** (caché + trazabilidad): RLS de lectura por miembro; escritura solo server-side. Guarda `resultado jsonb` + `modelo` + `created_at`.
+- **API `/api/oportunidades/mensaje`:** genera el mensaje con el motor 4.3 y lo **cachea 30 días** por (cliente, familia destino) — re-entrar antes de 30 días **no** re-llama a la IA (criterio de aceptación). Registra `proveedor:modelo`.
+- **UI:** filtros (prioridad/ramo/búsqueda), resumen por prioridad, botón "Mensaje IA" por fila con copiar y WhatsApp (reusa `lib/whatsapp`).
+- **Probado en staging** con clientes sintéticos: excluye lo ya contratado (cliente con Autos+Vida+Hogar solo recibe Vida→Salud), ignora pólizas vencidas, scoring coherente (mayor prima/antigüedad → mayor score). tsc/build/55 tests OK.
+- **Nota operativa (7-ago):** al aplicar en prod, la 1ª corrida del SQL falló por un error de transcripción al chat (se cayó el alias `AS score`); el archivo de migración siempre estuvo correcto. Re-corrido con el SQL exacto del archivo → OK.
+- **Sin colisión:** RPC + vista nueva + `analisis_ia`; toca `Sidebar.tsx` y `types/index.ts` con adiciones.
 
 ### Fase 2 — Paridad de modelo de datos (Carril B) — 1-ago
 
@@ -774,4 +786,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 7 de agosto de 2026. Fase 1 y 2 cerradas. Fase 3 backbone (#28) desbloqueado. WhatsApp 5.1 (#27) y **motor de IA 4.3 (#38, base de fase 4)** en prod.*
+*Última actualización: 7 de agosto de 2026. Fase 1 y 2 cerradas. Fase 4 avanzando: motor IA 4.3 (#38) y cross-sell 4.2 (#40) en prod; falta 4.1 (extractor PDF). Fase 3 backbone desbloqueado.**motor de IA 4.3 (#38, base de fase 4)** en prod.*
