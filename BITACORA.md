@@ -19,8 +19,8 @@
 | — | **Reconciliar recibos/caja + RPC atómica de pago** | ✅ Hecho — misma rama. Caja estaba rota en runtime (400); RPC `registrar_pago_cobro` probada en staging |
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
-| 2.x | Paridad de modelo de datos (referencia externa) | 🔵 Casi — schema (#25), matching (#29) y **2.6 ramos-aseguradora (#33)** mergeados y en prod; **UI #31 ABIERTO**. Falta solo cerrar #31 y la alerta de certificados en el cron (bloqueador documentado) |
-| 3.x | Operaciones de Producción | 🟡 Backbone hecho — PR #28 mergeado y desplegado (tabla `operaciones` + generador de cuotas + vista `/operaciones`). Timeline en PolizaDetalle diferido (coordinar con fase 2) |
+| 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
+| 3.x | Operaciones de Producción | 🟡 Backbone en prod (#28). **Desbloqueado**: fase 2 cerró y `PolizaDetalle`/`PolizaModal` están libres. Falta timeline, enganche de financiación, y operaciones de renovación/cancelación. ⚠️ Antes de usar las cuotas en operación diaria hay que decidir el solapamiento `operaciones` vs `cobros` (ver sección de fase 3) |
 | 4.x | Automatización e IA (extractor PDF, cross-sell, motor multi-proveedor) | ⬜ Pendiente |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
@@ -122,6 +122,31 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 - **Vista `/operaciones`** (sidebar → Finanzas): lista con filtros por tipo/estado y resumen de cartera pendiente/pagada. Tipos `Operacion` / `TipoOperacion` / `EstadoCartera`.
 - **Probada en staging:** 4 cuotas trimestrales con fechas correctas (ene/abr/jul/oct), anti-duplicado y bloqueo de usuario ajeno OK. Migración aplicada en prod (SQL Editor, 1-ago). tsc/build/29 tests OK.
 - **DIFERIDO (coordinar con fase 2 de Santiago):** timeline de operaciones dentro de `PolizaDetalle`, enganche del generador con la UI de financiación, y creación de operaciones `renovacion` (cron) y `cancelacion` (fase 1.1). Todo eso toca `PolizaDetalle`/`PolizaModal` (sus archivos).
+
+- **DESBLOQUEADO (2-ago):** fase 2 cerró (PR #34 mergeado), así que `PolizaDetalle`/`PolizaModal` quedaron libres. Lo diferido ya se puede tomar. Desglose de lo que falta:
+
+| # | Pendiente | Archivos | ¿Migración? |
+|---|-----------|----------|-------------|
+| 1 | Timeline de operaciones en `PolizaDetalle` | `PolizaDetalle` | No |
+| 2 | Enganchar `generar_operaciones_cuotas` con la UI de financiación | `PolizaModal` | No |
+| 3 | El cron crea la operación `renovacion` 60 días antes | `app/api/cron/renovaciones` | **Probablemente sí** — revisar el dedup (ver nota abajo) |
+| 4 | Cancelar una póliza crea la operación `cancelacion` (enlaza con 1.1) | `PolizaModal` | No |
+
+1, 2 y 4 comparten archivos y no llevan migración → caben en un solo PR (PR-10 del plan). El 3 conviene separarlo: toca el cron y arrastra el mismo problema de dedup que la alerta de certificados (`notificaciones_renovacion` tiene clave `(poliza_id, dias_alerta)`; una operación de renovación necesita su propio criterio de "ya creada" para no duplicar en cada corrida diaria).
+
+> **⚠️ DECISIÓN DE PRODUCTO PENDIENTE — solapamiento `operaciones` vs `cobros`.**
+> Hoy la cartera vive en **dos** lugares y eso va a divergir si no se decide:
+> - El **aging de cartera** (fase 1.2, `get_cartera_aging`) lee de **`cobros`**.
+> - Las **cuotas** que genera `generar_operaciones_cuotas` viven en **`operaciones`**.
+>
+> El plan dice explícitamente "no migrar los históricos de Cobros a operaciones; conviven", y también sugiere que el aging "puede alimentarse de operaciones pendientes". Ambas cosas a la vez no se sostienen: si se generan cuotas como operaciones y el aging sigue leyendo `cobros`, esas cuotas **no aparecen en la cartera** — o peor, si alguien registra lo mismo en los dos lados, la mora se cuenta doble.
+>
+> **No hay que resolverlo para hacer 1, 2 y 4** (esos solo muestran/crean operaciones por póliza). Sí hay que decidirlo **antes** de que las operaciones tipo `cobro` se usen en la operación diaria. Opciones a plantear al owner:
+> 1. `operaciones` es la fuente de verdad de cartera → migrar el aging a leer de ahí (o a una vista que una ambas).
+> 2. `cobros` sigue siendo la cartera y `operaciones` queda solo como bitácora de movimientos → entonces el generador de cuotas debería escribir en `cobros`, no en `operaciones`.
+>
+> Elegir una y dejarla escrita aquí antes de seguir con el punto 3.
+
 
 ### Fase 2 — Paridad de modelo de datos (Carril B) — 1-ago
 
