@@ -8,6 +8,7 @@ import {
   pctDe, comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor,
   comisionIntermediario as calcComisionIntermediario, retencion, comisionNeta, RETENCION_AGENCIA,
 } from '@/lib/comisiones'
+import { pctComisionPorDefecto, type TarifaCatalogo } from '@/lib/polizas/tarifas'
 
 /* ────────────────────────────────────────────────────────── */
 /*  Lists                                                     */
@@ -76,6 +77,8 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [miembros,        setMiembros]        = useState<{ user_id: string; nombre: string; email: string }[]>([])
   const [aseguradoras,    setAseguradoras]    = useState<string[]>(ASEGURADORAS_DEFAULT)
   const [tarifas,         setTarifas]         = useState<TarifaComision[]>([])
+  // Catálogo formal ramo-por-aseguradora (fase 2.6): tiene precedencia sobre `tarifas` (JSON heredado)
+  const [catalogoRamos,   setCatalogoRamos]   = useState<TarifaCatalogo[]>([])
   const [showNuevaTarifa, setShowNuevaTarifa] = useState(false)
   const [nuevaTarifaForm, setNuevaTarifaForm] = useState<Omit<TarifaComision,'id'>>({ codigo:'', ramo:'', aseguradora:'', porcentaje:0 })
   const [nuevaTarifaErr,  setNuevaTarifaErr]  = useState('')
@@ -208,6 +211,12 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     }
 
     if (currentWorkspace) {
+      supabase.from('ramos_aseguradora')
+        .select('aseguradora, ramo, pct_comision_default, activo')
+        .eq('workspace_id', currentWorkspace.id)
+        .not('pct_comision_default', 'is', null)
+        .then(({ data }) => setCatalogoRamos((data ?? []) as TarifaCatalogo[]))
+
       supabase.from('configuracion')
         .select('clave, valor')
         .eq('workspace_id', currentWorkspace.id)
@@ -239,17 +248,29 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     })
   }
 
-  /* auto-select tarifa when ramo changes (primera coincidencia por ramo) */
-  function onRamoChange(ramo: string) {
+  /* Al cambiar ramo o aseguradora, autocompletar el % de comisión de agencia.
+     Precedencia: catálogo ramos_aseguradora → tarifa JSON exacta → tarifa por ramo
+     (ver lib/polizas/tarifas.ts). Si ninguna aplica se conserva el valor actual. */
+  function autocompletarPct(aseguradora: string, ramo: string) {
     setForm(f => {
+      const pct   = pctComisionPorDefecto(catalogoRamos, tarifas, aseguradora, ramo)
       const match = tarifas.find(t => t.ramo === ramo)
       return {
         ...f,
         ramo,
+        aseguradora,
         tarifa_codigo: match?.codigo || '',
-        porcentaje_comision_agencia: match ? match.porcentaje.toString() : f.porcentaje_comision_agencia,
+        porcentaje_comision_agencia: pct !== null ? pct.toString() : f.porcentaje_comision_agencia,
       }
     })
+  }
+
+  function onRamoChange(ramo: string) {
+    autocompletarPct(form.aseguradora, ramo)
+  }
+
+  function onAseguradoraChange(aseguradora: string) {
+    autocompletarPct(aseguradora, form.ramo)
   }
 
   /* seleccionar tarifa por código → rellena % */
@@ -471,7 +492,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                       set('aseguradora', '')
                     } else {
                       setAseguradoraOtro(false)
-                      set('aseguradora', e.target.value)
+                      onAseguradoraChange(e.target.value)
                     }
                   }}
                   className={cls}>
@@ -482,7 +503,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 {aseguradoraOtro && (
                   <input
                     value={form.aseguradora}
-                    onChange={e => set('aseguradora', e.target.value)}
+                    onChange={e => onAseguradoraChange(e.target.value)}
                     placeholder="Nombre de la aseguradora..."
                     autoFocus
                     className={`${cls} mt-2`}

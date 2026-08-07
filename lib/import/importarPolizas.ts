@@ -20,6 +20,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ExcelRow, ImportResult } from './types'
 import { comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor, redondear2 } from '@/lib/comisiones'
 import { normalizarNumeroPoliza, mapaPorNumeroNormalizado } from '@/lib/polizas/numeroPoliza'
+import { pctComisionPorDefecto, type TarifaCatalogo } from '@/lib/polizas/tarifas'
 
 const LOTE_INSERT = 500
 const LOTE_IN     = 200   // tamaño de chunk para filtros .in() (límite de URL)
@@ -92,11 +93,17 @@ export async function importarPolizas(
     } catch { /* ignore */ }
   }
 
+  // Catálogo formal ramo-por-aseguradora (fase 2.6). Tiene precedencia sobre el
+  // JSON heredado; ver lib/polizas/tarifas.ts para la regla completa.
+  const { data: catData } = await supabase
+    .from('ramos_aseguradora')
+    .select('aseguradora, ramo, pct_comision_default, activo')
+    .eq('workspace_id', wsId)
+    .not('pct_comision_default', 'is', null)
+  const catalogoRamos = (catData ?? []) as TarifaCatalogo[]
+
   function matchTarifa(ramo: string, aseguradora: string): number | null {
-    const exact = tarifasComision.find(t => t.ramo === ramo && t.aseguradora === aseguradora)
-    if (exact) return exact.porcentaje
-    const byRamo = tarifasComision.find(t => t.ramo === ramo)
-    return byRamo ? byRamo.porcentaje : null
+    return pctComisionPorDefecto(catalogoRamos, tarifasComision, aseguradora, ramo)
   }
 
   function matchVendedor(asesorNombre: string): VendedorCache | null {
