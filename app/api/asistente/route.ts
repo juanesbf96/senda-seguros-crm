@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { completar } from '@/lib/ia/motor'
+import { resolverConfigIA } from '@/lib/ia/resolverConfig'
 
 export async function POST(req: NextRequest) {
   // Verificar autenticación — la cookie de sesión viene en el header
@@ -20,12 +22,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
   }
 
-  const GROQ_API_KEY = process.env.GROQ_API_KEY
-  if (!GROQ_API_KEY) {
-    return NextResponse.json({ error: 'GROQ_API_KEY no configurado en .env.local' }, { status: 500 })
-  }
-
-  const { messages, contexto } = await req.json()
+  const { messages, contexto, workspaceId } = await req.json()
 
   const hoy = new Date().toLocaleDateString('es-CO', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
@@ -47,32 +44,29 @@ INSTRUCCIONES:
 - Sé breve: máximo 3-4 oraciones salvo que la pregunta requiera una lista.
 - Si te preguntan por un asesor o persona, busca su nombre en los datos disponibles.`
 
-  const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROQ_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'llama-3.3-70b-versatile',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...messages,
-      ],
-      max_tokens: 600,
-      temperature: 0.2,
-    }),
-  })
-
-  const data = await resp.json()
-
-  if (!resp.ok) {
-    console.error('Groq error:', data)
-    return NextResponse.json(
-      { error: data.error?.message || 'Error al contactar Groq' },
-      { status: 500 }
-    )
+  // Resolver el proveedor de IA del workspace (BYOK) — la llave se lee server-side
+  // con service-role; si no hay config, cae al Groq incluido.
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!serviceKey) {
+    return NextResponse.json({ error: 'SUPABASE_SERVICE_ROLE_KEY no configurada en el servidor' }, { status: 500 })
   }
+  const serviceClient = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceKey)
 
-  return NextResponse.json({ respuesta: data.choices[0].message.content })
+  try {
+    const cfg = workspaceId
+      ? await resolverConfigIA(serviceClient, workspaceId)
+      : { proveedor: 'groq' as const, modelo: null, apiKey: process.env.GROQ_API_KEY || '' }
+
+    const respuesta = await completar(cfg, {
+      system: systemPrompt,
+      messages,
+      maxTokens: 600,
+      temperature: 0.2,
+    })
+    return NextResponse.json({ respuesta })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Error al contactar el proveedor de IA'
+    console.error('Motor IA error:', msg)
+    return NextResponse.json({ error: msg }, { status: 500 })
+  }
 }
