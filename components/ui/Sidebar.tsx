@@ -8,7 +8,7 @@ import {
   LogOut, ClipboardList, CheckSquare, Send,
   DollarSign, Receipt, UserCog, Calculator, TrendingUp, CalendarDays,
   BarChart2, FolderOpen, ShieldAlert, FileSpreadsheet, ClipboardCheck,
-  Target, Bot, Settings, Building2, Check, ChevronsUpDown, FileDown, PiggyBank, Layers,
+  Target, Bot, Settings, Building2, Check, ChevronsUpDown, FileDown, PiggyBank, Layers, Sparkles,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -67,7 +67,8 @@ const NAV_GROUPS: NavGroup[] = [
     id: 'crm',
     label: 'CRM',
     items: [
-      { href: '/prospectos', label: 'Prospectos', icon: TrendingUp, perm: 'pipeline_ver' },
+      { href: '/prospectos',   label: 'Prospectos',    icon: TrendingUp, perm: 'pipeline_ver' },
+      { href: '/oportunidades', label: 'Oportunidades', icon: Sparkles,   perm: 'clientes_ver_todos' },
     ],
   },
   {

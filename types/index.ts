@@ -482,6 +482,22 @@ export interface CarteraAgingRow {
   total: number
 }
 
+// Ventas cruzadas (fase 4.2) — una fila de get_oportunidades_cross_sell.
+export type PrioridadOportunidad = 'alta' | 'media' | 'baja'
+
+export interface OportunidadCrossSell {
+  client_id: string
+  cliente_nombre: string
+  telefono: string | null
+  familia_tiene: string
+  familia_sugerida: string
+  prioridad: PrioridadOportunidad
+  num_polizas: number
+  prima_total: number
+  antiguedad_dias: number
+  score: number
+}
+
 // Catálogo ramos-por-aseguradora (fase 2.6).
 export type DisponibleRamo = 'si' | 'no' | 'condicionado'
 
