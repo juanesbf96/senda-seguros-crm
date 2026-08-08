@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Poliza, EstadoPoliza, Cliente, Vendedor, PeriodicidadCuota } from '@/types'
-import { X, Calculator } from 'lucide-react'
+import { Poliza, EstadoPoliza, Cliente, Vendedor, PeriodicidadCuota, OrigenCreacion } from '@/types'
+import { X, Calculator, AlertTriangle } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
   pctDe, comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor,
@@ -80,6 +80,10 @@ interface Props {
   poliza?: Poliza
   clientId?: string
   isCumplimiento?: boolean
+  /** Cómo nació la póliza (fase 0.3). Solo aplica al alta; en edición no se relabela. */
+  origenCreacion?: OrigenCreacion
+  /** Aviso persistente en la cabecera del formulario (p. ej. datos extraídos por IA). */
+  aviso?: string | null
   onClose: () => void
   onSaved: () => void
 }
@@ -88,7 +92,7 @@ interface Props {
 /*  Component                                                 */
 /* ────────────────────────────────────────────────────────── */
 
-export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose, onSaved }: Props) {
+export default function PolizaModal({ poliza, clientId, isCumplimiento, origenCreacion = 'manual', aviso, onClose, onSaved }: Props) {
   const { currentWorkspace } = useWorkspace()
   const [clientes,        setClientes]        = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [vendedores,      setVendedores]      = useState<Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]>([])
@@ -429,7 +433,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
 
     const { data: guardada, error: err } = poliza?.id
       ? await supabase.from('polizas').update(payload).eq('id', poliza.id).select('id').single()
-      : await supabase.from('polizas').insert({ ...payload, origen_creacion: 'manual' }).select('id').single()
+      : await supabase.from('polizas').insert({ ...payload, origen_creacion: origenCreacion }).select('id').single()
 
     if (err) { setError(err.message); setSaving(false); return }
 
@@ -519,6 +523,16 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
         </div>
 
         <div className="p-5 space-y-5">
+
+          {/* Aviso del origen de los datos (p. ej. extracción de PDF por IA).
+              Va DENTRO del formulario y no se puede cerrar: el usuario tiene que
+              verlo mientras edita, no solo antes de llegar acá. */}
+          {aviso && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 text-sm text-amber-800">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <p>{aviso}</p>
+            </div>
+          )}
 
           {/* ── 1. Info básica ── */}
           <Section title="Información básica">
