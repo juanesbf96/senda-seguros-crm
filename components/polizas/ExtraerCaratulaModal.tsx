@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import type { Poliza, ResultadoExtraccionCaratula } from '@/types'
 import {
-  borradorAPoliza, camposBorrador, mapearRamo, ETIQUETAS_BORRADOR,
+  borradorAPoliza, camposBorrador, mapearRamo, resolverPrima, ETIQUETAS_BORRADOR,
 } from '@/lib/polizas/borradorCaratula'
 import {
   X, Upload, FileText, AlertTriangle, Sparkles, Check, UserPlus, Loader2, ScanLine,
@@ -161,17 +161,18 @@ export default function ExtraerCaratulaModal({ onClose, onContinuar }: Props) {
       notas.push(`No se pudo leer del PDF: ${faltan}.`)
     }
     if (ramo.inferido) notas.push(`El ramo "${ramo.valor}" es una sugerencia: confírmalo.`)
-    if (resultado.borrador.prima != null) {
-      notas.push('La prima se cargó como prima neta (antes de IVA); verifica si la carátula traía la prima total.')
-    }
+    // Aviso DIRIGIDO según el tipo de prima que trajo la carátula, en vez del
+    // genérico de antes (que salía siempre y no decía qué confirmar).
+    const avisoPrima = resolverPrima(resultado).aviso
+    if (avisoPrima) notas.push(avisoPrima)
 
     onContinuar({
-      poliza: borradorAPoliza(resultado.borrador, tomador.clienteId),
+      poliza: borradorAPoliza(resultado, tomador.clienteId),
       aviso:  notas.length ? notas.join(' ') : null,
     })
   }
 
-  const filas = resultado ? camposBorrador(resultado.borrador, resultado.campos_faltantes) : []
+  const filas = resultado ? camposBorrador(resultado) : []
   const requiereRevision = resultado?.confianza === 'requiere_revision'
 
   return (
