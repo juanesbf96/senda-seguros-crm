@@ -18,6 +18,23 @@ interface PolizaPorVencer {
   admin_nombre:   string
 }
 
+interface CertificadoPorVencer {
+  certificado_id:     string
+  numero_certificado: string | null
+  poliza_id:          string
+  numero_poliza:      string | null
+  aseguradora:        string
+  ramo:               string
+  valor:              number | null
+  fecha_fin:          string
+  dias_restantes:     number
+  cliente_nombre:     string
+  workspace_id:       string
+  workspace_name:     string
+  admin_email:        string
+  admin_nombre:       string
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function formatCOP(v: number | null): string {
   if (!v) return '—'
@@ -47,7 +64,45 @@ function buildEmail(
   rows7:  PolizaPorVencer[],
   rows15: PolizaPorVencer[],
   rows30: PolizaPorVencer[],
+  certs7:  CertificadoPorVencer[] = [],
+  certs15: CertificadoPorVencer[] = [],
+  certs30: CertificadoPorVencer[] = [],
 ): string {
+  // Tabla de certificados por vencer (mismo estilo que la de pólizas).
+  function tablaCert(rows: CertificadoPorVencer[], dias: number): string {
+    if (rows.length === 0) return ''
+    const color = urgencyColor(dias)
+    const bg    = urgencyBg(dias)
+    const titulo = dias === 7 ? '🔴 Certificados que vencen en 7 días o menos'
+      : dias === 15 ? '🟠 Certificados que vencen en 8–15 días' : '🟢 Certificados que vencen en 16–30 días'
+    const filas = rows.map(c => `
+      <tr>
+        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px">${c.cliente_nombre}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#475569">${c.numero_certificado || '—'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#475569">${c.numero_poliza || '—'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#059669;font-weight:600">${formatCOP(c.valor)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;color:#475569">${formatDate(c.fecha_fin)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #f1f5f9;text-align:center">
+          <span style="background:${bg};color:${color};font-weight:700;padding:3px 8px;border-radius:9999px;font-size:12px">${c.dias_restantes}d</span>
+        </td>
+      </tr>`).join('')
+    return `
+      <h3 style="color:${color};margin:24px 0 8px;font-size:15px">${titulo}</h3>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden">
+        <thead>
+          <tr style="background:#f8fafc">
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Cliente</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">N° Certificado</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">N° Póliza</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Valor</th>
+            <th style="padding:10px 12px;text-align:left;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Vence</th>
+            <th style="padding:10px 12px;text-align:center;font-size:11px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Días</th>
+          </tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>`
+  }
+
   function table(rows: PolizaPorVencer[], dias: number): string {
     if (rows.length === 0) return ''
     const color = urgencyColor(dias)
@@ -85,6 +140,7 @@ function buildEmail(
   }
 
   const total = rows7.length + rows15.length + rows30.length
+  const totalCert = certs7.length + certs15.length + certs30.length
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -102,13 +158,18 @@ function buildEmail(
     <div style="background:#fff;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;padding:32px">
       <p style="color:#1e293b;font-size:15px;margin:0 0 8px">Hola <strong>${adminNombre}</strong>,</p>
       <p style="color:#475569;font-size:14px;line-height:1.6;margin:0 0 24px">
-        Tienes <strong>${total} póliza${total !== 1 ? 's' : ''}</strong> que vence${total !== 1 ? 'n' : ''} en los próximos 30 días.
+        Tienes ${total > 0 ? `<strong>${total} póliza${total !== 1 ? 's' : ''}</strong>` : ''}${total > 0 && totalCert > 0 ? ' y ' : ''}${totalCert > 0 ? `<strong>${totalCert} certificado${totalCert !== 1 ? 's' : ''}</strong>` : ''} por vencer en los próximos 30 días.
         Es momento de contactar a los clientes para gestionar la renovación.
       </p>
 
       ${table(rows7,  7)}
       ${table(rows15, 15)}
       ${table(rows30, 30)}
+
+      ${totalCert > 0 ? `<h2 style="color:#1e293b;margin:32px 0 4px;font-size:16px">Certificados por vencer</h2>` : ''}
+      ${tablaCert(certs7,  7)}
+      ${tablaCert(certs15, 15)}
+      ${tablaCert(certs30, 30)}
 
       <div style="margin-top:32px;padding-top:24px;border-top:1px solid #f1f5f9;text-align:center">
         <a href="https://senda-seguros-crm.vercel.app/renovaciones"
@@ -248,42 +309,81 @@ export async function GET(req: NextRequest) {
     ws.polizas.get(umbral)!.push(p)
   }
 
-  if (porWorkspace.size === 0) {
+  // 6.5. Certificados por vencer (deuda de fase 2.4). Estructura PARALELA a la de
+  //      pólizas para no arriesgar el flujo de emails que ya funciona. Dedup propio
+  //      por (certificado_id, umbral) usando el nuevo `tipo='certificado'` del log.
+  const porWorkspaceCert = new Map<string, { certs: Map<number, CertificadoPorVencer[]>; admin: CertificadoPorVencer }>()
+  const { data: certsData } = await supabase.rpc('get_certificados_por_vencer', { dias_max: 30 })
+  const certsTodos = (certsData || []) as CertificadoPorVencer[]
+  if (certsTodos.length > 0) {
+    const certIds = certsTodos.map(c => c.certificado_id)
+    const { data: certEnviadas } = await supabase
+      .from('notificaciones_renovacion')
+      .select('certificado_id, dias_alerta')
+      .eq('tipo', 'certificado')
+      .in('certificado_id', certIds)
+    const certYa = new Set((certEnviadas || []).map(n => `${n.certificado_id}-${n.dias_alerta}`))
+
+    for (const c of certsTodos) {
+      const umbral = umbrales.find(u => c.dias_restantes <= u)
+      if (!umbral) continue
+      if (certYa.has(`${c.certificado_id}-${umbral}`)) continue
+      if (!porWorkspaceCert.has(c.workspace_id)) porWorkspaceCert.set(c.workspace_id, { certs: new Map(), admin: c })
+      const ws = porWorkspaceCert.get(c.workspace_id)!
+      if (!ws.certs.has(umbral)) ws.certs.set(umbral, [])
+      ws.certs.get(umbral)!.push(c)
+    }
+  }
+
+  if (porWorkspace.size === 0 && porWorkspaceCert.size === 0) {
     return NextResponse.json({ message: 'Todas las notificaciones de hoy ya fueron enviadas', sent: 0, renovacionesCreadas })
   }
 
-  // 7. Enviar un email por workspace y registrar
+  // 7. Enviar un email por workspace (pólizas y/o certificados) y registrar
   let emailsSent = 0
-  const logEntries: { workspace_id: string; poliza_id: string; dias_alerta: number; fecha_envio: string; email_destino: string }[] = []
+  type LogEntry = { workspace_id: string; poliza_id: string; certificado_id?: string; tipo: string; dias_alerta: number; fecha_envio: string; email_destino: string }
+  const logEntries: LogEntry[] = []
 
-  for (const [wsId, { polizas: mapaUmbral, admin }] of porWorkspace) {
-    const rows7  = mapaUmbral.get(7)  || []
-    const rows15 = mapaUmbral.get(15) || []
-    const rows30 = mapaUmbral.get(30) || []
+  const wsIds = new Set<string>([...porWorkspace.keys(), ...porWorkspaceCert.keys()])
+  for (const wsId of wsIds) {
+    const pw = porWorkspace.get(wsId)
+    const cw = porWorkspaceCert.get(wsId)
+    const admin = pw?.admin ?? cw!.admin   // datos del admin desde pólizas o certificados
 
-    const todas3 = [...rows7, ...rows15, ...rows30]
-    if (todas3.length === 0) continue
+    const rows7  = pw?.polizas.get(7)  || []
+    const rows15 = pw?.polizas.get(15) || []
+    const rows30 = pw?.polizas.get(30) || []
+    const certs7  = cw?.certs.get(7)  || []
+    const certs15 = cw?.certs.get(15) || []
+    const certs30 = cw?.certs.get(30) || []
 
-    const html = buildEmail(admin.admin_nombre, admin.workspace_name, rows7, rows15, rows30)
+    const nPol  = rows7.length + rows15.length + rows30.length
+    const nCert = certs7.length + certs15.length + certs30.length
+    if (nPol + nCert === 0) continue
+
+    const html = buildEmail(admin.admin_nombre, admin.workspace_name, rows7, rows15, rows30, certs7, certs15, certs30)
+    const partes = [
+      nPol  ? `${nPol} póliza${nPol !== 1 ? 's' : ''}` : '',
+      nCert ? `${nCert} certificado${nCert !== 1 ? 's' : ''}` : '',
+    ].filter(Boolean).join(' y ')
 
     const { error: emailError } = await resend.emails.send({
       from:    fromEmail,
       to:      admin.admin_email,
-      subject: `🔔 ${todas3.length} póliza${todas3.length !== 1 ? 's' : ''} por renovar — ${admin.workspace_name}`,
+      subject: `🔔 ${partes} por vencer — ${admin.workspace_name}`,
       html,
     })
-
     if (emailError) {
       console.error(`Cron: error enviando email a ${admin.admin_email}:`, emailError)
       continue
     }
-
     emailsSent++
 
-    // Registrar cada póliza notificada
-    for (const p of rows7)  logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 7,  fecha_envio: hoy, email_destino: admin.admin_email })
-    for (const p of rows15) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 15, fecha_envio: hoy, email_destino: admin.admin_email })
-    for (const p of rows30) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, dias_alerta: 30, fecha_envio: hoy, email_destino: admin.admin_email })
+    // Registrar pólizas (tipo 'poliza' por defecto) y certificados notificados
+    for (const [dias, rows] of [[7, rows7], [15, rows15], [30, rows30]] as [number, PolizaPorVencer[]][])
+      for (const p of rows) logEntries.push({ workspace_id: wsId, poliza_id: p.poliza_id, tipo: 'poliza', dias_alerta: dias, fecha_envio: hoy, email_destino: admin.admin_email })
+    for (const [dias, rows] of [[7, certs7], [15, certs15], [30, certs30]] as [number, CertificadoPorVencer[]][])
+      for (const c of rows) logEntries.push({ workspace_id: wsId, poliza_id: c.poliza_id, certificado_id: c.certificado_id, tipo: 'certificado', dias_alerta: dias, fecha_envio: hoy, email_destino: admin.admin_email })
   }
 
   // 8. Guardar log (con service role, ignora RLS)
@@ -297,9 +397,10 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     message: `Cron ejecutado correctamente`,
     date:    hoy,
-    polizasRevisadas:    todas.length,
-    emailsEnviados:      emailsSent,
-    notificacionesLog:   logEntries.length,
+    polizasRevisadas:      todas.length,
+    certificadosRevisados: certsTodos.length,
+    emailsEnviados:        emailsSent,
+    notificacionesLog:     logEntries.length,
     renovacionesCreadas,
   })
 }
