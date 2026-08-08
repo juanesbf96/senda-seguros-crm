@@ -500,10 +500,28 @@ export interface BorradorPoliza {
   tomador_documento: string | null
   fecha_inicio:      string | null   // 'YYYY-MM-DD'
   fecha_fin:         string | null   // 'YYYY-MM-DD'
+  /** @deprecated transicional (= mejor prima disponible). Usar la prima DISCRIMINADA
+   *  del wrapper `ResultadoExtraccionCaratula` (prima_neta/prima_total/prima_indeterminada).
+   *  Se mantiene poblado hasta que Carril B migre su mapeo; luego se elimina. */
   prima:             number | null
 }
 
-export interface ResultadoExtraccionCaratula {
+// Prima discriminada: la carátula puede traer neta (antes de IVA), total (con IVA) o
+// un solo número sin etiqueta clara. NO se asume el tipo — un número sin etiqueta va a
+// `prima_indeterminada` para que la UI pida confirmación dirigida.
+// Va en el WRAPPER (no en BorradorPoliza) porque `ETIQUETAS_BORRADOR` de Carril B es un
+// `Record<keyof BorradorPoliza>` total: agregar keys al borrador rompería su compilación.
+export interface PrimaDiscriminada {
+  prima_neta:          number | null   // antes de IVA
+  prima_total:         number | null   // con IVA (y gastos) incluidos
+  iva:                 number | null   // solo si la carátula lo discrimina
+  prima_indeterminada: number | null   // se encontró una prima pero no su tipo
+}
+
+// La prima discriminada es `Partial` en el wrapper para que sea ADITIVA: las fixtures
+// de Carril B que construyen este tipo sin esos campos siguen compilando. El endpoint
+// siempre los llena (spread de PrimaDiscriminada completa).
+export type ResultadoExtraccionCaratula = Partial<PrimaDiscriminada> & {
   borrador:              BorradorPoliza
   origen:                'parser' | 'ia'
   confianza:             'alta' | 'requiere_revision'

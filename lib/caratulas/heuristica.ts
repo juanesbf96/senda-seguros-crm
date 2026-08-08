@@ -5,7 +5,7 @@
 // parser por aseguradora afinado con PDFs reales; cuando un campo clave falta,
 // el endpoint completa con el motor de IA (4.3).
 
-import { BorradorPoliza } from '@/types'
+import { BorradorPoliza, PrimaDiscriminada } from '@/types'
 import { detectarAseguradora } from './aseguradoras'
 
 const RAMOS_CONOCIDOS = [
@@ -52,12 +52,9 @@ function detectarRamo(texto: string): string | null {
   return hit ? hit.charAt(0).toUpperCase() + hit.slice(1) : null
 }
 
-const CAMPOS_CLAVE: (keyof BorradorPoliza)[] = [
-  'numero_poliza', 'aseguradora', 'fecha_inicio', 'fecha_fin', 'prima',
-]
-
 export interface ExtraccionHeuristica {
   borrador: BorradorPoliza
+  prima: PrimaDiscriminada
   camposFaltantes: string[]
 }
 
@@ -84,7 +81,17 @@ export function extraerHeuristica(texto: string): ExtraccionHeuristica {
     fecha_inicio = normalizarFecha(fechas[0]); fecha_fin = normalizarFecha(fechas[1])
   }
 
-  const primaRaw = buscar(texto, /prima\s*(?:total|neta|anual)?[\s:$]*([\d][\d.,]*)/i)
+  // Prima: buscar PRIMERO las etiquetas específicas (neta/total) y solo si NO hay
+  // ninguna, aceptar una prima genérica como INDETERMINADA. El orden importa: "PRIMA
+  // TOTAL" también matchearía un patrón laxo de "PRIMA", así que la genérica usa un
+  // lookahead negativo para no capturar "prima neta"/"prima total".
+  const prima_neta  = normalizarMonto(buscar(texto, /prima\s*neta[\s:$]*([\d][\d.,]*)/i))
+  const prima_total = normalizarMonto(buscar(texto, /prima\s*total[\s:$]*([\d][\d.,]*)/i))
+  const iva         = normalizarMonto(buscar(texto, /\bi\.?\s*v\.?\s*a\.?[\s:$]*([\d][\d.,]*)/i))
+  const prima_indeterminada = (prima_neta == null && prima_total == null)
+    ? normalizarMonto(buscar(texto, /prima(?!\s*(?:neta|total))\s*(?:anual)?[\s:$]*([\d][\d.,]*)/i))
+    : null
+  const prima: PrimaDiscriminada = { prima_neta, prima_total, iva, prima_indeterminada }
 
   const borrador: BorradorPoliza = {
     numero_poliza,
@@ -94,9 +101,26 @@ export function extraerHeuristica(texto: string): ExtraccionHeuristica {
     tomador_documento,
     fecha_inicio,
     fecha_fin,
-    prima: normalizarMonto(primaRaw),
+    // Transicional: `prima` = la mejor disponible, para no romper a Carril B mientras migra.
+    prima: prima_neta ?? prima_total ?? prima_indeterminada,
   }
 
-  const camposFaltantes = CAMPOS_CLAVE.filter(c => borrador[c] == null).map(String)
-  return { borrador, camposFaltantes }
+  const camposFaltantes = faltanCamposClave(borrador, prima)
+  return { borrador, prima, camposFaltantes }
+}
+
+/** True si hay ALGUNA prima (neta, total o indeterminada). */
+export function tienePrima(p: PrimaDiscriminada): boolean {
+  return p.prima_neta != null || p.prima_total != null || p.prima_indeterminada != null
+}
+
+/** Campos clave faltantes. 'prima' se cumple con que exista cualquier prima. */
+export function faltanCamposClave(b: BorradorPoliza, prima: PrimaDiscriminada): string[] {
+  const faltantes: string[] = []
+  if (b.numero_poliza == null) faltantes.push('numero_poliza')
+  if (b.aseguradora == null)   faltantes.push('aseguradora')
+  if (b.fecha_inicio == null)  faltantes.push('fecha_inicio')
+  if (b.fecha_fin == null)     faltantes.push('fecha_fin')
+  if (!tienePrima(prima))      faltantes.push('prima')
+  return faltantes
 }
