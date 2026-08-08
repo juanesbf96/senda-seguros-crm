@@ -20,12 +20,58 @@
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
-| 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45), todo en prod. `periodicidad_cuota` resuelta en #49 (pendiente de aplicar migración + merge). ⚠️ Antes de usar cuotas en operación diaria queda **una sola** decisión: el solapamiento `operaciones` vs `cobros` (brief en `docs/DECISION_operaciones_vs_cobros.md`) |
+| 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45) + `periodicidad_cuota` (#49), todo en prod y **verificado en navegador** (ver sesión de verificación). ⚠️ Antes de usar cuotas en operación diaria queda **una sola** decisión: el solapamiento `operaciones` vs `cobros` (brief en `docs/DECISION_operaciones_vs_cobros.md`) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
 | 4.1 | Extractor PDF de carátulas | 🟢 **Backend + UI en prod** (#47, #50) + **prima discriminada** (#53, Carril A): neta/total/IVA/indeterminada en el wrapper, resuelve la ambigüedad del IVA. Falta: Carril B migra a leer la prima del wrapper, y **verificación con una carátula real** |
 | 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
+
+### 🔬 Sesión de verificación en navegador (8-ago, Carril B)
+
+**Primera vez que la app se maneja con sesión real.** Hasta acá, PRs de fases 2, 3 y 4 se habían mergeado con la nota "sin verificación visual" — ni staging ni las máquinas de desarrollo tenían credenciales. Esta sesión saldó ese backlog: el owner inició sesión y creó un **workspace de prueba aparte**, así que todo lo que se escribió quedó aislado por `workspace_id` de los datos de Sara (el `.env.local` local apunta a **producción**; no hay config local separada).
+
+**Encontró dos bugs en producción que ninguna de las pruebas automatizadas podía ver.**
+
+#### Lo que se verificó ✅
+
+| Fase | Qué | Resultado |
+|---|---|---|
+| 2 (#31) | Coberturas: alta inline y totales por columna | correctos ($50.000.000 / $800.000) |
+| 2 (#31) | Sección Asegurados en una póliza **individual** | aparece — el gate `es_colectiva` sí se quitó (2.2) |
+| 2 (#31) | Selector de técnico | lista los miembros del workspace |
+| 2 (#31) | **Prima intacta al agregar asegurado a una individual** | ✅ sigue en $1.000.000 — el guard `recalcularPrima` hace lo suyo |
+| 2 (#31) | **Prima recalculada en una colectiva** (regresión) | ✅ $5.000.000 → $750.000 |
+| 3 (#42) | Timeline de operaciones, cancelación con motivo, anti-duplicado al reeditar | correctos |
+| 3 (#43) | Generar cuotas, guard de "cambios sin guardar", anti-duplicado | correctos |
+| 3 (#49) | **Cuotas trimestrales con `periodicidad_pago='Anual'`** | ✅ 08-ago → 08-nov → 08-feb → 08-may. Sin el fix habrían salido anuales |
+| 1.1 | Cancelar sin motivo | bloqueado ("Indica el motivo de cancelación") |
+| 0.3 | Cronología con el diff del trigger | `estado: activa → cancelada`, `motivo_cancelacion: ∅ → por_no_pago` |
+| — (#52) | Validaciones del import (por API) | fila corrupta rechazada, retención 150000 → 10% con advertencia |
+
+#### 🐛 Bugs encontrados y corregidos
+
+**PR #56 — "Invalid Date" en pantalla.** `formatDate()` está hecho para fechas sin hora (`'YYYY-MM-DD'`) y les concatena `'T00:00:00'`; con un `timestamptz` eso produce `Invalid Date`. Salía en **toda** cronología de póliza, en el "Desde" de **cada** ficha de cliente y en la fecha de cada colilla. Es exactamente lo que habría cazado la verificación visual de fase 0.3, que quedó pendiente por falta de datos y usuarios en staging.
+
+**PR #57 — una póliza cancelada se mostraba como activa.** Desde fase 6 el estado se calcula desde `fecha_fin` (porque la columna `estado` quedaba obsoleta), pero ese cálculo pasó a mandar **siempre** y dejó la rama `cancelada` como código muerto — justo en el caso que importa, porque nadie cancela una póliza ya vencida. La cancelada mostraba chip "Activa", la cabecera la contaba en **"1 activas · Prima: $1.000.000"** y la marcaba como próxima a vencer. Esto le quitaba el sentido a **fase 1.1**: se registraba el motivo, pero la pérdida no se veía en ninguna parte. Nuevo `lib/polizas/estado.ts`: `cancelada`/`pendiente` mandan sobre la fecha; activa vs vencida se sigue calculando.
+
+**PR #58 — la fila corrupta del import creaba su cliente igual.** Hueco de #52 detectado al probarlo contra producción: la validación vivía en la fase de pólizas, que corre **después** de la creación masiva de clientes (`clientesCreados: 3` con 2 pólizas). Contradecía el propio criterio de #52 — si la columna de aseguradora se corrió, el nombre y la cédula de esa fila tampoco son de fiar. El descarte pasó a una fase 0, antes de tocar la base.
+
+#### ⬜ Hallazgo reportado y NO corregido: prima de colectivas en dos columnas
+
+Al recalcular la prima de una colectiva, `AfiliadosTab` escribe solo **`prima`** (la columna legacy), pero la UI muestra **`prima_neta`**. Medido: `prima = 750.000` mientras `PolizaDetalle` sigue mostrando *"Prima neta $5.000.000 · Total prima $5.950.000"*. Las dos columnas quedan en desacuerdo y el recálculo es invisible.
+
+**No se tocó a propósito.** Exige una decisión de producto —¿la suma de los afiliados es la prima **neta** antes de IVA, o el **total**?— y de ahí cuelga una cascada (`total_prima`, `iva`, `comision_agencia`). Además `components/afiliados/` ya está marcado como zona delicada en esta bitácora, precisamente por un bug de corrupción de prima. **Decisión del owner pendiente.**
+
+#### ⬜ Verificaciones que siguen pendientes (y por qué)
+
+| Qué | Por qué no se pudo |
+|---|---|
+| Extractor PDF end-to-end (#50) | no había una carátula real disponible |
+| Bloque ámbar de advertencias del import en la UI | las herramientas de navegador no pueden adjuntar un archivo a un `input type=file`; se verificó llamando al endpoint con las filas ya parseadas |
+| Gating por permisos (usuario sin `polizas_editar`) | exige una segunda cuenta con rol agente. Crear cuentas e iniciar sesión no es algo que la instancia pueda hacer; lo tiene que hacer una persona y luego se maneja esa sesión |
+
+> **Nota de método:** el server local apunta a **producción**. Para volver a verificar, usar siempre un **workspace de prueba** — el aislamiento por `workspace_id` + RLS es lo que evita sembrar registros en el CRM real de la agencia.
 
 ### Fase 0.2 — Supabase CLI + staging (rama `infra/supabase-cli-staging`)
 
@@ -865,4 +911,6 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 7 de agosto de 2026. Fases 1, 2 y 3 cerradas. Fase 4 completa a falta de merges: 4.3 y 4.2 en prod, 4.1 con backend en prod (#47) y UI entregada (#50). `periodicidad_cuota` resuelta en #49 — su migración debe aplicarse en staging y prod antes de mergear. Pendiente de decisión del owner: `operaciones` vs `cobros` (brief en `docs/DECISION_operaciones_vs_cobros.md`).*
+*Última actualización: 8 de agosto de 2026. Fases 1, 2 y 3 cerradas y **verificadas en navegador** por primera vez (ver "Sesión de verificación"); de ahí salieron los fixes #56, #57 y #58. Fase 4: 4.2 y 4.3 en prod; 4.1 con backend, UI y prima discriminada en prod, falta que Carril B lea la prima del wrapper y una prueba con carátula real.*
+
+*Pendientes de decisión del owner: (1) `operaciones` vs `cobros` — brief en `docs/DECISION_operaciones_vs_cobros.md`; (2) la prima de colectivas escrita en `prima` mientras la UI muestra `prima_neta`.*
