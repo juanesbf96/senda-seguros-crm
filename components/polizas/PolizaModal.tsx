@@ -31,6 +31,15 @@ const ASEGURADORAS_DEFAULT = [
   'La Equidad','Mapfre','Positiva','Previsora','BBVA Seguros','Seguros del Estado',
 ]
 
+/** Etiquetas de motivo de cancelación (fase 1.1). Fuente única: la usa el
+ *  selector del formulario y la operación `cancelacion` de fase 3. */
+const MOTIVO_CANCELACION_LABELS: Record<string, string> = {
+  por_no_pago:              'Por no pago',
+  por_peticion_cliente:     'Por petición del cliente',
+  por_cambio_intermediario: 'Por cambio de intermediario',
+  otro:                     'Otro',
+}
+
 const PERIODICIDADES = ['Anual','Semestral','Trimestral','Mensual','Prima única']
 const FORMAS_PAGO    = ['Contado','Financiación','Mensual']
 const FINANCIERAS    = ['Crediseguro','Finesa','Servicrédito']
@@ -393,12 +402,52 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       workspace_id: currentWorkspace?.id,
     }
 
-    const { error: err } = poliza?.id
-      ? await supabase.from('polizas').update(payload).eq('id', poliza.id)
-      : await supabase.from('polizas').insert({ ...payload, origen_creacion: 'manual' })
+    const { data: guardada, error: err } = poliza?.id
+      ? await supabase.from('polizas').update(payload).eq('id', poliza.id).select('id').single()
+      : await supabase.from('polizas').insert({ ...payload, origen_creacion: 'manual' }).select('id').single()
 
     if (err) { setError(err.message); setSaving(false); return }
+
+    // Fase 3, ítem 4: cancelar una póliza deja su operación de Producción.
+    // Se hace DESPUÉS de guardar (necesita el id) y es best-effort: si falla
+    // (p.ej. el usuario no tiene finanzas_cobros_registrar) no se pierde la
+    // cancelación, que ya quedó persistida arriba.
+    const polizaId = guardada?.id ?? poliza?.id
+    if (form.estado === 'cancelada' && polizaId && currentWorkspace) {
+      await registrarOperacionCancelacion(polizaId, currentWorkspace.id)
+    }
+
     onSaved()
+  }
+
+  /** Crea la operación `cancelacion` si la póliza no tiene una ya (evita
+   *  duplicar al reeditar una póliza que ya estaba cancelada). */
+  async function registrarOperacionCancelacion(polizaId: string, wsId: string) {
+    const { data: yaExiste } = await supabase
+      .from('operaciones')
+      .select('id')
+      .eq('poliza_id', polizaId)
+      .eq('tipo', 'cancelacion')
+      .limit(1)
+      .maybeSingle()
+    if (yaExiste) return
+
+    const motivo = form.motivo_cancelacion === 'otro'
+      ? form.motivo_cancelacion_otro.trim()
+      : MOTIVO_CANCELACION_LABELS[form.motivo_cancelacion] ?? form.motivo_cancelacion
+
+    const { error: errOp } = await supabase.from('operaciones').insert({
+      workspace_id:     wsId,
+      poliza_id:        polizaId,
+      tipo:             'cancelacion',
+      estado_cartera:   'anulada',   // una cancelación no es cartera por cobrar
+      valor:            0,
+      fecha_programada: form.fecha_cancelacion || new Date().toISOString().slice(0, 10),
+      origen:           'poliza_modal',
+      notas:            motivo ? `Motivo: ${motivo}` : null,
+    })
+    // No se bloquea el flujo: la póliza ya se canceló correctamente.
+    if (errOp) console.error('No se pudo registrar la operación de cancelación:', errOp.message)
   }
 
   /* ────────────────────────────────────────────────────── */
@@ -553,10 +602,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                 <Field label="Motivo de cancelación *">
                   <select value={form.motivo_cancelacion} onChange={e => set('motivo_cancelacion', e.target.value)} className={cls}>
                     <option value="">Seleccionar…</option>
-                    <option value="por_no_pago">Por no pago</option>
-                    <option value="por_peticion_cliente">Por petición del cliente</option>
-                    <option value="por_cambio_intermediario">Por cambio de intermediario</option>
-                    <option value="otro">Otro</option>
+                    {Object.entries(MOTIVO_CANCELACION_LABELS).map(([v, label]) => (
+                      <option key={v} value={v}>{label}</option>
+                    ))}
                   </select>
                 </Field>
                 <Field label="Fecha de cancelación">
