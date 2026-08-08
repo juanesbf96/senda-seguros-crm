@@ -58,6 +58,8 @@ export interface Cliente {
 export type OrigenCreacion = 'manual' | 'import_excel' | 'colilla' | 'extractor_pdf' | 'api'
 export type MotivoCancelacion = 'por_no_pago' | 'por_peticion_cliente' | 'por_cambio_intermediario' | 'otro'
 export type MotivoNoRenovacion = 'por_no_pago' | 'por_peticion_cliente' | 'por_cambio_intermediario' | 'precio' | 'competencia' | 'otro'
+/** Valores en minúscula: el CHECK de `polizas.periodicidad_cuota` los exige así. */
+export type PeriodicidadCuota = 'mensual' | 'bimestral' | 'trimestral' | 'semestral' | 'anual'
 
 export interface RegistroCambio {
   id: string
@@ -125,6 +127,12 @@ export interface Poliza {
   iva_caratula: boolean | null
   tasa_runt: number | null
   periodicidad_pago: string | null
+  /**
+   * Espaciado entre cuotas de financiación — lo define el acuerdo con la
+   * financiera, no `periodicidad_pago` (que describe la prima). NULL = no
+   * especificado; `generar_operaciones_cuotas` asume mensual.
+   */
+  periodicidad_cuota: PeriodicidadCuota | null
   forma_pago: string | null
   medio_pago: string | null
   banco_pago: string | null
