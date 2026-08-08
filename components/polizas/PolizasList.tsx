@@ -7,13 +7,14 @@ import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
 import {
   Search, AlertTriangle, Plus, Pencil, Trash2,
   FileText, ShieldCheck, Paperclip, Users, Archive, RefreshCw,
-  SlidersHorizontal, X, ChevronUp, ChevronDown, ChevronsUpDown, Download,
+  SlidersHorizontal, X, ChevronUp, ChevronDown, ChevronsUpDown, Download, ScanLine,
 } from 'lucide-react'
 import Link from 'next/link'
 import PolizaModal from './PolizaModal'
 import PolizaAnexoModal from './PolizaAnexoModal'
 import PolizaVinculadoModal from './PolizaVinculadoModal'
 import ImportPolizasModal from './ImportPolizasModal'
+import ExtraerCaratulaModal, { type PrefillCaratula } from './ExtraerCaratulaModal'
 
 const ESTADO_COLORS: Record<EstadoPoliza, string> = {
   activa:    'bg-primary-100 text-primary-700',
@@ -85,6 +86,9 @@ export default function PolizasList() {
 
   // Modals
   const [showPolizaModal, setShowPolizaModal]           = useState(false)
+  // Extractor de carátulas PDF (fase 4.1): el borrador abre PolizaModal pre-llenado
+  const [showCaratulaModal, setShowCaratulaModal]       = useState(false)
+  const [caratulaPrefill,  setCaratulaPrefill]          = useState<PrefillCaratula | null>(null)
   const [editingPoliza, setEditingPoliza]               = useState<PolizaConCliente | undefined>()
   const [showAnexoModal, setShowAnexoModal]             = useState(false)
   const [editingAnexo, setEditingAnexo]                 = useState<PolizaAnexo | undefined>()
@@ -345,6 +349,11 @@ export default function PolizasList() {
                 onClick={() => setShowImportModal(true)}
                 className="flex items-center gap-2 border border-ink-200 text-ink-500 hover:bg-cream-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
                 <Archive className="w-4 h-4" /> Importar Excel
+              </button>
+              <button
+                onClick={() => setShowCaratulaModal(true)}
+                className="flex items-center gap-2 border border-ink-200 text-ink-500 hover:bg-cream-100 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+                <ScanLine className="w-4 h-4" /> Cargar desde PDF
               </button>
               <button
                 onClick={() => { setEditingPoliza(undefined); setShowPolizaModal(true) }}
@@ -793,6 +802,23 @@ export default function PolizasList() {
         <ImportPolizasModal
           onClose={() => setShowImportModal(false)}
           onImported={() => { setShowImportModal(false); load() }}
+        />
+      )}
+      {showCaratulaModal && (
+        <ExtraerCaratulaModal
+          onClose={() => setShowCaratulaModal(false)}
+          onContinuar={prefill => { setShowCaratulaModal(false); setCaratulaPrefill(prefill) }}
+        />
+      )}
+      {/* Alta desde carátula: instancia aparte para no pasar `clientId`, que
+          ocultaría el selector de cliente (el tomador resuelto se puede cambiar). */}
+      {caratulaPrefill && (
+        <PolizaModal
+          poliza={caratulaPrefill.poliza as Poliza}
+          origenCreacion="extractor_pdf"
+          aviso={caratulaPrefill.aviso}
+          onClose={() => setCaratulaPrefill(null)}
+          onSaved={() => { setCaratulaPrefill(null); load() }}
         />
       )}
     </div>
