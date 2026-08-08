@@ -482,6 +482,27 @@ export interface CarteraAgingRow {
   total: number
 }
 
+// Extractor PDF de carátulas (fase 4.1). Contrato entre el endpoint (Carril A)
+// y la UI que lo consume (Carril B).
+export interface BorradorPoliza {
+  numero_poliza:     string | null
+  aseguradora:       string | null
+  ramo:              string | null
+  tomador_nombre:    string | null
+  tomador_documento: string | null
+  fecha_inicio:      string | null   // 'YYYY-MM-DD'
+  fecha_fin:         string | null   // 'YYYY-MM-DD'
+  prima:             number | null
+}
+
+export interface ResultadoExtraccionCaratula {
+  borrador:              BorradorPoliza
+  origen:                'parser' | 'ia'
+  confianza:             'alta' | 'requiere_revision'
+  aseguradora_detectada: string | null
+  campos_faltantes:      string[]
+}
+
 // Ventas cruzadas (fase 4.2) — una fila de get_oportunidades_cross_sell.
 export type PrioridadOportunidad = 'alta' | 'media' | 'baja'
 
