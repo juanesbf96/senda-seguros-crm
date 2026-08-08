@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { extraerTextoPdf } from '@/lib/colillas/parsers/pdf'
-import { extraerHeuristica } from '@/lib/caratulas/heuristica'
+import { extraerHeuristica, faltanCamposClave } from '@/lib/caratulas/heuristica'
 import { detectarAseguradora } from '@/lib/caratulas/aseguradoras'
 import { SYSTEM_EXTRACCION_CARATULA, buildPromptCaratula, parseRespuestaIA } from '@/lib/caratulas/promptIA'
 import { resolverConfigIA } from '@/lib/ia/resolverConfig'
 import { completar } from '@/lib/ia/motor'
-import { BorradorPoliza, ResultadoExtraccionCaratula } from '@/types'
-
-const CAMPOS_CLAVE: (keyof BorradorPoliza)[] = ['numero_poliza', 'aseguradora', 'fecha_inicio', 'fecha_fin', 'prima']
+import { BorradorPoliza, PrimaDiscriminada, ResultadoExtraccionCaratula } from '@/types'
 
 // Extrae un borrador de póliza desde el PDF de una carátula (fase 4.1).
 export async function POST(req: NextRequest) {
@@ -44,7 +42,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Extracción heurística (determinística)
-  const { borrador, camposFaltantes } = extraerHeuristica(texto)
+  const { borrador, prima, camposFaltantes } = extraerHeuristica(texto)
   let origen: ResultadoExtraccionCaratula['origen'] = 'parser'
 
   // 3. Fallback IA si faltan campos clave (best-effort: si la IA falla, se devuelve lo heurístico)
@@ -70,6 +68,9 @@ export async function POST(req: NextRequest) {
               borrador[k] = iaParcial[k]
             }
           }
+          for (const k of Object.keys(prima) as (keyof PrimaDiscriminada)[]) {
+            if (prima[k] == null && iaParcial[k] != null) prima[k] = iaParcial[k] as number
+          }
         }
       } catch (e) {
         console.error('Carátula: fallback IA falló, se devuelve lo heurístico:', e instanceof Error ? e.message : e)
@@ -77,12 +78,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const faltantesFinales = CAMPOS_CLAVE.filter(c => borrador[c] == null).map(String)
+  // Recomputar la prima transicional del borrador tras el merge (mejor disponible).
+  borrador.prima = prima.prima_neta ?? prima.prima_total ?? prima.prima_indeterminada
+
+  const faltantesFinales = faltanCamposClave(borrador, prima)
+  // Requiere revisión si: intervino la IA, falta algún campo clave, o la ÚNICA prima
+  // hallada es la indeterminada (no se sabe si incluye IVA → la UI debe confirmar).
+  const primaSoloIndeterminada =
+    prima.prima_neta == null && prima.prima_total == null && prima.prima_indeterminada != null
+
   const resultado: ResultadoExtraccionCaratula = {
     borrador,
+    ...prima,
     origen,
-    // La IA siempre exige revisión; el parser puro con todo lo clave es 'alta'.
-    confianza: origen === 'ia' || faltantesFinales.length > 0 ? 'requiere_revision' : 'alta',
+    confianza: origen === 'ia' || faltantesFinales.length > 0 || primaSoloIndeterminada
+      ? 'requiere_revision' : 'alta',
     aseguradora_detectada: detectarAseguradora(texto),
     campos_faltantes: faltantesFinales,
   }

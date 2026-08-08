@@ -2,8 +2,11 @@
 // Construye el prompt y parsea la respuesta JSON del motor de IA (4.3).
 // Funciones puras — el motor lo llama el endpoint.
 
-import { BorradorPoliza } from '@/types'
+import { BorradorPoliza, PrimaDiscriminada } from '@/types'
 import { normalizarMonto } from './heuristica'
+
+/** Lo que la IA puede rellenar: campos del borrador + la prima discriminada. */
+export type ExtraccionIA = Partial<BorradorPoliza> & Partial<PrimaDiscriminada>
 
 export const SYSTEM_EXTRACCION_CARATULA =
   'Eres un extractor de datos de carátulas de pólizas de seguros colombianas. ' +
@@ -23,16 +26,24 @@ export function buildPromptCaratula(texto: string, faltantes: string[]): string 
   "tomador_documento": string|null,
   "fecha_inicio": "YYYY-MM-DD"|null,
   "fecha_fin": "YYYY-MM-DD"|null,
-  "prima": number|null
+  "prima_neta": number|null,
+  "prima_total": number|null,
+  "iva": number|null,
+  "prima_indeterminada": number|null
 }
-Las fechas SIEMPRE en formato YYYY-MM-DD. La prima como número sin separadores de miles ni símbolo. ${foco}
+Las fechas SIEMPRE en formato YYYY-MM-DD. Los montos como número sin separadores de miles ni símbolo.
+
+REGLA CRÍTICA DE LA PRIMA — no adivines si incluye IVA:
+- Si la carátula distingue prima neta (antes de IVA) y/o prima total (con IVA), llena "prima_neta" y/o "prima_total" y deja "prima_indeterminada" en null.
+- Si solo aparece UN valor de prima sin decir claramente si incluye o no el IVA, ponlo en "prima_indeterminada" y deja "prima_neta" y "prima_total" en null. NUNCA supongas que una prima sin etiqueta es neta.
+- "iva" solo si el valor del IVA aparece explícito. ${foco}
 
 --- TEXTO DE LA CARÁTULA ---
 ${texto.slice(0, 6000)}`
 }
 
 /** Parsea la respuesta del modelo a un BorradorPoliza parcial. Tolera ```json y texto alrededor. */
-export function parseRespuestaIA(respuesta: string): Partial<BorradorPoliza> | null {
+export function parseRespuestaIA(respuesta: string): ExtraccionIA | null {
   if (!respuesta) return null
   // Extraer el primer bloque {...} aunque venga con ```json o texto.
   const limpio = respuesta.replace(/```json/gi, '').replace(/```/g, '')
@@ -48,6 +59,9 @@ export function parseRespuestaIA(respuesta: string): Partial<BorradorPoliza> | n
     if (typeof v === 'string') return normalizarMonto(v)  // tolera formato colombiano
     return null
   }
+  const prima_neta          = num(obj.prima_neta)
+  const prima_total         = num(obj.prima_total)
+  const prima_indeterminada = num(obj.prima_indeterminada)
   return {
     numero_poliza:     str(obj.numero_poliza),
     aseguradora:       str(obj.aseguradora),
@@ -56,6 +70,11 @@ export function parseRespuestaIA(respuesta: string): Partial<BorradorPoliza> | n
     tomador_documento: str(obj.tomador_documento),
     fecha_inicio:      str(obj.fecha_inicio),
     fecha_fin:         str(obj.fecha_fin),
-    prima:             num(obj.prima),
+    prima_neta,
+    prima_total,
+    iva:               num(obj.iva),
+    prima_indeterminada,
+    // Transicional: si el modelo antiguo devolviera "prima", se respeta; si no, la mejor.
+    prima:             num(obj.prima) ?? prima_neta ?? prima_total ?? prima_indeterminada,
   }
 }
