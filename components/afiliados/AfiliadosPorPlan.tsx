@@ -7,6 +7,7 @@ import { Plus, Pencil, UserX, UserCheck, Layers } from 'lucide-react'
 import PlanModal from './PlanModal'
 import AfiliadoModal from './AfiliadoModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
+import { derivarPrimaColectiva } from '@/lib/polizas/primaColectiva'
 
 interface Props {
   poliza: Poliza
@@ -67,7 +68,7 @@ export default function AfiliadosPorPlan({ poliza, clienteTipo, workspaceId }: P
     const { data: todos } = await supabase
       .from('poliza_afiliados').select('prima_individual').eq('poliza_id', poliza.id).eq('activo', true)
     const sumaTotal = (todos ?? []).reduce((s, a) => s + (a.prima_individual ?? 0), 0)
-    await supabase.from('polizas').update({ prima: sumaTotal }).eq('id', poliza.id)
+    await supabase.from('polizas').update(derivarPrimaColectiva(sumaTotal)).eq('id', poliza.id)
   }
 
   const puedoGestionar = can('afiliados_gestionar') || can('afiliados_gestionar_propios')
