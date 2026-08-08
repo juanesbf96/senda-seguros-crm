@@ -57,11 +57,30 @@
 
 **PR #58 — la fila corrupta del import creaba su cliente igual.** Hueco de #52 detectado al probarlo contra producción: la validación vivía en la fase de pólizas, que corre **después** de la creación masiva de clientes (`clientesCreados: 3` con 2 pólizas). Contradecía el propio criterio de #52 — si la columna de aseguradora se corrió, el nombre y la cédula de esa fila tampoco son de fiar. El descarte pasó a una fase 0, antes de tocar la base.
 
-#### ⬜ Hallazgo reportado y NO corregido: prima de colectivas en dos columnas
+#### ✅ RESUELTO — prima de colectivas en dos columnas (PR #64)
 
-Al recalcular la prima de una colectiva, `AfiliadosTab` escribe solo **`prima`** (la columna legacy), pero la UI muestra **`prima_neta`**. Medido: `prima = 750.000` mientras `PolizaDetalle` sigue mostrando *"Prima neta $5.000.000 · Total prima $5.950.000"*. Las dos columnas quedan en desacuerdo y el recálculo es invisible.
+**El hallazgo:** al recalcular la prima de una colectiva se escribía solo **`prima`** (la columna legacy), pero la UI muestra **`prima_neta`**. Medido en su momento: `prima = 750.000` mientras `PolizaDetalle` mostraba *"Prima neta $5.000.000 · Total prima $5.950.000"*. Las columnas en desacuerdo y el recálculo invisible.
 
-**No se tocó a propósito.** Exige una decisión de producto —¿la suma de los afiliados es la prima **neta** antes de IVA, o el **total**?— y de ahí cuelga una cascada (`total_prima`, `iva`, `comision_agencia`). Además `components/afiliados/` ya está marcado como zona delicada en esta bitácora, precisamente por un bug de corrupción de prima. **Decisión del owner pendiente.**
+**La decisión del owner que lo destrabó:** la suma de las primas de los afiliados **es la prima NETA** (lo que cuesta el seguro sin IVA), y el IVA de estas pólizas es **siempre 19%**. De ahí:
+
+```
+prima_neta  = suma de los afiliados
+iva         = round(prima_neta × 0,19, 2)
+total_prima = prima_neta + iva
+```
+
+**El arreglo.** El bug estaba en **cinco** puntos de escritura, no en uno: `AfiliadosTab` (dos ramas: suma directa y fallback `prima_por_afiliado × count`), `AfiliadoModal`, `AfiliadosPorPlan` e `ImportAfiliadosModal`. La fórmula pasó a `lib/polizas/primaColectiva.ts` — pura, 7 tests — y devuelve el **payload de update completo**, que los cinco sitios pasan verbatim a `.update(...)`: así ninguno puede olvidar una columna ni escribir su propia fórmula. Es la lección de fase 0.1 aplicada al módulo que ya corrompió la prima en producción.
+
+Dos decisiones que acompañan:
+
+1. **Se sincroniza la columna legacy `prima`** con `prima_neta`. Se verificó que sigue habiendo lectores reales — `MetasView`, `AsistenteView`, la tabla de Cumplimiento y el propio `AfiliadosPorPlan` —, así que dejarla desincronizada reintroduciría la misma incoherencia por el otro lado.
+2. **Se escribe también `porcentaje_iva: 19`.** Sin eso la fila se contradice sola: `PolizaModal` deriva el IVA del porcentaje almacenado al guardar, así que abrir la póliza y guardarla sin tocar nada recalcularía un IVA distinto del que dejó el recálculo.
+
+El gating `recalcularPrima` (que excluye las individuales) no cambió. **Sin migración**: prod ya tenía las cinco columnas.
+
+**Verificado** contra producción sobre un workspace de prueba: el payload es aceptado por el esquema y la RLS, y con 2 afiliados (750.000 + 250.000) `PolizaDetalle` pasó a mostrar *"Prima neta $1.000.000 · Total prima $1.190.000"*. ⬜ Lo que **no** se pudo ejercitar fue el clic de UI que dispara el recálculo (los clics del navegador automatizado dejaron de registrar en esa vista); al revisar conviene agregar y quitar un afiliado a mano.
+
+> **Dato de contexto:** en producción hay **una sola póliza colectiva, y es la de prueba**. Cero colectivas reales de la agencia. No había filas históricas que reparar — pero el bug se habría disparado con la primera colectiva real.
 
 #### ⬜ Verificaciones que siguen pendientes (y por qué)
 
@@ -938,4 +957,4 @@ senda-seguros-crm/
 
 *Última actualización: 8 de agosto de 2026. Fases 1, 2 y 3 cerradas y **verificadas en navegador** por primera vez (ver "Sesión de verificación"); de ahí salieron los fixes #56, #57 y #58. **Fase 4 completa** (4.1, 4.2 y 4.3): el extractor tiene backend, UI y prima discriminada de punta a punta (#47, #50, #53, #61); queda el PR de limpieza de `borrador.prima` (Carril A) y la prueba con una carátula real.*
 
-*Pendientes de decisión del owner: (1) `operaciones` vs `cobros` — brief en `docs/DECISION_operaciones_vs_cobros.md`; (2) la prima de colectivas escrita en `prima` mientras la UI muestra `prima_neta`.*
+*Pendiente de decisión del owner: `operaciones` vs `cobros` — brief en `docs/DECISION_operaciones_vs_cobros.md`. (La prima de colectivas quedó resuelta en #64: la suma de afiliados es la prima neta, IVA 19%.)*
