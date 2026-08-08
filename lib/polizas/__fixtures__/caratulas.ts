@@ -18,6 +18,10 @@ export const CARATULA_PARSER_ALTA: ResultadoExtraccionCaratula = {
     fecha_fin:         '2027-03-01',
     prima:             1850000,
   },
+  prima_neta: 1850000,
+  prima_total: 2201500,
+  iva: 351500,
+  prima_indeterminada: null,
   origen: 'parser',
   confianza: 'alta',
   aseguradora_detectada: 'Sura',
@@ -36,6 +40,10 @@ export const CARATULA_IA_REVISION: ResultadoExtraccionCaratula = {
     fecha_fin:         null,
     prima:             990000,
   },
+  prima_neta: 990000,
+  prima_total: null,
+  iva: null,
+  prima_indeterminada: null,
   origen: 'ia',
   confianza: 'requiere_revision',
   aseguradora_detectada: 'Seguros Bolívar',
@@ -54,8 +62,78 @@ export const CARATULA_INCOMPLETA: ResultadoExtraccionCaratula = {
     fecha_fin:         null,
     prima:             null,
   },
+  prima_neta: null,
+  prima_total: null,
+  iva: null,
+  prima_indeterminada: null,
   origen: 'ia',
   confianza: 'requiere_revision',
   aseguradora_detectada: null,
   campos_faltantes: ['numero_poliza', 'aseguradora', 'fecha_inicio', 'fecha_fin', 'prima'],
+}
+
+/** Carátula que solo discrimina el TOTAL y el IVA: la neta se deriva exacta. */
+export const CARATULA_TOTAL_CON_IVA: ResultadoExtraccionCaratula = {
+  borrador: {
+    numero_poliza:     'BOL-77-11223',
+    aseguradora:       'Seguros Bolívar',
+    ramo:              'Hogar',
+    tomador_nombre:    'CARLOS ANDRES RUIZ',
+    tomador_documento: '71234567',
+    fecha_inicio:      '2026-04-01',
+    fecha_fin:         '2027-04-01',
+    prima:             1190000,   // transicional: la mejor disponible (el total)
+  },
+  prima_neta: null,
+  prima_total: 1190000,
+  iva: 190000,
+  prima_indeterminada: null,
+  origen: 'parser',
+  confianza: 'alta',
+  aseguradora_detectada: 'Seguros Bolívar',
+  campos_faltantes: [],
+}
+
+/** Carátula que solo trae el total, sin discriminar IVA: hay que estimar la neta. */
+export const CARATULA_SOLO_TOTAL: ResultadoExtraccionCaratula = {
+  borrador: {
+    numero_poliza:     'MAP-33-99887',
+    aseguradora:       'Mapfre',
+    ramo:              'Autos',
+    tomador_nombre:    'LUZ MARINA TORRES',
+    tomador_documento: '52998877',
+    fecha_inicio:      '2026-06-15',
+    fecha_fin:         '2027-06-15',
+    prima:             2380000,
+  },
+  prima_neta: null,
+  prima_total: 2380000,
+  iva: null,
+  prima_indeterminada: null,
+  origen: 'parser',
+  confianza: 'alta',
+  aseguradora_detectada: 'Mapfre',
+  campos_faltantes: [],
+}
+
+/** Un solo número de prima sin etiqueta: el endpoint fuerza `requiere_revision`. */
+export const CARATULA_PRIMA_INDETERMINADA: ResultadoExtraccionCaratula = {
+  borrador: {
+    numero_poliza:     'HDI-01-44556',
+    aseguradora:       'HDI',
+    ramo:              'Salud',
+    tomador_nombre:    'JORGE ELIECER PARRA',
+    tomador_documento: '80445566',
+    fecha_inicio:      '2026-02-01',
+    fecha_fin:         '2027-02-01',
+    prima:             1500000,
+  },
+  prima_neta: null,
+  prima_total: null,
+  iva: null,
+  prima_indeterminada: 1500000,
+  origen: 'parser',
+  confianza: 'requiere_revision',
+  aseguradora_detectada: 'HDI',
+  campos_faltantes: [],
 }
