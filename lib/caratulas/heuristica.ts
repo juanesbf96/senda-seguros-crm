@@ -15,18 +15,41 @@ const RAMOS_CONOCIDOS = [
   'arrendamiento', 'accidentes personales', 'pyme',
 ]
 
-/** Convierte una fecha DD/MM/AAAA (o DD-MM-AA, con . / -) a 'YYYY-MM-DD'. */
+// Meses en español (con y sin tilde) → número. Cubre fechas escritas de carátulas
+// oficiales colombianas, p.ej. "15 de marzo de 2026".
+const MES_NUM: Record<string, number> = {
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10,
+  noviembre: 11, diciembre: 12,
+}
+
+// Fragmento de regex que matchea una fecha NUMÉRICA (DD/MM/AAAA) o ESCRITA
+// ("DD de MMMM de AAAA"). Se usa para extraer vigencias en cualquiera de los dos formatos.
+export const FECHA_RE = String.raw`(?:\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4}|\d{1,2}\s+de\s+[a-záéíóú]+\s+de\s+\d{4})`
+
+function armar(a: string, mes: number, d: number): string | null {
+  if (mes < 1 || mes > 12 || d < 1 || d > 31) return null
+  return `${a}-${String(mes).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+}
+
+/** Convierte una fecha numérica (DD/MM/AAAA) o escrita ("15 de marzo de 2026") a 'YYYY-MM-DD'. */
 export function normalizarFecha(raw: string | undefined | null): string | null {
   if (!raw) return null
-  const m = raw.trim().match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/)
+  const t = raw.trim()
+
+  // Escrita: "15 de marzo de 2026"
+  const w = t.toLowerCase().match(/(\d{1,2})\s+de\s+([a-záéíóú]+)\s+de\s+(\d{4})/)
+  if (w) {
+    const mes = MES_NUM[w[2]]
+    if (mes) return armar(w[3], mes, Number(w[1]))
+  }
+
+  // Numérica: DD/MM/AAAA (o DD-MM-AA)
+  const m = t.match(/(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/)
   if (!m) return null
-  const d = m[1].padStart(2, '0')
-  const mes = m[2].padStart(2, '0')
   let a = m[3]
   if (a.length === 2) a = (Number(a) > 50 ? '19' : '20') + a
-  const dd = Number(d), mm = Number(mes)
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null
-  return `${a}-${mes}-${d}`
+  return armar(a, Number(m[2]), Number(m[1]))
 }
 
 /** Convierte un monto en formato colombiano ('1.234.567,89' o '1234567') a número. */
@@ -67,13 +90,13 @@ export function extraerHeuristica(texto: string): ExtraccionHeuristica {
   const tomador_documento = buscar(texto,
     /(?:nit|c\.?c\.?|c[eé]dula|documento|identificaci[oó]n)\s*[:.]?\s*([\d][\d.\-]{5,})/i)
 
-  // Vigencia: dos fechas en una zona etiquetada "vigencia/desde...hasta".
-  const fechas = texto.match(/(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/g) || []
+  // Vigencia: dos fechas (numéricas o escritas) en una zona etiquetada "vigencia/desde...hasta".
+  const fechas = texto.match(new RegExp(FECHA_RE, 'gi')) || []
   let fecha_inicio: string | null = null, fecha_fin: string | null = null
-  const vig = texto.match(/vigencia[\s\S]{0,120}?(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})[\s\S]{0,40}?(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i)
+  const vig = texto.match(new RegExp(`vigencia[\\s\\S]{0,120}?(${FECHA_RE})[\\s\\S]{0,40}?(${FECHA_RE})`, 'i'))
   if (vig) { fecha_inicio = normalizarFecha(vig[1]); fecha_fin = normalizarFecha(vig[2]) }
-  const desde = buscar(texto, /(?:desde|inicio|vigente\s+desde)\s*[:]?\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i)
-  const hasta = buscar(texto, /(?:hasta|vencimiento|vence|vigente\s+hasta)\s*[:]?\s*(\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{2,4})/i)
+  const desde = buscar(texto, new RegExp(`(?:desde|inicio|vigente\\s+desde)\\s*[:]?\\s*(${FECHA_RE})`, 'i'))
+  const hasta = buscar(texto, new RegExp(`(?:hasta|vencimiento|vence|vigente\\s+hasta)\\s*[:]?\\s*(${FECHA_RE})`, 'i'))
   if (desde) fecha_inicio = normalizarFecha(desde)
   if (hasta) fecha_fin = normalizarFecha(hasta)
   // Último recurso: si hay exactamente 2 fechas y no se etiquetaron, asumir orden.
