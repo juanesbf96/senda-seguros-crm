@@ -17,6 +17,15 @@ describe('normalizarFecha', () => {
     expect(normalizarFecha(null)).toBeNull()
     expect(normalizarFecha('sin fecha')).toBeNull()
   })
+  it('parsea fechas ESCRITAS en español ("15 de marzo de 2026")', () => {
+    expect(normalizarFecha('15 de marzo de 2026')).toBe('2026-03-15')
+    expect(normalizarFecha('1 de enero de 2027')).toBe('2027-01-01')
+    expect(normalizarFecha('5 DE DICIEMBRE DE 2026')).toBe('2026-12-05')
+    expect(normalizarFecha('30 de setiembre de 2026')).toBe('2026-09-30')  // variante 'setiembre'
+  })
+  it('rechaza un mes escrito inexistente', () => {
+    expect(normalizarFecha('10 de marte de 2026')).toBeNull()
+  })
 })
 
 describe('normalizarMonto', () => {
@@ -71,6 +80,12 @@ describe('extraerHeuristica', () => {
     expect(borrador.numero_poliza).toBeNull()
     expect(camposFaltantes).toContain('numero_poliza')
     expect(camposFaltantes).toContain('prima')
+  })
+  it('extrae vigencia con fechas ESCRITAS ("desde ... hasta ...")', () => {
+    const { borrador } = extraerHeuristica(
+      'SURA\nPóliza No X-7\nVigencia desde 15 de marzo de 2026 hasta 15 de marzo de 2027\nPrima Neta 800.000')
+    expect(borrador.fecha_inicio).toBe('2026-03-15')
+    expect(borrador.fecha_fin).toBe('2027-03-15')
   })
 })
 
