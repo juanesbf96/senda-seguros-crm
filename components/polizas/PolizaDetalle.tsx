@@ -62,6 +62,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import PolizaModal from './PolizaModal'
 import Cronologia from '@/components/ui/Cronologia'
 import SubTablaPoliza from './SubTablaPoliza'
+import OperacionesPoliza from './OperacionesPoliza'
 
 
 type PolizaConCliente = Poliza & { cliente: Cliente | null }
@@ -555,6 +556,11 @@ export default function PolizaDetalle({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {/* ── Operaciones de Producción (fase 3) ── */}
+      {currentWorkspace && (
+        <OperacionesPoliza polizaId={poliza.id} workspaceId={currentWorkspace.id} />
+      )}
 
       {/* ── Cronología de cambios ── */}
       <Cronologia tabla="polizas" registroId={poliza.id} />
