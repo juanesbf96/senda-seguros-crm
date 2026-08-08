@@ -92,6 +92,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [nuevaTarifaForm, setNuevaTarifaForm] = useState<Omit<TarifaComision,'id'>>({ codigo:'', ramo:'', aseguradora:'', porcentaje:0 })
   const [nuevaTarifaErr,  setNuevaTarifaErr]  = useState('')
   const [savingTarifa,    setSavingTarifa]    = useState(false)
+  // Generador de cuotas (fase 3, ítem 2)
+  const [generandoCuotas, setGenerandoCuotas] = useState(false)
+  const [cuotasMsg,       setCuotasMsg]       = useState<{ ok: boolean; texto: string } | null>(null)
   // Pre-poblar búsqueda con nombre_tomador cuando se crea desde colilla (sin client_id aún)
   const [clienteSearch,   setClienteSearch]   = useState(
     !poliza?.id && !poliza?.client_id && poliza?.nombre_tomador ? poliza.nombre_tomador : ''
@@ -169,6 +172,14 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   const [error,  setError]  = useState('')
 
   /* derived */
+  // El RPC de cuotas lee la póliza persistida; si estos campos cambiaron en el
+  // formulario y no se guardaron, generaría cuotas con los valores viejos.
+  const financiacionSinGuardar = !!poliza?.id && (
+    (form.num_cuotas || '')        !== (((poliza as { num_cuotas?: number }).num_cuotas ?? '') + '') ||
+    (form.periodicidad_pago || '') !== (poliza.periodicidad_pago ?? '') ||
+    (form.fecha_inicio || '')      !== (poliza.fecha_inicio ?? '')
+  )
+
   const esCumplimiento    = RAMOS_CUMPLIMIENTO.includes(form.ramo)
   const primaNeta         = n(form.prima_neta)
   const pctIva            = n(form.porcentaje_iva)
@@ -418,6 +429,34 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     }
 
     onSaved()
+  }
+
+  /**
+   * Genera las cuotas de financiación como operaciones (fase 3, ítem 2).
+   *
+   * El RPC lee la financiación de la póliza YA GUARDADA (num_cuotas,
+   * periodicidad, fecha_inicio), no del formulario — por eso el botón se
+   * deshabilita si hay cambios sin guardar en esos campos. El RPC además es
+   * anti-duplicado y valida el permiso `finanzas_cobros_registrar`, así que
+   * acá solo se traduce su error a algo legible.
+   */
+  async function generarCuotas() {
+    if (!poliza?.id) return
+    setGenerandoCuotas(true); setCuotasMsg(null)
+    const { data, error: err } = await supabase.rpc('generar_operaciones_cuotas', {
+      p_poliza_id: poliza.id,
+    })
+    setGenerandoCuotas(false)
+    if (err) {
+      const m = err.message || ''
+      setCuotasMsg({ ok: false, texto:
+        m.includes('ya tiene cuotas')     ? 'Esta póliza ya tiene sus cuotas generadas.'
+      : m.includes('num_cuotas')          ? 'Falta el número de cuotas: complétalo y guarda antes de generar.'
+      : m.includes('Sin permiso')         ? 'No tienes permiso para generar cuotas.'
+      : m })
+      return
+    }
+    setCuotasMsg({ ok: true, texto: `${data} cuota${data === 1 ? '' : 's'} generada${data === 1 ? '' : 's'}. Aparecen en la sección Operaciones de la póliza.` })
   }
 
   /** Crea la operación `cancelacion` si la póliza no tiene una ya (evita
@@ -950,6 +989,32 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                     className={cls}
                   />
                 </Field>
+
+                {/* Generador de cuotas (fase 3). Solo en pólizas ya guardadas:
+                    el RPC lee la financiación persistida, no el formulario. */}
+                {poliza?.id && (
+                  <div className="col-span-2">
+                    {financiacionSinGuardar ? (
+                      <p className="text-xs text-ink-400">
+                        Guarda los cambios de financiación para poder generar las cuotas.
+                      </p>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={generarCuotas}
+                        disabled={generandoCuotas || !form.num_cuotas}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary-300 bg-primary-50 text-primary-700 text-sm font-medium hover:bg-primary-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                        <Calculator className="w-4 h-4" />
+                        {generandoCuotas ? 'Generando…' : 'Generar cuotas'}
+                      </button>
+                    )}
+                    {cuotasMsg && (
+                      <p className={`text-xs mt-2 ${cuotasMsg.ok ? 'text-primary-700' : 'text-error'}`}>
+                        {cuotasMsg.texto}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
