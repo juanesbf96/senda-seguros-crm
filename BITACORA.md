@@ -1,6 +1,6 @@
 # Bitácora de Desarrollo — Senda Seguros CRM
 
-> Última actualización: 1 de agosto de 2026  
+> Última actualización: 7 de agosto de 2026  
 > Stack: Next.js 16.2.4 · Supabase (PostgreSQL + Auth + Storage) · Tailwind CSS · Vercel
 
 ---
@@ -20,9 +20,9 @@
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
-| 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45), todo en prod. ⚠️ Antes de usar cuotas en operación diaria: decidir el solapamiento `operaciones` vs `cobros` y agregar `periodicidad_cuota` (ver sección de fase 3) |
+| 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45), todo en prod. `periodicidad_cuota` resuelta en #49 (pendiente de aplicar migración + merge). ⚠️ Antes de usar cuotas en operación diaria queda **una sola** decisión: el solapamiento `operaciones` vs `cobros` (brief en `docs/DECISION_operaciones_vs_cobros.md`) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
-| 4.1 | Extractor PDF de carátulas | 🟡 **Backend en prod** (#47, Carril A): endpoint `/api/polizas/extraer-caratula` (heurística + fallback IA 4.3) + contrato `BorradorPoliza`. **Falta la UI** (botón + preview) → Carril B |
+| 4.1 | Extractor PDF de carátulas | 🟢 **Backend en prod** (#47, Carril A) + **UI entregada** (#50, Carril B): botón "Cargar desde PDF", preview del borrador y `PolizaModal` pre-llenado con `origen_creacion='extractor_pdf'`. Falta merge y **verificación con una carátula real** |
 | 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
@@ -176,11 +176,16 @@ En el PR #42 reporté que el RPC generaría **cuotas mensuales equivocadas para 
 
 Conclusión: **no se hizo migración** y el botón sirve tal cual para pólizas nuevas donde el usuario llene la financiación. Las históricas se irán completando a medida que se editen.
 
-#### ⬜ Pendiente derivado: la periodicidad de la cuota depende de la FINANCIERA
+#### ✅ Pendiente derivado resuelto: la periodicidad de la cuota depende de la FINANCIERA (PR #49, Carril B)
 
-Decisión del owner (7-ago): el espaciado de las cuotas **no** lo define `periodicidad_pago` —que describe la **prima**— sino el acuerdo con la **financiera** (Crediseguro / Finesa / Servicrédito u otro). Hoy el RPC usa `periodicidad_pago`, que es conceptualmente incorrecto para pólizas financiadas.
+Decisión del owner (7-ago): el espaciado de las cuotas **no** lo define `periodicidad_pago` —que describe la **prima**— sino el acuerdo con la **financiera** (Crediseguro / Finesa / Servicrédito u otro). El RPC usaba `periodicidad_pago`, conceptualmente incorrecto para financiadas.
 
-Para resolverlo hace falta **un campo propio en la póliza** (p. ej. `periodicidad_cuota`) + su migración, y ajustar el `CASE` del RPC para leerlo. No urge: sin `num_cuotas` en ninguna póliza, hoy no se generan cuotas. Hacerlo **antes** de que la financiación se use en volumen.
+- **Migración `20260808010000_periodicidad_cuota.sql`:** `polizas.periodicidad_cuota text`, **nullable y sin DEFAULT**, CHECK sobre `mensual|bimestral|trimestral|semestral|anual` (minúscula). Sin DEFAULT a propósito: un `'mensual'` automático escribiría sobre las ~1.000 pólizas existentes una decisión que nadie tomó. `NULL` = no especificado.
+- **RPC:** `CREATE OR REPLACE` de `generar_operaciones_cuotas` leyendo `lower(COALESCE(periodicidad_cuota,'mensual'))`. **No cae de vuelta a `periodicidad_pago`** — es el campo equivocado que esta migración saca del camino, y usarlo de respaldo reintroduciría el bug en silencio.
+- **UI:** selector "Periodicidad de la cuota" en el bloque de Financiación de `PolizaModal`. El campo entra al guard `financiacionSinGuardar`, que además deja de vigilar `periodicidad_pago` (ya no afecta la generación); sin eso se reproduce el footgun que #43 evitó con `num_cuotas`.
+- **Verificado en Postgres local** (esta máquina no tiene el CLI ni credenciales de staging): espaciado correcto en las 5 periodicidades, `NULL` con `periodicidad_pago='Anual'` → mensual (el fix confirmado), "Anual financiado" a 10 cuotas → 10 mensuales, CHECK rechaza `'quincenal'` y `'Mensual'` capitalizado, guards del RPC intactos.
+
+> ⚠️ **La migración debe aplicarse en staging y luego en prod ANTES de mergear #49** (la UI escribe la columna). Impacto sobre datos existentes: nulo.
 
 #### 📖 Definición de las dos carteras (aclarada por el owner, 7-ago)
 
@@ -225,7 +230,26 @@ Endpoint que devuelve un **borrador de póliza** desde el PDF de una carátula, 
 - **`POST /api/polizas/extraer-caratula`:** auth por token → texto con `pdf-parse` (helper compartido de colillas) → **heurística determinística** (`lib/caratulas/heuristica.ts`: número, aseguradora, tomador, documento, vigencia, prima; normalizadores de fecha/monto colombiano) → si faltan campos clave, **fallback al motor 4.3** (best-effort: si la IA falla, devuelve lo heurístico). `confianza='requiere_revision'` cuando interviene la IA o quedan huecos.
 - **Decisión de alcance honesta:** sin PDFs de carátula **reales** no hay parsers determinísticos por aseguradora todavía. El v1 es heurístico genérico + IA; la arquitectura (`lib/caratulas/`) queda lista para enchufar parsers por aseguradora con fixtures cuando haya muestras.
 - 12 tests de las funciones puras (67 en total). tsc/build OK.
-- **Pendiente Carril B:** botón "Cargar desde PDF" en `PolizasList` + `PolizaModal` pre-llenado que guarda con `origen_creacion='extractor_pdf'` (ver prompt de coordinación).
+- ~~**Pendiente Carril B:** botón "Cargar desde PDF"~~ → ✅ entregado en **PR #50** (abajo).
+
+### Fase 4.1 — Extractor PDF de carátulas: UI (rama `feat/extractor-caratula-ui`, PR #50) 🔵 abierto, verify en verde (Carril B)
+
+Segunda mitad de 4.1, sobre el backend de #47. **Sin migración.** Botón **"Cargar desde PDF"** en `PolizasList` → preview de lo extraído → `PolizaModal` **pre-llenado y editable**. Nunca se crea la póliza a ciegas.
+
+- **`lib/polizas/borradorCaratula.ts` — mapeo puro con 18 tests y 3 fixtures del contrato.** Vive fuera del componente a propósito: traducir el borrador al formulario es donde se concentran las ambigüedades, y es exactamente la lección de fase 0.1 (el mapeo del parser de Excel corrompió producción dos veces sin un solo test).
+- **`ExtraerCaratulaModal`** — subida con drag & drop, preview campo por campo con los faltantes marcados, chips de origen (`lectura directa` / `IA`) y aseguradora detectada.
+- **`PolizaModal`** — dos props aditivas: `origenCreacion` (el insert hardcodeaba `'manual'`; ahora el alta desde PDF queda con `origen_creacion='extractor_pdf'`, que es lo que la trazabilidad de fase 0.3 esperaba) y `aviso`.
+
+**Tres decisiones a tener presentes:**
+
+1. **El aviso de revisión va DENTRO del formulario**, como banner no descartable, no solo en el preview. Si viviera en la pantalla anterior el usuario lo perdería justo cuando empieza a editar, que es cuando importa. Enumera qué confirmar: que los datos los puso la IA, qué campos no se leyeron, si el ramo es sugerido y la advertencia de la prima.
+2. **⚠️ La prima se carga como `prima_neta`, y el aviso lo dice.** El contrato trae **un solo** campo `prima` y la heurística de #47 matchea tanto `PRIMA NETA` como `PRIMA TOTAL` — no hay forma de saber si incluye IVA. Si la carátula traía la total, el formulario le suma 19% encima. **Resolverlo de raíz exige que el contrato discrimine neta/total** (decisión de Carril A).
+3. **El tomador nunca se crea solo.** Se busca por documento (cédula **o** NIT, probando crudo, solo dígitos y sin dígito de verificación, porque vienen como `900.123.456-7`). Sin match, el preview ofrece un alta explícita editable. Crear clientes en silencio desde datos que pudo inventar una IA sembraría basura difícil de rastrear.
+
+También se normalizan alias de aseguradora: el extractor devuelve `'Seguros Bolívar'` y `'Equidad Seguros'`, que en el CRM ya existen como `'Bolívar'` y `'La Equidad'` — sin normalizar se sembraría una segunda grafía del mismo emisor y se romperían los filtros e informes. Los ramos fuera del catálogo del formulario (`Maquinaria`) quedan vacíos en vez de guardar un valor inexistente; los ambiguos (`Vida` → Individual o Grupo) se sugieren marcados como tales.
+
+- tsc limpio, **85 tests** (18 nuevos), build OK, eslint sin hallazgos en los archivos nuevos.
+- **⬜ Sin verificación visual ni end-to-end:** la vista pide sesión y esa máquina no tenía credenciales (misma limitación de #31 y #42). Al revisar, probar con una **carátula real**: parser completo (sin banner ámbar) vs. fallback IA (con banner); tomador existente / nuevo / sin documento; que la póliza guardada quede con `origen_creacion='extractor_pdf'`; y un PDF escaneado → error legible.
 
 ### Decisión pendiente documentada: `operaciones` vs `cobros`
 
@@ -841,4 +865,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 7 de agosto de 2026. Fases 1, 2, 3 cerradas. Fase 4: 4.3 y 4.2 en prod; 4.1 backend en prod (#47), falta la UI (Carril B). Brief operaciones-vs-cobros para el owner en docs/.**motor de IA 4.3 (#38, base de fase 4)** en prod.*
+*Última actualización: 7 de agosto de 2026. Fases 1, 2 y 3 cerradas. Fase 4 completa a falta de merges: 4.3 y 4.2 en prod, 4.1 con backend en prod (#47) y UI entregada (#50). `periodicidad_cuota` resuelta en #49 — su migración debe aplicarse en staging y prod antes de mergear. Pendiente de decisión del owner: `operaciones` vs `cobros` (brief en `docs/DECISION_operaciones_vs_cobros.md`).*
