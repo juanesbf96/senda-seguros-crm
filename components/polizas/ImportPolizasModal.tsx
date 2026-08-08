@@ -328,12 +328,12 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
       })
       if (!resp.ok) {
         const { error } = await resp.json().catch(() => ({ error: `HTTP ${resp.status}` }))
-        setResult({ clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [error ?? `HTTP ${resp.status}`] })
+        setResult({ clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [error ?? `HTTP ${resp.status}`], advertencias: [] })
       } else {
         setResult(await resp.json())
       }
     } catch (e) {
-      setResult({ clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [`Error de red: ${String(e)}`] })
+      setResult({ clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [`Error de red: ${String(e)}`], advertencias: [] })
     }
     setStage('done')
   }
@@ -590,6 +590,21 @@ export default function ImportPolizasModal({ onClose, onImported }: Props) {
                   </p>
                   {result.errores.map((e, i) => (
                     <p key={i} className="text-xs text-error/80">{e}</p>
+                  ))}
+                </div>
+              )}
+
+              {/* Advertencias: la fila SÍ se importó, pero con un dato corregido.
+                  Van en ámbar y aparte de los errores para que no se lean como
+                  "no se importó nada". */}
+              {result.advertencias?.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1 max-h-48 overflow-y-auto">
+                  <p className="text-sm font-medium text-amber-800 mb-2 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {result.advertencias.length} advertencia{result.advertencias.length !== 1 ? 's' : ''} — se importaron con datos corregidos
+                  </p>
+                  {result.advertencias.map((a, i) => (
+                    <p key={i} className="text-xs text-amber-700">{a}</p>
                   ))}
                 </div>
               )}
