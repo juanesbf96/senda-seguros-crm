@@ -63,5 +63,12 @@ export interface ImportResult {
   clientesCreados: number
   clientesExistentes: number
   polizasCreadas: number
+  /** Filas que NO se importaron. */
   errores: string[]
+  /**
+   * Filas que SÍ se importaron, pero con un dato corregido o descartado.
+   * Separado de `errores` a propósito: "no la importé" y "la importé pero
+   * revisá este campo" exigen acciones distintas del usuario.
+   */
+  advertencias: string[]
 }

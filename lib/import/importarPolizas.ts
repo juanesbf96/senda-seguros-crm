@@ -21,6 +21,7 @@ import type { ExcelRow, ImportResult } from './types'
 import { comisionAgencia as calcComisionAgencia, comisionVendedor as calcComisionVendedor, redondear2 } from '@/lib/comisiones'
 import { normalizarNumeroPoliza, mapaPorNumeroNormalizado } from '@/lib/polizas/numeroPoliza'
 import { pctComisionPorDefecto, type TarifaCatalogo } from '@/lib/polizas/tarifas'
+import { aseguradoraEsNumerica, normalizarRetencionVendedor } from './validaciones'
 
 const LOTE_INSERT = 500
 const LOTE_IN     = 200   // tamaño de chunk para filtros .in() (límite de URL)
@@ -42,7 +43,7 @@ export async function importarPolizas(
   wsId: string,
   userId: string,
 ): Promise<ImportResult> {
-  const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [] }
+  const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [], advertencias: [] }
 
   // ── 1a. Vendedores del workspace ──────────────────────────────────
   type VendedorCache = { id: string; pct: number | null }
@@ -244,6 +245,15 @@ export async function importarPolizas(
       return
     }
 
+    // Aseguradora que es un número = columna corrida en el Excel (típicamente el
+    // teléfono del cliente). Se rechaza la fila entera: si esa columna se corrió,
+    // no hay razón para confiar en las demás de la misma fila.
+    if (aseguradoraEsNumerica(r.aseguradora)) {
+      result.errores.push(
+        `Fila ${i + 2}: la aseguradora es un número ("${r.aseguradora}") — parece una columna corrida. Fila omitida.`)
+      return
+    }
+
     let estadoPoliza = 'activa'
     if (r.fecha_fin && r.fecha_fin < hoy) estadoPoliza = 'vencida'
     else if (!r.fecha_inicio && !r.fecha_fin) estadoPoliza = 'pendiente'
@@ -251,6 +261,12 @@ export async function importarPolizas(
     const vendedorMatch = matchVendedor(r.asesor)
     const vendedorId    = vendedorMatch?.id ?? null
     const pctVendedor   = r.pct_comision_asesor ?? vendedorMatch?.pct ?? null
+
+    const retencion = normalizarRetencionVendedor(r.retencion_asesor)
+    if (retencion.corregido) {
+      result.advertencias.push(
+        `Fila ${i + 2}: retención del asesor fuera de rango (${r.retencion_asesor}) — no es un porcentaje. Se usó ${retencion.valor}%.`)
+    }
 
     const primaNeta       = r.prima_neta ?? 0
     const pctAgencia      = r.pct_comision_negocio ?? matchTarifa(r.ramo, r.aseguradora) ?? null
@@ -291,7 +307,7 @@ export async function importarPolizas(
       comision_intermediario:      r.comision_intermediario,
       vendedor_id:                 vendedorId,
       porcentaje_comision_vendedor: pctVendedor,
-      retencion_vendedor:          r.retencion_asesor ?? 10,
+      retencion_vendedor:          retencion.valor,
       comision_vendedor:           comisionVendedor,
       referido:                    r.referido || null,
       pct_comision_referido:       r.pct_comision_referido,
