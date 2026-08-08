@@ -22,7 +22,7 @@
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
 | 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45) + `periodicidad_cuota` (#49), todo en prod y **verificado en navegador** (ver sesión de verificación). ⚠️ Antes de usar cuotas en operación diaria queda **una sola** decisión: el solapamiento `operaciones` vs `cobros` (brief en `docs/DECISION_operaciones_vs_cobros.md`) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
-| 4.1 | Extractor PDF de carátulas | 🟢 **Backend + UI en prod** (#47, #50) + **prima discriminada** (#53, Carril A): neta/total/IVA/indeterminada en el wrapper, resuelve la ambigüedad del IVA. Falta: Carril B migra a leer la prima del wrapper, y **verificación con una carátula real** |
+| 4.1 | Extractor PDF de carátulas | ✅ **Completa** — backend (#47), UI (#50), prima discriminada en el contrato (#53) y **la UI consumiéndola** (#61). `borrador.prima` quedó sin consumidores: pendiente el PR de limpieza de Carril A. Único pendiente real: **verificación con una carátula real** |
 | 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
@@ -280,7 +280,7 @@ Endpoint que devuelve un **borrador de póliza** desde el PDF de una carátula, 
 - 12 tests de las funciones puras (67 en total). tsc/build OK.
 - ~~**Pendiente Carril B:** botón "Cargar desde PDF"~~ → ✅ entregado en **PR #50** (abajo).
 
-### Fase 4.1 — Extractor PDF de carátulas: UI (rama `feat/extractor-caratula-ui`, PR #50) 🔵 abierto, verify en verde (Carril B)
+### Fase 4.1 — Extractor PDF de carátulas: UI (PR #50, y prima discriminada en #61) ✅ mergeados (Carril B)
 
 Segunda mitad de 4.1, sobre el backend de #47. **Sin migración.** Botón **"Cargar desde PDF"** en `PolizasList` → preview de lo extraído → `PolizaModal` **pre-llenado y editable**. Nunca se crea la póliza a ciegas.
 
@@ -291,13 +291,36 @@ Segunda mitad de 4.1, sobre el backend de #47. **Sin migración.** Botón **"Car
 **Tres decisiones a tener presentes:**
 
 1. **El aviso de revisión va DENTRO del formulario**, como banner no descartable, no solo en el preview. Si viviera en la pantalla anterior el usuario lo perdería justo cuando empieza a editar, que es cuando importa. Enumera qué confirmar: que los datos los puso la IA, qué campos no se leyeron, si el ramo es sugerido y la advertencia de la prima.
-2. **✅ RESUELTO por Carril A (#53) — la prima ahora se discrimina.** El contrato exponía **un solo** `prima` sin decir si incluía IVA, y la UI lo cargaba como `prima_neta` sumándole 19% (aviso de curita). El wrapper `ResultadoExtraccionCaratula` ahora trae `prima_neta` / `prima_total` / `iva` / **`prima_indeterminada`** (una prima sin etiqueta clara NO se asume neta — la UI pide confirmación dirigida). Fue en el **wrapper** y no en `BorradorPoliza` para no romper `ETIQUETAS_BORRADOR: Record<keyof BorradorPoliza>` (aditivo, Carril B compila sin cambios). **Pendiente Carril B:** migrar el mapeo a leer `resultado.prima_neta/total/indeterminada` (hoy sigue usando `borrador.prima`, que se mantiene transicional); cuando migre, Carril A hace el PR de limpieza que quita `borrador.prima`.
+2. **✅ RESUELTO por Carril A (#53) — la prima ahora se discrimina.** El contrato exponía **un solo** `prima` sin decir si incluía IVA, y la UI lo cargaba como `prima_neta` sumándole 19% (aviso de curita). El wrapper `ResultadoExtraccionCaratula` ahora trae `prima_neta` / `prima_total` / `iva` / **`prima_indeterminada`** (una prima sin etiqueta clara NO se asume neta — la UI pide confirmación dirigida). Fue en el **wrapper** y no en `BorradorPoliza` para no romper `ETIQUETAS_BORRADOR: Record<keyof BorradorPoliza>` (aditivo, Carril B compila sin cambios). **✅ La UI ya consume el wrapper (PR #61)** — ver el detalle abajo. `borrador.prima` quedó **sin consumidores**: Carril A puede hacer el PR de limpieza que lo quita del contrato.
 3. **El tomador nunca se crea solo.** Se busca por documento (cédula **o** NIT, probando crudo, solo dígitos y sin dígito de verificación, porque vienen como `900.123.456-7`). Sin match, el preview ofrece un alta explícita editable. Crear clientes en silencio desde datos que pudo inventar una IA sembraría basura difícil de rastrear.
 
 También se normalizan alias de aseguradora: el extractor devuelve `'Seguros Bolívar'` y `'Equidad Seguros'`, que en el CRM ya existen como `'Bolívar'` y `'La Equidad'` — sin normalizar se sembraría una segunda grafía del mismo emisor y se romperían los filtros e informes. Los ramos fuera del catálogo del formulario (`Maquinaria`) quedan vacíos en vez de guardar un valor inexistente; los ambiguos (`Vida` → Individual o Grupo) se sugieren marcados como tales.
 
 - tsc limpio, **85 tests** (18 nuevos), build OK, eslint sin hallazgos en los archivos nuevos.
 - **⬜ Sin verificación visual ni end-to-end:** la vista pide sesión y esa máquina no tenía credenciales (misma limitación de #31 y #42). Al revisar, probar con una **carátula real**: parser completo (sin banner ámbar) vs. fallback IA (con banner); tomador existente / nuevo / sin documento; que la póliza guardada quede con `origen_creacion='extractor_pdf'`; y un PDF escaneado → error legible.
+
+#### PR #61 — la UI consume la prima discriminada (cierra el punto 2)
+
+Al plantear la migración salió una precisión del owner que **cambió el criterio técnico**, y conviene que quede escrita porque aplica más allá del extractor:
+
+> **`prima_neta` es el valor SIN IVA, que el CRM usa como producción de la agencia y como base de la comisión. El valor CON IVA es lo que se le cobra al cliente final.**
+
+Con esa definición, cargar un total en `prima_neta` no "infla un número en pantalla": **corrompe la métrica de producción y sobrevalora la comisión ~19%**. Eso descartó la salida fácil (cargar el total como base con IVA 0%, que hacía cuadrar el total pero ensuciaba la producción).
+
+**`resolverPrima()`** — función pura, 13 tests — concentra la regla de no guardar nunca un valor con IVA como si fuera neto:
+
+| La carátula trae | Se carga | Por qué |
+|---|---|---|
+| `prima_neta` | tal cual; con `iva` presente se deriva el **% real** | Hay ramos exentos (SOAT, vida): asumir 19% inflaría el total |
+| `prima_total` + `iva` | `neta = total − iva`, % derivado | Exacto, sin asumir nada |
+| solo `prima_total` | neta estimada al 19%, con el supuesto **declarado en el aviso** | Único caso donde hay que estimar; el aviso nombra dónde falla (SOAT, vida) |
+| solo `prima_indeterminada` | se carga como neta y el aviso pide confirmar el tipo | El endpoint ya fuerza `requiere_revision` acá |
+
+Si el % de IVA no se puede determinar, **se omite del pre-llenado** para no pisar el default del formulario.
+
+También: el preview pasó a **desglosar la prima** (neta / IVA / total) en lugar de una sola fila ambigua, y la fila de prima indeterminada se marca como pendiente **aunque tenga valor** — lo que falta no es el número, es saber de qué tipo es. El aviso genérico de prima se reemplazó por el dirigido.
+
+`borradorAPoliza` y `camposBorrador` ahora reciben el `ResultadoExtraccionCaratula` completo. 126 tests en total (31 en el módulo, antes 18), tsc/build/eslint limpios.
 
 ### Decisión pendiente documentada: `operaciones` vs `cobros`
 
@@ -913,6 +936,6 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 8 de agosto de 2026. Fases 1, 2 y 3 cerradas y **verificadas en navegador** por primera vez (ver "Sesión de verificación"); de ahí salieron los fixes #56, #57 y #58. Fase 4: 4.2 y 4.3 en prod; 4.1 con backend, UI y prima discriminada en prod, falta que Carril B lea la prima del wrapper y una prueba con carátula real.*
+*Última actualización: 8 de agosto de 2026. Fases 1, 2 y 3 cerradas y **verificadas en navegador** por primera vez (ver "Sesión de verificación"); de ahí salieron los fixes #56, #57 y #58. **Fase 4 completa** (4.1, 4.2 y 4.3): el extractor tiene backend, UI y prima discriminada de punta a punta (#47, #50, #53, #61); queda el PR de limpieza de `borrador.prima` (Carril A) y la prueba con una carátula real.*
 
 *Pendientes de decisión del owner: (1) `operaciones` vs `cobros` — brief en `docs/DECISION_operaciones_vs_cobros.md`; (2) la prima de colectivas escrita en `prima` mientras la UI muestra `prima_neta`.*
