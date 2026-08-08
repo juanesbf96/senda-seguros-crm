@@ -10,6 +10,7 @@ import {
   SlidersHorizontal, X, ChevronUp, ChevronDown, ChevronsUpDown, Download, ScanLine,
 } from 'lucide-react'
 import Link from 'next/link'
+import { estadoEfectivo, esVigente, ESTADO_LABELS as ESTADO_TEXTO } from '@/lib/polizas/estado'
 import PolizaModal from './PolizaModal'
 import PolizaAnexoModal from './PolizaAnexoModal'
 import PolizaVinculadoModal from './PolizaVinculadoModal'
@@ -214,7 +215,7 @@ export default function PolizasList() {
 
     setTabCounts({ normales: norm.count ?? 0, cumplimiento: cumpl.count ?? 0 })
 
-    const activas = (slim.data ?? []).filter(p => p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa')
+    const activas = (slim.data ?? []).filter(p => esVigente(p, hoy))
     setHeaderStats({
       activas: activas.length,
       prima:   activas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0),
@@ -649,7 +650,7 @@ export default function PolizasList() {
           {/* Stats */}
           {filteredCumplimiento.length > 0 && (() => {
             const hoy = new Date().toISOString().split('T')[0]
-            const activas = filteredCumplimiento.filter(p => p.fecha_fin ? p.fecha_fin >= hoy : p.estado === 'activa')
+            const activas = filteredCumplimiento.filter(p => esVigente(p, hoy))
             const primaNeta   = activas.reduce((s, p) => s + (p.prima_neta || p.prima || 0), 0)
             const totalPrima  = activas.reduce((s, p) => s + (p.total_prima || 0), 0)
             const comision    = activas.reduce((s, p) => s + (p.comision_agencia || 0), 0)
@@ -692,7 +693,8 @@ export default function PolizasList() {
               <tbody>
                 {filteredCumplimiento.map(p => {
                   const hoyStr = new Date().toISOString().split('T')[0]
-                  const esActiva = p.fecha_fin ? p.fecha_fin >= hoyStr : p.estado === 'activa'
+                  const estadoKey = estadoEfectivo(p, hoyStr)
+                  const esActiva = estadoKey === 'activa'
                   const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
                   const urgent = esActiva && days !== null && days >= 0 && days <= 30
                   const warn   = esActiva && days !== null && days > 30 && days <= 60
@@ -713,8 +715,8 @@ export default function PolizasList() {
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-ink-500 text-xs">{p.nombre_tomador || '—'}</td>
                       <td className="px-4 py-3 hidden md:table-cell">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${esActiva ? ESTADO_COLORS['activa'] : ESTADO_COLORS['vencida']}`}>
-                          {esActiva ? 'Activa' : 'Vencida'}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[estadoKey]}`}>
+                          {ESTADO_TEXTO[estadoKey]}
                         </span>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell">
@@ -994,7 +996,8 @@ function PolizasTable({
         <tbody>
           {sorted.map(p => {
             const hoyStr = new Date().toISOString().split('T')[0]
-            const esActiva = p.fecha_fin ? p.fecha_fin >= hoyStr : p.estado === 'activa'
+            // Una cancelada no debe salir marcada como "vence en Nd": ya no se renueva.
+            const esActiva = esVigente(p, hoyStr)
             const days   = p.fecha_fin ? daysUntil(p.fecha_fin) : null
             const urgent = esActiva && days !== null && days >= 0 && days <= 30
             const warn   = esActiva && days !== null && days > 30 && days <= 60

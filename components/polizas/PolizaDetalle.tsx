@@ -5,6 +5,7 @@ import { Poliza, Cliente, Archivo } from '@/types'
 import AfiliadosTab from '@/components/afiliados/AfiliadosTab'
 import AfiliadosPorPlan from '@/components/afiliados/AfiliadosPorPlan'
 import { formatCOP, formatDate, daysUntil } from '@/lib/utils'
+import { estadoEfectivo, ESTADO_LABELS as ESTADO_TEXTO } from '@/lib/polizas/estado'
 import { comisionVendedor as calcComisionVendedor, retencion, comisionNeta } from '@/lib/comisiones'
 import {
   ArrowLeft, Pencil, AlertTriangle, FileText, Shield,
@@ -173,10 +174,12 @@ export default function PolizaDetalle({ id }: { id: string }) {
   )
 
   const hoy = new Date().toISOString().split('T')[0]
-  const esActiva = poliza.fecha_fin ? poliza.fecha_fin >= hoy : poliza.estado === 'activa'
+  // `cancelada`/`pendiente` los declara una persona y mandan sobre la vigencia;
+  // activa vs vencida se sigue calculando por fecha (ver lib/polizas/estado.ts).
+  const estadoKey = estadoEfectivo(poliza, hoy)
+  const esActiva = estadoKey === 'activa'
   const days = poliza.fecha_fin ? daysUntil(poliza.fecha_fin) : null
   const urgent = esActiva && days !== null && days >= 0 && days <= 30
-  const estadoKey = esActiva ? 'activa' : poliza.estado === 'cancelada' ? 'cancelada' : 'vencida'
   const primaDisplay = poliza.prima_neta ?? poliza.prima
 
   return (
@@ -207,7 +210,7 @@ export default function PolizaDetalle({ id }: { id: string }) {
                   {poliza.ramo}
                 </span>
                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${ESTADO_COLORS[estadoKey]}`}>
-                  {esActiva ? 'Activa' : poliza.estado === 'cancelada' ? 'Cancelada' : 'Vencida'}
+                  {ESTADO_TEXTO[estadoKey]}
                 </span>
                 {poliza.es_renovacion && (
                   <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-cream-200 text-ink-500">
