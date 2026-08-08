@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
-import { Poliza, EstadoPoliza, Cliente, Vendedor } from '@/types'
+import { Poliza, EstadoPoliza, Cliente, Vendedor, PeriodicidadCuota } from '@/types'
 import { X, Calculator } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
@@ -43,6 +43,16 @@ const MOTIVO_CANCELACION_LABELS: Record<string, string> = {
 const PERIODICIDADES = ['Anual','Semestral','Trimestral','Mensual','Prima única']
 const FORMAS_PAGO    = ['Contado','Financiación','Mensual']
 const FINANCIERAS    = ['Crediseguro','Finesa','Servicrédito']
+// Espaciado entre cuotas: lo define el acuerdo con la financiera, NO la
+// periodicidad de la prima. El valor se guarda en minúscula (lo exige el CHECK
+// de la columna y el CASE de `generar_operaciones_cuotas`).
+const PERIODICIDADES_CUOTA: { value: PeriodicidadCuota; label: string }[] = [
+  { value: 'mensual',    label: 'Mensual' },
+  { value: 'bimestral',  label: 'Bimestral' },
+  { value: 'trimestral', label: 'Trimestral' },
+  { value: 'semestral',  label: 'Semestral' },
+  { value: 'anual',      label: 'Anual' },
+]
 const MEDIOS_PAGO    = ['Efectivo','Transferencia','Cheque','PSE','Débito automático','Tarjeta crédito']
 const BANCOS_PAGO    = [
   'Bancolombia','Banco de Bogotá','Davivienda','BBVA','Banco de Occidente',
@@ -155,6 +165,7 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
     forma_pago:        poliza?.forma_pago        || '',
     financiera:        (poliza as any)?.financiera || '',
     num_cuotas:        (poliza as any)?.num_cuotas?.toString() || '',
+    periodicidad_cuota: poliza?.periodicidad_cuota || '',
     medio_pago:        poliza?.medio_pago        || '',
     banco_pago:        poliza?.banco_pago        || '',
     // recaudo (legacy cumplimiento)
@@ -175,9 +186,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
   // El RPC de cuotas lee la póliza persistida; si estos campos cambiaron en el
   // formulario y no se guardaron, generaría cuotas con los valores viejos.
   const financiacionSinGuardar = !!poliza?.id && (
-    (form.num_cuotas || '')        !== (((poliza as { num_cuotas?: number }).num_cuotas ?? '') + '') ||
-    (form.periodicidad_pago || '') !== (poliza.periodicidad_pago ?? '') ||
-    (form.fecha_inicio || '')      !== (poliza.fecha_inicio ?? '')
+    (form.num_cuotas || '')         !== (((poliza as { num_cuotas?: number }).num_cuotas ?? '') + '') ||
+    (form.periodicidad_cuota || '') !== (poliza.periodicidad_cuota ?? '') ||
+    (form.fecha_inicio || '')       !== (poliza.fecha_inicio ?? '')
   )
 
   const esCumplimiento    = RAMOS_CUMPLIMIENTO.includes(form.ramo)
@@ -399,6 +410,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
       forma_pago:        form.forma_pago        || null,
       financiera:        form.forma_pago === 'Financiación' ? (form.financiera || null) : null,
       num_cuotas:        form.forma_pago === 'Financiación' ? (form.num_cuotas ? parseInt(form.num_cuotas) : null) : null,
+      // Solo aplica a financiadas; en cualquier otra forma de pago se limpia
+      // para no dejar un espaciado huérfano que confunda al generador.
+      periodicidad_cuota: form.forma_pago === 'Financiación' ? (form.periodicidad_cuota || null) : null,
       medio_pago:        form.medio_pago        || null,
       banco_pago:        form.banco_pago        || null,
       // legacy cumplimiento
@@ -988,6 +1002,18 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, onClose,
                     placeholder="Ej: 12"
                     className={cls}
                   />
+                </Field>
+                <Field label="Periodicidad de la cuota">
+                  <select
+                    value={form.periodicidad_cuota}
+                    onChange={e => set('periodicidad_cuota', e.target.value)}
+                    className={cls}>
+                    <option value="">Mensual (por defecto)</option>
+                    {PERIODICIDADES_CUOTA.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                  <p className="text-xs text-ink-400 mt-1">
+                    Cada cuánto cobra la financiera. Es distinta de la periodicidad de la prima.
+                  </p>
                 </Field>
 
                 {/* Generador de cuotas (fase 3). Solo en pólizas ya guardadas:
