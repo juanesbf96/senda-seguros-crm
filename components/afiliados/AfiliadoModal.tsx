@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { PolizaAfiliado, PolizaPlan, Poliza, TipoCliente, AfiliadoCambioPlan } from '@/types'
 import { X, User } from 'lucide-react'
+import { derivarPrimaColectiva } from '@/lib/polizas/primaColectiva'
 
 /* ── Constantes ── */
 
@@ -70,7 +71,7 @@ async function recalcularPrimas(polizaId: string, planId?: string | null) {
     .eq('poliza_id', polizaId)
     .eq('activo', true)
   const sumaPoliza = (todosAfs ?? []).reduce((s, a) => s + (a.prima_individual ?? 0), 0)
-  await supabase.from('polizas').update({ prima: sumaPoliza }).eq('id', polizaId)
+  await supabase.from('polizas').update(derivarPrimaColectiva(sumaPoliza)).eq('id', polizaId)
 }
 
 /* ── Componente ── */

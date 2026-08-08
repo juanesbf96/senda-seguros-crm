@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Poliza, TipoCliente } from '@/types'
 import { X, Upload, CheckCircle, AlertTriangle, FileSpreadsheet } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { derivarPrimaColectiva } from '@/lib/polizas/primaColectiva'
 
 interface Props {
   poliza: Poliza
@@ -64,7 +65,7 @@ async function recalcularPrima(polizaId: string) {
   if (pol?.prima_por_afiliado != null && count != null) {
     await supabase
       .from('polizas')
-      .update({ prima: pol.prima_por_afiliado * count })
+      .update(derivarPrimaColectiva(pol.prima_por_afiliado * count))
       .eq('id', polizaId)
   }
 }

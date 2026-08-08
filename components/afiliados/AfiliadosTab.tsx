@@ -10,6 +10,7 @@ import {
 import AfiliadoModal from './AfiliadoModal'
 import ImportAfiliadosModal from './ImportAfiliadosModal'
 import { usePermissions } from '@/contexts/PermissionsContext'
+import { derivarPrimaColectiva } from '@/lib/polizas/primaColectiva'
 
 interface Props {
   /** Modo póliza: muestra afiliados de esta póliza fija */
@@ -38,7 +39,7 @@ async function recalcularPrimaPoliza(polizaId: string) {
 
   if (suma > 0) {
     // Primas individuales → suma directa
-    await supabase.from('polizas').update({ prima: suma }).eq('id', polizaId)
+    await supabase.from('polizas').update(derivarPrimaColectiva(suma)).eq('id', polizaId)
   } else {
     // Fallback: prima_por_afiliado × count (si la póliza usa ese modelo)
     const { count } = await supabase
@@ -52,7 +53,7 @@ async function recalcularPrimaPoliza(polizaId: string) {
       .eq('id', polizaId)
       .single()
     if (pol?.prima_por_afiliado != null && count != null) {
-      await supabase.from('polizas').update({ prima: pol.prima_por_afiliado * count }).eq('id', polizaId)
+      await supabase.from('polizas').update(derivarPrimaColectiva(pol.prima_por_afiliado * count)).eq('id', polizaId)
     }
   }
 }
