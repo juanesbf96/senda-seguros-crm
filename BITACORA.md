@@ -22,7 +22,7 @@
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
 | 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45), todo en prod. ⚠️ Antes de usar cuotas en operación diaria: decidir el solapamiento `operaciones` vs `cobros` y agregar `periodicidad_cuota` (ver sección de fase 3) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
-| 4.1 | Extractor PDF de carátulas | ⬜ Pendiente (usa el motor 4.3 como fallback) |
+| 4.1 | Extractor PDF de carátulas | 🟡 **Backend en prod** (#47, Carril A): endpoint `/api/polizas/extraer-caratula` (heurística + fallback IA 4.3) + contrato `BorradorPoliza`. **Falta la UI** (botón + preview) → Carril B |
 | 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
@@ -216,6 +216,20 @@ Vista **Oportunidades** (`/oportunidades`, sidebar → CRM): clientes con póliz
 - **Probado en staging** con clientes sintéticos: excluye lo ya contratado (cliente con Autos+Vida+Hogar solo recibe Vida→Salud), ignora pólizas vencidas, scoring coherente (mayor prima/antigüedad → mayor score). tsc/build/55 tests OK.
 - **Nota operativa (7-ago):** al aplicar en prod, la 1ª corrida del SQL falló por un error de transcripción al chat (se cayó el alias `AS score`); el archivo de migración siempre estuvo correcto. Re-corrido con el SQL exacto del archivo → OK.
 - **Sin colisión:** RPC + vista nueva + `analisis_ia`; toca `Sidebar.tsx` y `types/index.ts` con adiciones.
+
+### Fase 4.1 — Extractor PDF de carátulas: BACKEND (rama `feat/extractor-caratula-backend`, PR #47) 🟡 en prod, falta la UI (Carril A)
+
+Endpoint que devuelve un **borrador de póliza** desde el PDF de una carátula, para que la UI (Carril B) abra el formulario pre-llenado. **Sin migración.**
+
+- **Contrato `BorradorPoliza` / `ResultadoExtraccionCaratula`** en `types/index.ts` — lo consume Carril B.
+- **`POST /api/polizas/extraer-caratula`:** auth por token → texto con `pdf-parse` (helper compartido de colillas) → **heurística determinística** (`lib/caratulas/heuristica.ts`: número, aseguradora, tomador, documento, vigencia, prima; normalizadores de fecha/monto colombiano) → si faltan campos clave, **fallback al motor 4.3** (best-effort: si la IA falla, devuelve lo heurístico). `confianza='requiere_revision'` cuando interviene la IA o quedan huecos.
+- **Decisión de alcance honesta:** sin PDFs de carátula **reales** no hay parsers determinísticos por aseguradora todavía. El v1 es heurístico genérico + IA; la arquitectura (`lib/caratulas/`) queda lista para enchufar parsers por aseguradora con fixtures cuando haya muestras.
+- 12 tests de las funciones puras (67 en total). tsc/build OK.
+- **Pendiente Carril B:** botón "Cargar desde PDF" en `PolizasList` + `PolizaModal` pre-llenado que guarda con `origen_creacion='extractor_pdf'` (ver prompt de coordinación).
+
+### Decisión pendiente documentada: `operaciones` vs `cobros`
+
+Se preparó un brief para el owner en **`docs/DECISION_operaciones_vs_cobros.md`** (Carril A, dueño del aging). Recomienda la **Opción 2**: `cobros` como única fuente de verdad de la cartera de cobros (el generador de cuotas escribe en `cobros`, no en `operaciones`); `operaciones` queda como timeline de movimientos. Es el camino de menor riesgo (no toca la capa de finanzas ya reconciliada) y sin doble conteo. **No urge** (0 pólizas con `num_cuotas` en prod → hoy no se generan cuotas), pero decidir **antes** de usar financiación en volumen. Si se aprueba, Carril B ajusta `generar_operaciones_cuotas` (junto con `periodicidad_cuota`).
 
 ### Fase 2 — Paridad de modelo de datos (Carril B) — 1-ago
 
@@ -827,4 +841,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 7 de agosto de 2026. Fases 1, 2 y 3 cerradas. Fase 4 avanzando: motor IA 4.3 (#38) y cross-sell 4.2 (#40) en prod; falta 4.1 (extractor PDF).**motor de IA 4.3 (#38, base de fase 4)** en prod.*
+*Última actualización: 7 de agosto de 2026. Fases 1, 2, 3 cerradas. Fase 4: 4.3 y 4.2 en prod; 4.1 backend en prod (#47), falta la UI (Carril B). Brief operaciones-vs-cobros para el owner en docs/.**motor de IA 4.3 (#38, base de fase 4)** en prod.*
