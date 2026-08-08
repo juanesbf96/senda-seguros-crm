@@ -45,6 +45,23 @@ export async function importarPolizas(
 ): Promise<ImportResult> {
   const result: ImportResult = { clientesCreados: 0, clientesExistentes: 0, polizasCreadas: 0, errores: [], advertencias: [] }
 
+  // ── 0. Filas descartadas, ANTES de tocar la base ──────────────────
+  // Una aseguradora que es un número delata una columna corrida en el Excel
+  // (típicamente el teléfono del cliente). Si esa columna se corrió, tampoco
+  // hay razón para confiar en el nombre ni en la cédula de la misma fila, así
+  // que la fila se descarta entera y no llega a crear ni cliente ni póliza.
+  // Se conserva el número de fila original para que los mensajes sigan
+  // apuntando a la línea real del Excel.
+  const filas = rows
+    .map((r, i) => ({ r, fila: i + 2 }))
+    .filter(({ r, fila }) => {
+      if (!aseguradoraEsNumerica(r.aseguradora)) return true
+      result.errores.push(
+        `Fila ${fila}: la aseguradora es un número ("${r.aseguradora}") — parece una columna corrida. Fila omitida.`)
+      return false
+    })
+  const rowsValidas = filas.map(f => f.r)
+
   // ── 1a. Vendedores del workspace ──────────────────────────────────
   type VendedorCache = { id: string; pct: number | null }
   const vendedoresMap = new Map<string, VendedorCache>()
@@ -60,7 +77,7 @@ export async function importarPolizas(
 
   // ── 1b. Crear vendedores nuevos (un solo insert) ──────────────────
   // Sólo nombres de texto: un asesor que empieza en dígito indica una columna mal mapeada
-  const asesoresNuevos = [...new Set(rows.map(r => r.asesor).filter(a => a && !/^\d/.test(a)))].filter(nombre => {
+  const asesoresNuevos = [...new Set(rowsValidas.map(r => r.asesor).filter(a => a && !/^\d/.test(a)))].filter(nombre => {
     const k = norm(nombre)
     if (vendedoresMap.has(k)) return false
     for (const key of vendedoresMap.keys()) {
@@ -119,7 +136,7 @@ export async function importarPolizas(
 
   // ── 2. Clientes: lookup en bloque por cédula ──────────────────────
   const clienteIdPorClave = new Map<string, string>()  // cedula (o nombre-lower) → id
-  const cedulas = [...new Set(rows.map(r => r.cedula).filter(Boolean))]
+  const cedulas = [...new Set(rowsValidas.map(r => r.cedula).filter(Boolean))]
 
   for (const lote of chunks(cedulas, LOTE_IN)) {
     const { data } = await supabase
@@ -137,7 +154,7 @@ export async function importarPolizas(
   type ClienteNuevo = { clave: string; data: Record<string, unknown> }
   const nuevosPorClave = new Map<string, ClienteNuevo>()
 
-  for (const r of rows) {
+  for (const r of rowsValidas) {
     const clave = r.cedula || r.nombre.toLowerCase()
     if (clienteIdPorClave.has(clave) || nuevosPorClave.has(clave)) continue
 
@@ -177,7 +194,7 @@ export async function importarPolizas(
   }
 
   // ── 4. Pólizas existentes: lookup en bloque por número ────────────
-  const numerosPoliza = [...new Set(rows.map(r => r.numero_poliza).filter(Boolean))]
+  const numerosPoliza = [...new Set(rowsValidas.map(r => r.numero_poliza).filter(Boolean))]
   const polizaIdPorNumero = new Map<string, string>()
 
   for (const lote of chunks(numerosPoliza, LOTE_IN)) {
@@ -237,20 +254,11 @@ export async function importarPolizas(
   const insertsPorClave = new Map<string, Record<string, unknown>>()  // clave: numero_poliza o clave sintética por fila
   const updatesPorId    = new Map<string, { data: Record<string, unknown>; fila: number }>()
 
-  rows.forEach((r, i) => {
+  filas.forEach(({ r, fila }) => {
     const clave = r.cedula || r.nombre.toLowerCase()
     const clienteId = clienteIdPorClave.get(clave)
     if (!clienteId) {
-      result.errores.push(`Fila ${i + 2}: sin cliente para "${r.nombre}" (falló su creación)`)
-      return
-    }
-
-    // Aseguradora que es un número = columna corrida en el Excel (típicamente el
-    // teléfono del cliente). Se rechaza la fila entera: si esa columna se corrió,
-    // no hay razón para confiar en las demás de la misma fila.
-    if (aseguradoraEsNumerica(r.aseguradora)) {
-      result.errores.push(
-        `Fila ${i + 2}: la aseguradora es un número ("${r.aseguradora}") — parece una columna corrida. Fila omitida.`)
+      result.errores.push(`Fila ${fila}: sin cliente para "${r.nombre}" (falló su creación)`)
       return
     }
 
@@ -265,7 +273,7 @@ export async function importarPolizas(
     const retencion = normalizarRetencionVendedor(r.retencion_asesor)
     if (retencion.corregido) {
       result.advertencias.push(
-        `Fila ${i + 2}: retención del asesor fuera de rango (${r.retencion_asesor}) — no es un porcentaje. Se usó ${retencion.valor}%.`)
+        `Fila ${fila}: retención del asesor fuera de rango (${r.retencion_asesor}) — no es un porcentaje. Se usó ${retencion.valor}%.`)
     }
 
     const primaNeta       = r.prima_neta ?? 0
@@ -331,10 +339,10 @@ export async function importarPolizas(
       if (!r.aseguradora || BAD_VALUES.has(r.aseguradora.toLowerCase().trim())) delete updateData.aseguradora
       if (!r.ramo      || BAD_VALUES.has(r.ramo.toLowerCase().trim()))      delete updateData.ramo
       delete updateData.origen_creacion  // no relabelar el origen de una póliza ya existente
-      updatesPorId.set(existenteId, { data: updateData, fila: i + 2 })
+      updatesPorId.set(existenteId, { data: updateData, fila })
     } else {
       // Clave de dedupe: el número de póliza; sin número, cada fila es única
-      const clave = r.numero_poliza || `__fila_${i}`
+      const clave = r.numero_poliza || `__fila_${fila}`
       insertsPorClave.set(clave, { ...polizaData, created_by: userId })
     }
   })
