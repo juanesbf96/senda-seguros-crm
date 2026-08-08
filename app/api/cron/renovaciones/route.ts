@@ -158,8 +158,12 @@ export async function GET(req: NextRequest) {
   const supabase = createClient(supabaseUrl, serviceRoleKey)
   const resend   = new Resend(resendKey)
 
-  // 4. Obtener todas las pólizas por vencer (próximos 30 días)
-  const { data: polizas, error } = await supabase.rpc('get_polizas_por_vencer', { dias_max: 30 })
+  // 4. Obtener todas las pólizas por vencer (próximos 60 días).
+  //    Ventana de 60 días: los EMAILS siguen filtrando por umbrales ≤30 (7/15/30),
+  //    pero la OPERACIÓN de renovación (paso 4.5) se crea desde los 60 días para que
+  //    la gestión sea temprana. Ampliar la ventana no agrega emails: el bloque de
+  //    correo descarta las de 31–60 días (ningún umbral las matchea).
+  const { data: polizas, error } = await supabase.rpc('get_polizas_por_vencer', { dias_max: 60 })
   if (error) {
     console.error('Cron: error consultando pólizas:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
@@ -168,6 +172,41 @@ export async function GET(req: NextRequest) {
   const todas = (polizas || []) as PolizaPorVencer[]
   if (todas.length === 0) {
     return NextResponse.json({ message: 'Sin pólizas por vencer hoy', sent: 0 })
+  }
+
+  // 4.5. Crear la operación 'renovacion' para las pólizas dentro de 60 días
+  //      (ítem 3 de fase 3): la renovación deja de ser solo una alerta y pasa a ser
+  //      una operación gestionable (asignable, con estado de cartera).
+  //      Dedup contra la propia tabla `operaciones` por (poliza_id, fecha_programada):
+  //      una renovación por póliza por ciclo. Cuando la póliza renueva, su fecha_fin
+  //      avanza → el próximo ciclo genera otra operación distinta. Mismo patrón
+  //      app-level que el dedup de emails (el cron corre secuencial, 1 vez al día).
+  let renovacionesCreadas = 0
+  const opPolizaIds = todas.map(p => p.poliza_id)
+  const { data: opExistentes } = await supabase
+    .from('operaciones')
+    .select('poliza_id, fecha_programada')
+    .eq('tipo', 'renovacion')
+    .in('poliza_id', opPolizaIds)
+  const yaCreadas = new Set((opExistentes || []).map(o => `${o.poliza_id}|${o.fecha_programada}`))
+
+  const nuevasOps = todas
+    .filter(p => !yaCreadas.has(`${p.poliza_id}|${p.fecha_fin}`))
+    .map(p => ({
+      workspace_id:     p.workspace_id,
+      poliza_id:        p.poliza_id,
+      tipo:             'renovacion',
+      estado_cartera:   'pendiente',
+      valor:            p.prima_neta ?? 0,
+      fecha_programada: p.fecha_fin,          // = clave de dedup del ciclo
+      origen:           'cron_renovaciones',
+      notas:            `Renovación programada — la póliza vence el ${formatDate(p.fecha_fin)}`,
+    }))
+
+  if (nuevasOps.length > 0) {
+    const { error: opError } = await supabase.from('operaciones').insert(nuevasOps)
+    if (opError) console.error('Cron: error creando operaciones de renovación:', opError)
+    else renovacionesCreadas = nuevasOps.length
   }
 
   // 5. Agrupar por workspace + filtrar por umbral (7, 15, 30 días)
@@ -210,7 +249,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (porWorkspace.size === 0) {
-    return NextResponse.json({ message: 'Todas las notificaciones de hoy ya fueron enviadas', sent: 0 })
+    return NextResponse.json({ message: 'Todas las notificaciones de hoy ya fueron enviadas', sent: 0, renovacionesCreadas })
   }
 
   // 7. Enviar un email por workspace y registrar
@@ -261,5 +300,6 @@ export async function GET(req: NextRequest) {
     polizasRevisadas:    todas.length,
     emailsEnviados:      emailsSent,
     notificacionesLog:   logEntries.length,
+    renovacionesCreadas,
   })
 }
