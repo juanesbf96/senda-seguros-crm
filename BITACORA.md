@@ -20,7 +20,7 @@
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
-| 3.x | Operaciones de Producción | 🟡 Backbone en prod (#28). **Desbloqueado**: fase 2 cerró y `PolizaDetalle`/`PolizaModal` están libres. Falta timeline, enganche de financiación, y operaciones de renovación/cancelación. ⚠️ Antes de usar las cuotas en operación diaria hay que decidir el solapamiento `operaciones` vs `cobros` (ver sección de fase 3) |
+| 3.x | Operaciones de Producción | 🟢 Backbone (#28) + **UI completa**: timeline, operación de cancelación y botón de generar cuotas (#42, #43) — todo en prod. Falta solo el **ítem 3** (el cron crea la operación `renovacion`), que va aparte por el dedup. ⚠️ Antes de usar cuotas en operación diaria: decidir el solapamiento `operaciones` vs `cobros` y agregar `periodicidad_cuota` (ver sección de fase 3) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
 | 4.1 | Extractor PDF de carátulas | ⬜ Pendiente (usa el motor 4.3 como fallback) |
 | 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
@@ -129,10 +129,10 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 
 | # | Pendiente | Archivos | ¿Migración? |
 |---|-----------|----------|-------------|
-| 1 | Timeline de operaciones en `PolizaDetalle` | `PolizaDetalle` | No |
-| 2 | Enganchar `generar_operaciones_cuotas` con la UI de financiación | `PolizaModal` | No |
-| 3 | El cron crea la operación `renovacion` 60 días antes | `app/api/cron/renovaciones` | **Probablemente sí** — revisar el dedup (ver nota abajo) |
-| 4 | Cancelar una póliza crea la operación `cancelacion` (enlaza con 1.1) | `PolizaModal` | No |
+| 1 | ~~Timeline de operaciones en `PolizaDetalle`~~ | `PolizaDetalle` | ✅ **HECHO** (#42) |
+| 2 | ~~Enganchar `generar_operaciones_cuotas` con la UI de financiación~~ | `PolizaModal` | ✅ **HECHO** (#43) — sin migración, ver corrección abajo |
+| 3 | El cron crea la operación `renovacion` 60 días antes | `app/api/cron/renovaciones` | ⬜ **ÚNICO PENDIENTE** — revisar el dedup (ver nota abajo) |
+| 4 | ~~Cancelar una póliza crea la operación `cancelacion`~~ | `PolizaModal` | ✅ **HECHO** (#42) |
 
 1, 2 y 4 comparten archivos y no llevan migración → caben en un solo PR (PR-10 del plan). El 3 conviene separarlo: toca el cron y arrastra el mismo problema de dedup que la alerta de certificados (`notificaciones_renovacion` tiene clave `(poliza_id, dias_alerta)`; una operación de renovación necesita su propio criterio de "ya creada" para no duplicar en cada corrida diaria).
 
@@ -147,8 +147,47 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 > 1. `operaciones` es la fuente de verdad de cartera → migrar el aging a leer de ahí (o a una vista que una ambas).
 > 2. `cobros` sigue siendo la cartera y `operaciones` queda solo como bitácora de movimientos → entonces el generador de cuotas debería escribir en `cobros`, no en `operaciones`.
 >
-> Elegir una y dejarla escrita aquí antes de seguir con el punto 3.
+> **ACTUALIZACIÓN (7-ago) — el owner definió los conceptos:** existen **dos carteras distintas**, no una partida:
+> 1. **Producción total de la agencia** (prima − IVA), que se alimenta de cada póliza completa — métrica de producción, no un saldo por cobrar.
+> 2. **Cartera de cobros**: lo que deben los clientes de pólizas ya emitidas, en mora o aún dentro del período de pago.
+>
+> Eso confirma que las filas de `cobros` y las cuotas `tipo='cobro'` de `operaciones` son **el mismo concepto** (la #2) en dos tablas. Falta decidir la **implementación**: una tabla como fuente de verdad, o una vista que una ambas. Es coordinación con Carril A (dueño de fase 1.2). Los ítems 1, 2 y 4 ya entregados no dependen de esto; el uso real de cuotas sí.
 
+
+### Fase 3 — UI de Operaciones: timeline, cancelación y generador (PR #42 y #43) ✅ mergeados y en prod
+
+Cierra los ítems **1, 2 y 4** de la UI que el backbone (#28) había diferido. **Sin migración**: todo consume la tabla `operaciones`, el tipo `Operacion` y el RPC `generar_operaciones_cuotas` que ya estaban en producción.
+
+- **Ítem 1 — Timeline (`components/polizas/OperacionesPoliza.tsx`, en `PolizaDetalle`):** lista los movimientos de la póliza (cuota / renovación / cancelación / modificación / expedición) con estado de cartera, valor, fechas y total por cobrar. Solo lectura. **La sección se oculta si el usuario no tiene `finanzas_cobros_ver`** — la RLS devolvería 0 filas igual, y mostrar "no hay operaciones" a quien simplemente no puede verlas sería engañoso.
+- **Ítem 4 — Cancelación:** guardar una póliza como `cancelada` crea su operación `cancelacion` con `estado_cartera='anulada'` (una cancelación no es cartera por cobrar) y el motivo de fase 1.1 en `notas`. Tres decisiones: se ejecuta **después** de guardar (necesita el id, que en altas nuevas no existe antes); es **anti-duplicado** (reeditar una póliza ya cancelada no ensucia el timeline); y es **best-effort** — si el insert falla (p. ej. sin `finanzas_cobros_registrar`) se loguea pero **no se revierte la cancelación**, que es lo que el usuario pidió y ya quedó persistida.
+- **Ítem 2 — Botón "Generar cuotas":** solo en pólizas **ya guardadas** con `forma_pago='Financiación'`, porque el RPC lee la financiación **persistida, no el formulario**. Se **deshabilita con aviso si hay cambios sin guardar** en `num_cuotas`/`periodicidad_pago`/`fecha_inicio` — ese era el footgun principal: generaría cuotas con valores viejos sin que el usuario lo note. Traduce los errores del RPC a mensajes accionables.
+- De paso, los motivos de cancelación pasaron a una **constante única** que alimenta el `<select>` y el texto de la operación, para que no se desincronicen.
+- Verificado: tsc, 55 tests y build limpios. Queries validadas contra la API de prod (el timeline responde 200; el insert de cancelación falla **solo** por FK inexistente → columnas, tipos y CHECKs correctos). **Sin verificación visual** (la app pide sesión): pendiente comprobar en navegador el timeline vacío, la cancelación que no se duplica al reeditar, y el ciclo completo de generar cuotas.
+
+#### 🔴 Corrección de un diagnóstico equivocado (importante, no partir de él)
+
+En el PR #42 reporté que el RPC generaría **cuotas mensuales equivocadas para el 52% de las pólizas** (las de `Anual financiado`, que no matchean su `CASE`) y que hacía falta una migración para corregirlo. **Al verificarlo con datos resultó falso en la práctica:**
+
+- **Ninguna** de las 1.000 pólizas de producción tiene `num_cuotas` (0 de 1.000). Tampoco `forma_pago`, `financiera` ni `prima_mensual` en las 517 de "Anual financiado" — vienen del import de Excel, que no mapea esos campos.
+- El RPC valida `num_cuotas` **antes** de llegar al `CASE`, así que hoy **no genera nada para ninguna póliza existente**; nunca calcula fechas.
+- Y "Anual financiado" significa *póliza anual pagada en cuotas*, así que el `ELSE → mensual` probablemente sea el comportamiento **correcto**: mapearlo a `anual` daría 10 cuotas anuales para una póliza de un año.
+
+Conclusión: **no se hizo migración** y el botón sirve tal cual para pólizas nuevas donde el usuario llene la financiación. Las históricas se irán completando a medida que se editen.
+
+#### ⬜ Pendiente derivado: la periodicidad de la cuota depende de la FINANCIERA
+
+Decisión del owner (7-ago): el espaciado de las cuotas **no** lo define `periodicidad_pago` —que describe la **prima**— sino el acuerdo con la **financiera** (Crediseguro / Finesa / Servicrédito u otro). Hoy el RPC usa `periodicidad_pago`, que es conceptualmente incorrecto para pólizas financiadas.
+
+Para resolverlo hace falta **un campo propio en la póliza** (p. ej. `periodicidad_cuota`) + su migración, y ajustar el `CASE` del RPC para leerlo. No urge: sin `num_cuotas` en ninguna póliza, hoy no se generan cuotas. Hacerlo **antes** de que la financiación se use en volumen.
+
+#### 📖 Definición de las dos carteras (aclarada por el owner, 7-ago)
+
+No estaba escrita en ninguna parte y es clave para no seguir confundiendo conceptos:
+
+1. **Producción total de la agencia** — prima − IVA, se alimenta de **cada póliza completa**. Es una métrica de producción/ventas, no un saldo por cobrar.
+2. **Cartera de cobros** — lo que **deben los clientes** de pólizas ya emitidas: puede estar en mora o aún dentro del período de pago.
+
+**Qué implica esto para el solapamiento `operaciones` vs `cobros`:** las filas de `cobros` y las cuotas `tipo='cobro'` de `operaciones` son **el mismo concepto** (cartera de cobros) viviendo en dos tablas por accidente técnico. Mientras el aging (`get_cartera_aging`) siga leyendo solo de `cobros`, las cuotas generadas **no aparecerán en la mora**. Sigue pendiente decidir la implementación (una tabla como fuente de verdad, o una vista que una ambas) — es coordinación con Carril A, dueño de fase 1.2. **No bloquea** los ítems 1, 2 y 4 ya entregados, pero sí hay que resolverlo antes de que las cuotas se usen en la operación diaria.
 
 ### Fase 4.3 — Motor de IA multi-proveedor (rama `feat/motor-ia-multiproveedor`, PR #38) ✅ mergeado y en prod (Carril A)
 
