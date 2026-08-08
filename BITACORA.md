@@ -20,7 +20,7 @@
 | 1.2 | Aging de cartera (buckets de mora) | ✅ Hecho — PR #23 mergeado y desplegado. RPC `get_cartera_aging` probada en staging + prod |
 | 1.3 | KPIs comparativos en Dashboard | ✅ Hecho — PR #24 mergeado y desplegado. RPC `get_dashboard_comparativos` probada en staging + prod |
 | 2.x | Paridad de modelo de datos (referencia externa) | ✅ **Cerrada (2-ago)** — schema (#25), matching (#29), UI (#31), catálogo 2.6 (#33) y sus consumidores (#34), todos mergeados y en prod. Único pendiente: la alerta de vencimiento de **certificados** en el cron (bloqueador documentado; 0 certificados en prod, urgencia nula) |
-| 3.x | Operaciones de Producción | 🟢 Backbone (#28) + **UI completa**: timeline, operación de cancelación y botón de generar cuotas (#42, #43) — todo en prod. Falta solo el **ítem 3** (el cron crea la operación `renovacion`), que va aparte por el dedup. ⚠️ Antes de usar cuotas en operación diaria: decidir el solapamiento `operaciones` vs `cobros` y agregar `periodicidad_cuota` (ver sección de fase 3) |
+| 3.x | Operaciones de Producción | ✅ **Completa** — backbone (#28) + UI (#42, #43) + cron de renovación (#45), todo en prod. ⚠️ Antes de usar cuotas en operación diaria: decidir el solapamiento `operaciones` vs `cobros` y agregar `periodicidad_cuota` (ver sección de fase 3) |
 | 4.3 | Motor de IA multi-proveedor (BYOK) | ✅ Hecho — PR #38 mergeado y en prod. Base de 4.1/4.2. Asistente migrado al motor; tab "Motor de IA" en Configuración |
 | 4.1 | Extractor PDF de carátulas | ⬜ Pendiente (usa el motor 4.3 como fallback) |
 | 4.2 | Ventas cruzadas con scoring | ✅ Hecho — PR #40 mergeado y en prod. RPC `get_oportunidades_cross_sell` + `analisis_ia` (caché 30d) + vista `/oportunidades` con mensaje IA |
@@ -131,10 +131,12 @@ Modelo unificado estilo Cider: movimientos por póliza (cobro-cuota / renovació
 |---|-----------|----------|-------------|
 | 1 | ~~Timeline de operaciones en `PolizaDetalle`~~ | `PolizaDetalle` | ✅ **HECHO** (#42) |
 | 2 | ~~Enganchar `generar_operaciones_cuotas` con la UI de financiación~~ | `PolizaModal` | ✅ **HECHO** (#43) — sin migración, ver corrección abajo |
-| 3 | El cron crea la operación `renovacion` 60 días antes | `app/api/cron/renovaciones` | ⬜ **ÚNICO PENDIENTE** — revisar el dedup (ver nota abajo) |
+| 3 | ~~El cron crea la operación `renovacion` 60 días antes~~ | `app/api/cron/renovaciones` | ✅ **HECHO** (#45, Carril A) — sin migración; dedup app-level contra `operaciones` |
 | 4 | ~~Cancelar una póliza crea la operación `cancelacion`~~ | `PolizaModal` | ✅ **HECHO** (#42) |
 
 1, 2 y 4 comparten archivos y no llevan migración → caben en un solo PR (PR-10 del plan). El 3 conviene separarlo: toca el cron y arrastra el mismo problema de dedup que la alerta de certificados (`notificaciones_renovacion` tiene clave `(poliza_id, dias_alerta)`; una operación de renovación necesita su propio criterio de "ya creada" para no duplicar en cada corrida diaria).
+
+> **Ítem 3 — resuelto (7-ago, PR #45, Carril A).** Resultó **más simple** de lo temido: **no** necesitó tocar `notificaciones_renovacion` ni migración. El dedup se hace contra la **propia tabla `operaciones`** por `(poliza_id, fecha_programada)` — una renovación por póliza por ciclo; al renovar, la `fecha_fin` avanza y el próximo ciclo genera otra. El cron amplió su ventana a **60 días** para crear la operación temprano (los emails no cambian: siguen filtrando ≤30). Operación: `tipo='renovacion'`, `estado_cartera='pendiente'`, `valor=prima_neta`, `origen='cron_renovaciones'`. Mismo patrón app-level que el dedup de emails (el cron corre secuencial). Probado en staging: 2 corridas no duplican, un ciclo nuevo crea la 2ª. **La alerta de certificados de fase 2.4 sigue pendiente** — esa sí necesita migrar `notificaciones_renovacion` (0 certificados en prod, urgencia nula).
 
 > **⚠️ DECISIÓN DE PRODUCTO PENDIENTE — solapamiento `operaciones` vs `cobros`.**
 > Hoy la cartera vive en **dos** lugares y eso va a divergir si no se decide:
@@ -825,4 +827,4 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 7 de agosto de 2026. Fase 1 y 2 cerradas. Fase 4 avanzando: motor IA 4.3 (#38) y cross-sell 4.2 (#40) en prod; falta 4.1 (extractor PDF). Fase 3 backbone desbloqueado.**motor de IA 4.3 (#38, base de fase 4)** en prod.*
+*Última actualización: 7 de agosto de 2026. Fases 1, 2 y 3 cerradas. Fase 4 avanzando: motor IA 4.3 (#38) y cross-sell 4.2 (#40) en prod; falta 4.1 (extractor PDF).**motor de IA 4.3 (#38, base de fase 4)** en prod.*
