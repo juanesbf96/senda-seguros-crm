@@ -27,6 +27,54 @@
 | 5.1 | WhatsApp ligero (recordatorio de pago en Cobros) | ✅ Hecho — PR #27 mergeado y desplegado |
 | 5.2 | WhatsApp API (inbox/campañas) | ⬜ Pendiente (por cotizar con owner) |
 
+---
+
+## Fase 12 — Correcciones del testeo con usuario real (8-ago)
+
+Los owners ejecutaron el plan de testeo manual (`docs/PLAN_TESTEO_MANUAL.md`) sobre la app
+desplegada y entregaron **20 correcciones + 5 observaciones** (`FDBK Senda CRM-8 ago.docx`).
+El plan de acción por etapas, con dueño por carril y los ítems F1–F20/O1–O5, está en
+**`docs/PLAN_ACCION_FEEDBACK_8AGO.md`** — esa es la fuente de verdad de esta fase.
+
+### 🚨 Hallazgo crítico verificado: fuga de datos entre workspaces (Etapa 0)
+
+Los ítems F2/F15 del feedback ("me aparecen clientes/pólizas de otra cuenta") **no son un
+bug puntual — son sistémicos**, verificado en código y esquema (no hipótesis):
+
+1. **23 políticas RLS permisivas** (`*_auth_all USING (true)`) en las tablas núcleo
+   (`clientes`, `polizas`, `cobros`, `actividades`, `liquidaciones`, `facturas`, …):
+   cualquier usuario autenticado puede leer TODAS las filas de TODOS los workspaces.
+   El aislamiento multi-tenant depende 100% del filtro `.eq('workspace_id')` del frontend.
+2. **Hay queries que olvidan ese filtro.** Confirmadas: `PolizaModal:231` (selector
+   CLIENTE CRM — exactamente el pantallazo de F2) y `ReciboModal` (selector de clientes).
+
+**Arreglo en dos capas (Etapa 0 del plan, bloquea todo lo demás):**
+- **0.1 (Carril A):** migración que reemplaza las 23 políticas por
+  `is_workspace_member(workspace_id)` — defensa en la BD: aunque una query olvide el
+  filtro, la base no entrega datos ajenos. ⚠️ Antes de restringir cada tabla hay que
+  verificar que no tenga filas con `workspace_id NULL` (quedarían invisibles).
+- **0.2 (Carril A):** barrido de todas las `.from(...)` sin `.eq('workspace_id')` →
+  lista de fixes dividida por dueño de archivo.
+- **0.3 (Carril B) / 0.4 (Carril A):** corregir las queries en los archivos de cada uno.
+- **0.5:** verificación manual cruzada con 2 cuentas en 2 workspaces.
+
+### Estado de las etapas
+
+| Etapa | Contenido | Estado |
+|---|---|---|
+| 0 🚨 Aislamiento de workspaces (F2, F15, O5) | RLS + barrido de queries | ⬜ **EN CURSO — bloquea todo** |
+| 1 💰 Dinero incorrecto (F14 Quálitas SALDO, F12 Expertos 2 clientes, F1 extractor tomador/prima, F4 clientes duplicados, F6) | A: colillas+extractor · B: duplicados | ⬜ |
+| 2 📋 Flujo diario de pólizas (F3, F7, F8, F9, F10, F11, F17) | B: UX pólizas · A: colillas y listas | ⬜ |
+| 3 🎯 Pipeline (F19 aseguradora, F20 etapas nuevas + observaciones) | A — confirmar mapeo de etapas con Sara | ⬜ |
+| 4 📊 Visibilidad de comisiones (F13, F16, O3, F18) | A — validar fórmulas del desglose con Sara | ⬜ |
+| 5 🧪 Verificaciones (O1, O2 liquidaciones el 15, O4 placa en asistente, O5 limpieza) | Mixto | ⬜ |
+
+**Insumos pendientes de los testers:** carátulas PDF del testeo (F1) · colilla Expertos
+con 2 clientes y planilla Quálitas (F12/F14) · precisión de F6 · mapeo de etapas del
+pipeline (F20) · fórmulas del desglose de comisiones (O3).
+
+---
+
 ### 🔬 Sesión de verificación en navegador (8-ago, Carril B)
 
 **Primera vez que la app se maneja con sesión real.** Hasta acá, PRs de fases 2, 3 y 4 se habían mergeado con la nota "sin verificación visual" — ni staging ni las máquinas de desarrollo tenían credenciales. Esta sesión saldó ese backlog: el owner inició sesión y creó un **workspace de prueba aparte**, así que todo lo que se escribió quedó aislado por `workspace_id` de los datos de Sara (el `.env.local` local apunta a **producción**; no hay config local separada).
@@ -955,6 +1003,6 @@ senda-seguros-crm/
 
 ---
 
-*Última actualización: 8 de agosto de 2026. Fases 1, 2 y 3 cerradas y **verificadas en navegador** por primera vez (ver "Sesión de verificación"); de ahí salieron los fixes #56, #57 y #58. **Fase 4 completa** (4.1, 4.2 y 4.3): el extractor tiene backend, UI y prima discriminada de punta a punta (#47, #50, #53, #61); queda el PR de limpieza de `borrador.prima` (Carril A) y la prueba con una carátula real.*
+*Última actualización: 8 de agosto de 2026. Plan de auditorías COMPLETO y en prod. Nueva Fase 12: correcciones del testeo real (20 fixes + 5 obs, plan en docs/PLAN_ACCION_FEEDBACK_8AGO.md). 🚨 Etapa 0 en curso: fuga de datos entre workspaces (23 políticas RLS permisivas + queries sin filtro).**verificadas en navegador** por primera vez (ver "Sesión de verificación"); de ahí salieron los fixes #56, #57 y #58. **Fase 4 completa** (4.1, 4.2 y 4.3): el extractor tiene backend, UI y prima discriminada de punta a punta (#47, #50, #53, #61); queda el PR de limpieza de `borrador.prima` (Carril A) y la prueba con una carátula real.*
 
 *Pendiente de decisión del owner: `operaciones` vs `cobros` — brief en `docs/DECISION_operaciones_vs_cobros.md`. (La prima de colectivas quedó resuelta en #64: la suma de afiliados es la prima neta, IVA 19%.)*
