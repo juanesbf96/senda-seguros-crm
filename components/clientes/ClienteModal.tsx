@@ -1,8 +1,9 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Cliente, ClienteHistorial, Etapa, TipoCliente } from '@/types'
 import { X, UserCircle2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
+import { variantesDocumento, normalizarDocumento } from '@/lib/clientes/documento'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { usePermissions } from '@/contexts/PermissionsContext'
 
@@ -106,6 +107,7 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
     autoriza_datos:           cliente?.autoriza_datos ?? false,
   })
   const [saving, setSaving] = useState(false)
+  const guardandoRef = useRef(false)
   const [error, setError] = useState('')
 
   // Pre-asignar al usuario actual cuando se crea un cliente nuevo
@@ -120,13 +122,40 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
   }
 
   async function save() {
+    // Guard contra doble submit: `saving` es estado de React y se aplica en el
+    // siguiente render, así que un doble clic rápido pasa dos veces por acá.
+    // El ref se actualiza de inmediato. (F4: clientes creados dos veces.)
+    if (guardandoRef.current) return
+    guardandoRef.current = true
+
     const nombreReq = tipo === 'persona_natural' ? form.nombre : form.razon_social
     if (!nombreReq.trim()) {
       setError(tipo === 'persona_natural' ? 'El nombre es obligatorio' : 'La razón social es obligatoria')
+      guardandoRef.current = false
       return
     }
     setSaving(true)
     setError('')
+
+    // Antes de crear, verificar que no exista ya un cliente con ese documento.
+    // Es la otra mitad de F4: el alta manual duplicaba porque nunca miraba.
+    const doc = tipo === 'persona_natural' ? form.cedula : form.nit
+    if (!cliente && normalizarDocumento(doc)) {
+      const variantes = variantesDocumento(doc)
+      const filtro = variantes.flatMap(v => [`cedula.eq.${v}`, `nit.eq.${v}`]).join(',')
+      const { data: yaExiste } = await supabase
+        .from('clientes')
+        .select('id, nombre')
+        .eq('workspace_id', currentWorkspace?.id ?? '')
+        .or(filtro)
+        .limit(1)
+      if (yaExiste?.length) {
+        setError(`Ya existe un cliente con ese documento: "${yaExiste[0].nombre}". Búscalo en la lista para editarlo.`)
+        setSaving(false)
+        guardandoRef.current = false
+        return
+      }
+    }
 
     const payload: Record<string, unknown> = {
       tipo_cliente:             tipo,
@@ -163,7 +192,7 @@ export default function ClienteModal({ cliente, members = [], onClose, onSaved }
       ? await supabase.from('clientes').update(payload).eq('id', cliente.id).select('id').single()
       : await supabase.from('clientes').insert(payload).select('id').single()
 
-    if (err) { setError(err.message); setSaving(false); return }
+    if (err) { setError(err.message); setSaving(false); guardandoRef.current = false; return }
 
     const clienteId = saved?.id ?? cliente?.id
     if (clienteId && currentWorkspace?.id) {

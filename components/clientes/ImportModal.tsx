@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { X, Upload, CheckCircle, AlertCircle, FileText } from 'lucide-react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { indexarPorDocumento, buscarEnIndice, normalizarDocumento, type ClienteConDocumento } from '@/lib/clientes/documento'
 
 interface ParsedRow {
   nombre: string
@@ -132,6 +133,13 @@ export default function ImportModal({ onClose, onImported }: Props) {
   const [parseErrors, setParseErrors] = useState<string[]>([])
   const [imported, setImported] = useState(0)
   const [failed, setFailed] = useState(0)
+  // F4: el import insertaba a ciegas, así que correrlo dos veces duplicaba todo.
+  // Ahora se detecta qué filas ya existen (por documento) y el usuario decide.
+  const [existentes, setExistentes] = useState<Map<string, ClienteConDocumento>>(new Map())
+  const [yaExisten, setYaExisten]   = useState<number>(0)
+  const [modoDuplicados, setModoDuplicados] = useState<'omitir' | 'actualizar'>('omitir')
+  const [omitidos, setOmitidos]     = useState(0)
+  const [actualizados, setActualizados] = useState(0)
 
   function handleFile(file: File) {
     setFileName(file.name)
@@ -142,8 +150,21 @@ export default function ImportModal({ onClose, onImported }: Props) {
       setParseErrors(errors)
       setRows(parsed)
       setStage('preview')
+      void detectarExistentes(parsed)
     }
     reader.readAsText(file, 'UTF-8')
+  }
+
+  /** Carga los clientes del workspace y cuenta cuántas filas del archivo ya existen. */
+  async function detectarExistentes(parsed: ParsedRow[]) {
+    if (!currentWorkspace) return
+    const { data } = await supabase
+      .from('clientes')
+      .select('id, nombre, cedula, nit')
+      .eq('workspace_id', currentWorkspace.id)
+    const idx = indexarPorDocumento((data ?? []) as ClienteConDocumento[])
+    setExistentes(idx)
+    setYaExisten(parsed.filter(r => buscarEnIndice(idx, r.cedula)).length)
   }
 
   function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -161,11 +182,41 @@ export default function ImportModal({ onClose, onImported }: Props) {
     setStage('importing')
     let ok = 0
     let err = 0
+    let omit = 0
+    let upd = 0
 
-    // Insert en lotes de 50
+    // Separar lo nuevo de lo que ya existe. Sin esto, reimportar el mismo
+    // archivo duplicaba todo (F4).
+    const nuevas: ParsedRow[] = []
+    const repetidas: { row: ParsedRow; existente: ClienteConDocumento }[] = []
+    for (const r of rows) {
+      const yaEsta = normalizarDocumento(r.cedula) ? buscarEnIndice(existentes, r.cedula) : null
+      if (yaEsta) repetidas.push({ row: r, existente: yaEsta })
+      else nuevas.push(r)
+    }
+
+    if (modoDuplicados === 'omitir') {
+      omit = repetidas.length
+    } else {
+      // Actualizar: se completa el cliente existente con los datos del archivo.
+      for (const { row, existente } of repetidas) {
+        const { error } = await supabase.from('clientes')
+          .update({
+            nombre: row.nombre,
+            telefono: row.telefono || null,
+            email: row.email || null,
+            notas: row.notas || null,
+          })
+          .eq('workspace_id', currentWorkspace?.id ?? '')
+          .eq('id', existente.id)
+        if (error) err++; else upd++
+      }
+    }
+
+    // Insert en lotes de 50 (solo las filas nuevas)
     const BATCH = 50
-    for (let i = 0; i < rows.length; i += BATCH) {
-      const batch = rows.slice(i, i + BATCH).map(r => ({
+    for (let i = 0; i < nuevas.length; i += BATCH) {
+      const batch = nuevas.slice(i, i + BATCH).map(r => ({
         nombre: r.nombre,
         cedula: r.cedula || null,
         telefono: r.telefono || null,
@@ -181,6 +232,8 @@ export default function ImportModal({ onClose, onImported }: Props) {
         ok += batch.length
       }
     }
+    setOmitidos(omit)
+    setActualizados(upd)
 
     setImported(ok)
     setFailed(err)
@@ -236,6 +289,30 @@ export default function ImportModal({ onClose, onImported }: Props) {
               {parseErrors.length > 0 && (
                 <div className="mb-4 p-3 bg-error-soft border border-error/30 rounded-lg text-sm text-error space-y-1">
                   {parseErrors.map((e, i) => <p key={i}>⚠ {e}</p>)}
+                </div>
+              )}
+
+              {yaExisten > 0 && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                  <p className="text-sm font-medium text-amber-800 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {yaExisten} de {rows.length} ya existen en este workspace (mismo documento)
+                  </p>
+                  <p className="text-xs text-amber-700 mt-1 mb-2">
+                    Elige qué hacer con ellos. Las {rows.length - yaExisten} filas restantes se crean igual.
+                  </p>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="flex items-center gap-2 text-sm text-amber-900">
+                      <input type="radio" checked={modoDuplicados === 'omitir'}
+                        onChange={() => setModoDuplicados('omitir')} />
+                      Omitirlos (no se tocan los datos que ya están en el CRM)
+                    </label>
+                    <label className="flex items-center gap-2 text-sm text-amber-900">
+                      <input type="radio" checked={modoDuplicados === 'actualizar'}
+                        onChange={() => setModoDuplicados('actualizar')} />
+                      Actualizarlos con los datos del archivo
+                    </label>
+                  </div>
                 </div>
               )}
 
@@ -303,6 +380,16 @@ export default function ImportModal({ onClose, onImported }: Props) {
                   {failed} fila{failed !== 1 ? 's' : ''} no se pudo importar
                 </div>
               )}
+              {omitidos > 0 && (
+                <p className="text-sm text-ink-500 mt-2">
+                  {omitidos} fila{omitidos !== 1 ? 's' : ''} omitida{omitidos !== 1 ? 's' : ''} porque ya existía{omitidos !== 1 ? 'n' : ''}
+                </p>
+              )}
+              {actualizados > 0 && (
+                <p className="text-sm text-ink-500 mt-2">
+                  {actualizados} cliente{actualizados !== 1 ? 's' : ''} existente{actualizados !== 1 ? 's' : ''} actualizado{actualizados !== 1 ? 's' : ''}
+                </p>
+              )}
               <p className="text-sm text-ink-400 mt-3">Ya puedes ver tus clientes en la lista</p>
             </div>
           )}
@@ -330,7 +417,9 @@ export default function ImportModal({ onClose, onImported }: Props) {
                   onClick={importar}
                   className="flex-1 px-4 py-2 rounded-lg bg-primary-500 text-white text-sm font-medium hover:bg-primary-700 transition-colors"
                 >
-                  Importar {rows.length} cliente{rows.length !== 1 ? 's' : ''}
+                  {modoDuplicados === 'omitir' && yaExisten > 0
+                    ? `Importar ${rows.length - yaExisten} cliente${rows.length - yaExisten !== 1 ? 's' : ''} nuevo${rows.length - yaExisten !== 1 ? 's' : ''}`
+                    : `Importar ${rows.length} cliente${rows.length !== 1 ? 's' : ''}`}
                 </button>
               )}
               {stage === 'preview' && (rows.length === 0 || parseErrors.length > 0) && (
