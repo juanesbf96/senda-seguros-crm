@@ -84,6 +84,7 @@ type TabKey = 'datos' | 'polizas' | 'actividades' | 'tareas' | 'archivos' | 'con
 /* ────────────────────────────────── inline tab components ── */
 
 function ClienteCobros({ id }: { id: string }) {
+  const { currentWorkspace } = useWorkspace()
   const [cobros, setCobros] = useState<Cobro[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -92,10 +93,11 @@ function ClienteCobros({ id }: { id: string }) {
     supabase
       .from('cobros')
       .select('*, poliza:polizas!inner(id, numero_poliza, aseguradora, ramo, client_id)')
+      .eq('workspace_id', currentWorkspace?.id ?? '')
       .eq('poliza.client_id', id)
       .order('compromiso_pago', { ascending: true })
       .then(({ data }) => { setCobros((data || []) as Cobro[]); setLoading(false) })
-  }, [id])
+  }, [id, currentWorkspace?.id])
 
   if (loading) return (
     <div className="flex items-center justify-center py-12">
@@ -280,6 +282,7 @@ export default function ClienteDetalle({ id }: { id: string }) {
     if (!actForm.descripcion.trim()) return
     setSavingAct(true)
     await supabase.from('actividades').insert({
+      workspace_id: currentWorkspace?.id,
       client_id:   id,
       tipo:        actForm.tipo,
       descripcion: actForm.descripcion.trim(),

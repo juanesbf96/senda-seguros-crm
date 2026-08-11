@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Contacto, Cliente } from '@/types'
 import { X } from 'lucide-react'
 
@@ -14,6 +15,7 @@ interface Props {
 const TIPOS_DOC = ['Cédula', 'NIT', 'CE', 'Pasaporte', 'Otro']
 
 export default function ContactoModal({ contacto, clienteId, onClose, onSaved }: Props) {
+  const { currentWorkspace } = useWorkspace()
   const [clientes, setClientes] = useState<Pick<Cliente, 'id' | 'nombre'>[]>([])
   const [form, setForm] = useState({
     client_id: contacto?.client_id || clienteId || '',
@@ -29,6 +31,7 @@ export default function ContactoModal({ contacto, clienteId, onClose, onSaved }:
     supabase
       .from('clientes')
       .select('id, nombre')
+      .eq('workspace_id', currentWorkspace?.id ?? '')
       .order('nombre')
       .then(({ data }) => setClientes(data || []))
   }, [])
@@ -53,7 +56,9 @@ export default function ContactoModal({ contacto, clienteId, onClose, onSaved }:
 
     const { error: err } = contacto
       ? await supabase.from('contactos').update(payload).eq('id', contacto.id)
-      : await supabase.from('contactos').insert(payload)
+      // El insert lleva workspace_id: sin él la fila nace huérfana y la RLS por
+      // workspace la dejaría invisible para todos.
+      : await supabase.from('contactos').insert({ ...payload, workspace_id: currentWorkspace?.id })
 
     if (err) { setError(err.message); setSaving(false); return }
     onSaved()
