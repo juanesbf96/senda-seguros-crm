@@ -228,7 +228,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, origenCr
   /* load */
   useEffect(() => {
     if (!clientId) {
-      supabase.from('clientes').select('id, nombre').order('nombre')
+      supabase.from('clientes').select('id, nombre')
+        .eq('workspace_id', currentWorkspace?.id ?? '')
+        .order('nombre')
         .then(({ data }) => {
           setClientes(data || [])
           if (poliza?.client_id) {
@@ -237,7 +239,9 @@ export default function PolizaModal({ poliza, clientId, isCumplimiento, origenCr
           }
         })
     }
-    supabase.from('vendedores').select('id, nombre, comisiones_por_anio').eq('activo', true).order('nombre')
+    supabase.from('vendedores').select('id, nombre, comisiones_por_anio')
+      .eq('workspace_id', currentWorkspace?.id ?? '')
+      .eq('activo', true).order('nombre')
       .then(({ data }) => setVendedores((data || []) as Pick<Vendedor, 'id' | 'nombre' | 'comisiones_por_anio'>[]))
 
     if (currentWorkspace) {

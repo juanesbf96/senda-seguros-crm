@@ -286,14 +286,16 @@ export default function ClientesList() {
   /* ── Bulk actions ── */
   async function bulkChangeEtapa(etapa: Etapa) {
     const ids = Array.from(selected)
-    await supabase.from('clientes').update({ etapa }).in('id', ids)
+    await supabase.from('clientes').update({ etapa })
+      .eq('workspace_id', currentWorkspace?.id ?? '').in('id', ids)
     setClientes(prev => prev.map(c => ids.includes(c.id) ? { ...c, etapa } : c))
     setSelected(new Set())
   }
 
   async function bulkDelete() {
     const ids = Array.from(selected)
-    await supabase.from('clientes').delete().in('id', ids)
+    await supabase.from('clientes').delete()
+      .eq('workspace_id', currentWorkspace?.id ?? '').in('id', ids)
     setSelected(new Set())
     setConfirmingBulkDelete(false)
     await Promise.all([load(), loadTotalWorkspace()])

@@ -1,6 +1,7 @@
 'use client'
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase/client'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { formatCOP } from '@/lib/utils'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -72,6 +73,7 @@ const PIE_COLORS = ['#3b82f6','#0ea5e9','#8b5cf6','#f59e0b','#10b981','#ef4444']
 
 /* ── ProspectosTab ────────────────────────────────────────────────────── */
 function ProspectosTab() {
+  const { currentWorkspace } = useWorkspace()
   const [prospectos, setProspectos] = useState<Prospecto[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -83,6 +85,7 @@ function ProspectosTab() {
     const { data } = await supabase
       .from('prospectos')
       .select('*')
+      .eq('workspace_id', currentWorkspace?.id ?? '')
       .order('created_at', { ascending: false })
     setProspectos(data || [])
     setLoading(false)
@@ -244,6 +247,7 @@ function ProspectoModal({ prospecto, onClose, onSaved }: {
   onClose: () => void
   onSaved: () => void
 }) {
+  const { currentWorkspace } = useWorkspace()
   const [form, setForm] = useState({
     nombre: prospecto?.nombre || '',
     empresa: prospecto?.empresa || '',
@@ -282,7 +286,9 @@ function ProspectoModal({ prospecto, onClose, onSaved }: {
     if (prospecto) {
       await supabase.from('prospectos').update(payload).eq('id', prospecto.id)
     } else {
-      await supabase.from('prospectos').insert(payload)
+      // workspace_id explícito: sin él la fila nace huérfana y la RLS por
+      // workspace la dejaría invisible para todos.
+      await supabase.from('prospectos').insert({ ...payload, workspace_id: currentWorkspace?.id })
     }
     setSaving(false)
     onSaved()
@@ -368,11 +374,14 @@ function ProspectoModal({ prospecto, onClose, onSaved }: {
 
 /* ── GestionTab ───────────────────────────────────────────────────────── */
 function GestionTab() {
+  const { currentWorkspace } = useWorkspace()
   const [prospectos, setProspectos] = useState<Prospecto[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('prospectos').select('*').order('created_at', { ascending: false })
+    supabase.from('prospectos').select('*')
+      .eq('workspace_id', currentWorkspace?.id ?? '')
+      .order('created_at', { ascending: false })
       .then(({ data }) => { setProspectos(data || []); setLoading(false) })
   }, [])
 
@@ -595,6 +604,7 @@ function GestionTab() {
 
 /* ── SOATTab ──────────────────────────────────────────────────────────── */
 function SOATTab() {
+  const { currentWorkspace } = useWorkspace()
   const [polizas, setPolizas] = useState<PolizaSOAT[]>([])
   const [loading, setLoading] = useState(true)
   const [filterDias, setFilterDias] = useState<30 | 60 | 90>(60)
@@ -606,6 +616,7 @@ function SOATTab() {
       const { data } = await supabase
         .from('polizas')
         .select('*, cliente:clientes(nombre)')
+        .eq('workspace_id', currentWorkspace?.id ?? '')
         .eq('eliminada', false)
         .ilike('ramo', '%soat%')
         .gte('fecha_fin', today)

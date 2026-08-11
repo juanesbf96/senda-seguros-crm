@@ -34,9 +34,12 @@ export default function PolizaAnexoModal({ anexo, polizaId, onClose, onSaved }: 
   useEffect(() => {
     if (!polizaId)
       supabase.from('polizas').select('id, numero_poliza, aseguradora, ramo')
+        .eq('workspace_id', currentWorkspace?.id ?? '')
         .eq('eliminada', false).order('created_at', { ascending: false })
         .then(({ data }) => setPolizas(data || []))
-    supabase.from('clientes').select('id, nombre').order('nombre')
+    supabase.from('clientes').select('id, nombre')
+      .eq('workspace_id', currentWorkspace?.id ?? '')
+      .order('nombre')
       .then(({ data }) => setClientes(data || []))
   }, [polizaId])
 

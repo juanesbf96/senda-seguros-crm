@@ -106,6 +106,7 @@ export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspace
       const { data: afs } = await supabase
         .from('poliza_afiliados')
         .select('*')
+        .eq('workspace_id', workspaceId)
         .in('poliza_id', polIds)
         .order('nombre_completo')
 
@@ -151,6 +152,7 @@ export default function AfiliadosTab({ poliza, clienteId, clienteTipo, workspace
     await supabase
       .from('poliza_afiliados')
       .update({ activo: false, fecha_retiro: hoy })
+      .eq('workspace_id', workspaceId)
       .in('id', Array.from(selected))
 
     // Recalcular primas de cada póliza afectada

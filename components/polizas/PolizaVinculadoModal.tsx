@@ -33,6 +33,7 @@ export default function PolizaVinculadoModal({ vinculado, polizaId, onClose, onS
   useEffect(() => {
     if (!polizaId)
       supabase.from('polizas').select('id, numero_poliza, aseguradora, ramo')
+        .eq('workspace_id', currentWorkspace?.id ?? '')
         .eq('eliminada', false).order('created_at', { ascending: false })
         .then(({ data }) => setPolizas(data || []))
   }, [polizaId])
